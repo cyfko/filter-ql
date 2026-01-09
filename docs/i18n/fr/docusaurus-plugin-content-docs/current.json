@@ -1,0 +1,30 @@
+{
+  "sidebar.tutorialSidebar.doc.🏠 Accueil": {
+    "message": "🏠 Accueil",
+    "description": "The label for doc 🏠 Accueil in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.doc.🚀 Hello World": {
+    "message": "🚀 Hello World",
+    "description": "The label for doc 🚀 Hello World in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.doc.📖 Guide Essentiel": {
+    "message": "📖 Guide Essentiel",
+    "description": "The label for doc 📖 Guide Essentiel in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.doc.🔧 Guide Avancé": {
+    "message": "🔧 Guide Avancé",
+    "description": "The label for doc 🔧 Guide Avancé in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.📚 Référence API": {
+    "message": "📚 Référence API",
+    "description": "The label for category 📚 Référence API in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.doc.📋 Protocole": {
+    "message": "📋 Protocole",
+    "description": "The label for doc 📋 Protocole in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.👥 Communauté": {
+    "message": "👥 Communauté",
+    "description": "The label for category 👥 Communauté in sidebar tutorialSidebar"
+  }
+}
