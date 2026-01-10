@@ -2,7 +2,6 @@ package io.github.cyfko.filterql.core.spi;
 
 import io.github.cyfko.filterql.core.model.FilterRequest;
 import io.github.cyfko.filterql.core.validation.PropertyReference;
-import jakarta.persistence.EntityManager;
 
 /**
  * <h2>FilterQuery</h2>
@@ -57,9 +56,10 @@ import jakarta.persistence.EntityManager;
  *     .sort(UserProperty.NAME, "ASC")
  *     .build();
  *
+ * // For JPA, context would be an EntityManager
  * List<UserDto> users = filterQuery.execute(
  *     request,
- *     entityManager,
+ *     context,
  *     new MultiQueryExecutionStrategy<>()
  * );
  * }</pre>
@@ -68,12 +68,12 @@ import jakarta.persistence.EntityManager;
  * <pre>{@code
  * FilterRequest<UserProperty> request = ...;
  *
- * QueryExecutor<UserDto> executor = filterQuery.resolve(request, UserDto.class);
+ * QueryExecutor<UserDto> executor = filterQuery.toExecutor(request);
  *
- * // Execute with different strategies
- * List<UserDto> list = executor.executeWith(em, new SingleQueryExecutionStrategy<>());
- * Page<UserDto> page = executor.executeWith(em, new PagedExecutionStrategy<>());
- * Long count = executor.executeWith(em, new CountExecutionStrategy<>());
+ * // Execute with different strategies (context is adapter-specific, e.g., EntityManager for JPA)
+ * List<UserDto> list = executor.executeWith(context, new SingleQueryExecutionStrategy<>());
+ * Page<UserDto> page = executor.executeWith(context, new PagedExecutionStrategy<>());
+ * Long count = executor.executeWith(context, new CountExecutionStrategy<>());
  * }</pre>
  *
  * <h4>Example 3: Low-level with predicate resolver (maximum control)</h4>
@@ -105,8 +105,9 @@ import jakarta.persistence.EntityManager;
  * <h3>Thread Safety:</h3>
  * <p>
  * Implementations of {@code FilterQuery} should be thread-safe and reusable across multiple
- * requests. However, the {@link EntityManager} instances passed to execution methods must be
- * managed per-thread according to JPA best practices.
+ * requests. However, the context instances passed to execution methods must be
+ * managed per-thread according to the underlying adapter's best practices
+ * (e.g., EntityManager for JPA must be managed per-thread).
  * </p>
  *
  * @param <E> Entity type targeted by this FilterQuery (e.g. {@code User}, {@code Order})
@@ -212,32 +213,33 @@ public interface FilterQuery<E> {
      *
      * // Returns List<UserDto> - type inferred from strategy
      * ExecutionStrategy<List<UserDto>> listStrategy = new MultiQueryExecutionStrategy<>();
-     * List<UserDto> users = filterQuery.execute(request, em, listStrategy);
+     * List<UserDto> users = filterQuery.execute(request, context, listStrategy);
      *
      * // Returns Page<UserDto> - type inferred from strategy
      * ExecutionStrategy<Page<UserDto>> pageStrategy = new PagedExecutionStrategy<>();
-     * Page<UserDto> page = filterQuery.execute(request, em, pageStrategy);
+     * Page<UserDto> page = filterQuery.execute(request, context, pageStrategy);
      *
      * // Returns Long - type inferred from strategy
      * ExecutionStrategy<Long> countStrategy = new CountExecutionStrategy<>();
-     * Long count = filterQuery.execute(request, em, countStrategy);
+     * Long count = filterQuery.execute(request, context, countStrategy);
      * }</pre>
      *
      * @param request FilterQL request to execute
-     * @param em {@link EntityManager} used for query execution. Must be active and transaction-aware.
+     * @param ctx the execution context used for query execution (e.g., EntityManager for JPA).
+     *           Must not be null.
      * @param strategy Execution strategy defining how to execute and what to return.
      *                The generic type parameter {@code T} determines the return type.
      * @param <P> Filter property enumeration type
+     * @param <Context> the type of execution context (e.g., EntityManager for JPA)
      * @param <T> Return type, inferred from the strategy's type parameter
      * @return Result of type {@code T} as defined by the strategy
      * @throws IllegalArgumentException if any parameter is null
-     * @throws jakarta.persistence.PersistenceException if query execution fails
      */
-    default <P extends Enum<P> & PropertyReference, T> T execute(
+    default <P extends Enum<P> & PropertyReference, Context, T> T execute(
             FilterRequest<P> request,
-            EntityManager em,
+            Context ctx,
             ExecutionStrategy<T> strategy
     ) {
-        return this.<P,T>toExecutor(request).executeWith(em, strategy);
+        return this.<P,T>toExecutor(request).executeWith(ctx, strategy);
     }
 }

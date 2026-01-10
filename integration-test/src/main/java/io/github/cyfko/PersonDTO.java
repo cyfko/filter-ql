@@ -1,7 +1,7 @@
 package io.github.cyfko;
 
+import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.validation.Op;
-import io.github.cyfko.filterql.jpa.mappings.PredicateResolverMapping;
 import io.github.cyfko.projection.Projection;
 import io.github.cyfko.projection.Provider;
 import io.github.cyfko.filterql.spring.ExposedAs;
@@ -79,11 +79,11 @@ public class PersonDTO {
             value = "FULL_NAME",
             operators = {Op.MATCHES}
     )
-    public static PredicateResolverMapping<Person> fullNameMatches() {
-        return (root, query, cb, params) -> {
-            if (params.length == 0) return cb.conjunction();
+    public static PredicateResolver<Person> fullNameMatches(String op, Object[] args) {
+        return (root, query, cb) -> {
+            if (args.length == 0) return cb.conjunction();
 
-            String searchTerm = (String) params[0];
+            String searchTerm = (String) args[0];
             String pattern = "%" + searchTerm + "%";
             Predicate firstName = cb.like(root.get("firstName"), pattern);
             Predicate lastName = cb.like(root.get("lastName"), pattern);

@@ -12,6 +12,7 @@ import javax.annotation.processing.Generated;
 
 @Generated("io.github.cyfko.filterql.spring.processor.ExposureAnnotationProcessor")
 @Configuration
+@SuppressWarnings({"unchecked", "rawtypes"})
 public class FilterQlContextConfig {
 
 ${contextInstances}

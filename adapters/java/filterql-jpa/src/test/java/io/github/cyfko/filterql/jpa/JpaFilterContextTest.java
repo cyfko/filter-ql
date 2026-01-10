@@ -101,15 +101,16 @@ class JpaFilterContextTest {
         }
 
         @Test
-        @DisplayName("Devrait rejeter operator inconnu")
-        void shouldRejectUnknownOperator() {
+        @DisplayName("Devrait traiter operator inconnu comme CUSTOM")
+        void shouldTreatUnknownOperatorAsCustom() {
             JpaFilterContext<TestProp> context = new JpaFilterContext<>(
                 TestProp.class,
                 ref -> "name"
             );
 
-            // Operator inexistant doit lancer exception
-            assertThrows(Exception.class, () ->
+            // Opérateur inexistant est traité comme CUSTOM (pas d'exception à la création)
+            // L'exception sera lancée lors de la résolution du prédicat
+            assertDoesNotThrow(() ->
                 context.toCondition("arg1", TestProp.NAME, "INVALID_OP")
             );
         }
@@ -199,8 +200,8 @@ class JpaFilterContextTest {
             // Given - Custom resolver mapping
             JpaFilterContext<TestProp> context = new JpaFilterContext<>(
                 TestProp.class,
-                ref -> (PredicateResolverMapping<TestEntity>) (root, query, cb, param) -> {
-                    return cb.conjunction(); // Always true predicate
+                ref -> (PredicateResolverMapping<TestEntity>) (op, args) -> {
+                    return (root, query, cb) -> cb.conjunction(); // Always true predicate
                 }
             );
 
@@ -221,10 +222,10 @@ class JpaFilterContextTest {
             
             JpaFilterContext<TestProp> context = new JpaFilterContext<>(
                 TestProp.class,
-                ref -> (PredicateResolverMapping<TestEntity>) (root, query, cb, param) -> {
-                    capturedParam[0] = param;  // Capture parameter
+                ref -> (PredicateResolverMapping<TestEntity>) (op, args) -> {
+                    capturedParam[0] = args[0];  // Capture parameter
                     // Return a valid predicate
-                    return cb.equal(root.get("name"), param);
+                    return (root, query, cb) -> cb.equal(root.get("name"), args[0]);
                 }
             );
 

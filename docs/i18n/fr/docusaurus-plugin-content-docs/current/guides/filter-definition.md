@@ -44,7 +44,7 @@ var filter = new FilterDefinition<>(UserPropertyRef.EMAIL, Op.EQ, "john@example.
 Identifiant de l'opération de filtrage. Peut être :
 
 - **Opérateur standard** : Un des 14 opérateurs définis dans `Op`
-- **Opérateur personnalisé** : Code enregistré dans `OperatorProviderRegistry`
+- **Opérateur personnalisé** : Code personnalisé géré via `PredicateResolverMapping` dans le JPA adapter
 
 ```java
 // Utilisation de l'enum Op (recommandé)

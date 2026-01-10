@@ -9,6 +9,7 @@ import io.github.cyfko.filterql.core.validation.PropertyReference;
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
 import io.github.cyfko.filterql.jpa.entities.projection._2.OrderC;
 import io.github.cyfko.filterql.jpa.entities.projection._2.UserC;
+import io.github.cyfko.filterql.core.spi.ExecutionStrategy;
 import io.github.cyfko.filterql.jpa.strategies.FullEntityFetchStrategy;
 import io.github.cyfko.filterql.jpa.strategies.MultiQueryFetchStrategy;
 import jakarta.persistence.*;
@@ -185,7 +186,7 @@ class FilterRequestProjectionIntegrationTest {
                     .projection(Set.of("id", "name", "email"))
                     .build();
 
-            var strategy = new MultiQueryFetchStrategy(UserC.class);
+            ExecutionStrategy<List<Map<String,Object>>> strategy = new MultiQueryFetchStrategy(UserC.class);
             List<Map<String, Object>> results = filterQuery.execute(request, em, strategy);
 
             assertEquals(2, results.size());

@@ -33,9 +33,7 @@ io.github.cyfko.filterql.core
 │   ├── FilterQuery            # Lifecycle facade
 │   ├── PredicateResolver      # Deferred predicate generator
 │   ├── ExecutionStrategy      # Execution strategy contract
-│   ├── QueryExecutor          # Execution coordinator
-│   ├── CustomOperatorProvider # Custom operator extension
-│   └── OperatorProviderRegistry # Operator registration
+│   └── QueryExecutor          # Execution coordinator
 ├── model/                      # Immutable data structures
 │   ├── FilterRequest          # Request container
 │   ├── FilterDefinition       # Atomic filter specification
@@ -262,23 +260,22 @@ public interface PredicateResolver<E> {
 
 ### QueryExecutor (SPI)
 
-Query execution coordinator.
+Query execution coordinator with generic context support.
 
 ```java
 package io.github.cyfko.filterql.core.spi;
 
-import jakarta.persistence.EntityManager;
-
-public interface QueryExecutor<R> {
+public interface QueryExecutor<Result> {
     
     /**
      * Executes with the specified strategy.
      * 
-     * @param em the JPA EntityManager
+     * @param <Context> the type of execution context (e.g., EntityManager for JPA)
+     * @param ctx the execution context
      * @param strategy the execution strategy
      * @return query results
      */
-    R executeWith(EntityManager em, ExecutionStrategy<R> strategy);
+    <Context> Result executeWith(Context ctx, ExecutionStrategy<Result> strategy);
 }
 ```
 
@@ -286,22 +283,24 @@ public interface QueryExecutor<R> {
 
 ### ExecutionStrategy (SPI)
 
-Execution strategy contract.
+Execution strategy contract with generic context support.
 
 ```java
 package io.github.cyfko.filterql.core.spi;
 
+@FunctionalInterface
 public interface ExecutionStrategy<R> {
     
     /**
-     * Returns the DTO projection class.
+     * Executes the FilterQL query using this strategy's specific execution logic.
+     * 
+     * @param <Context> the type of execution context (e.g., EntityManager for JPA)
+     * @param ctx the execution context
+     * @param pr the PredicateResolver for building filter predicates
+     * @param params execution parameters (projection, pagination, sorting)
+     * @return Result of type R
      */
-    Class<?> getProjectionClass();
-    
-    /**
-     * Executes the query and returns results.
-     */
-    R execute(/* implementation-dependent parameters */);
+    <Context> R execute(Context ctx, PredicateResolver<?> pr, QueryExecutionParams params);
 }
 ```
 
@@ -558,92 +557,6 @@ public class FilterDefinitionException extends RuntimeException {
 Thrown for:
 - Null property reference
 - Null or empty operator code
-- Unregistered custom operator
-
----
-
-## Custom Operators SPI
-
-### CustomOperatorProvider
-
-```java
-package io.github.cyfko.filterql.core.spi;
-
-/**
- * Contract for providing implementations of custom filter operators.
- * Implementations indicate which operator codes they support and provide
- * methods to resolve FilterDefinition instances into executable PredicateResolver.
- */
-public interface CustomOperatorProvider {
-    
-    /**
-     * Returns the set of operator codes supported by this provider.
-     * Each code must be unique across all registered providers.
-     * Use UPPER_SNAKE_CASE convention for consistency.
-     */
-    Set<String> supportedOperators();
-    
-    /**
-     * Resolves a FilterDefinition into a PredicateResolver for query construction.
-     * Value validation should be performed inside the returned PredicateResolver.
-     */
-    <P extends Enum<P> & PropertyReference> 
-    PredicateResolver<?> toResolver(FilterDefinition<P> definition);
-}
-```
-
-### Implementation Example
-
-```java
-public class StartsWithOperatorProvider implements CustomOperatorProvider {
-    
-    @Override
-    public Set<String> supportedOperators() {
-        return Set.of("STARTS_WITH");
-    }
-
-    @Override
-    public <P extends Enum<P> & PropertyReference> 
-    PredicateResolver<?> toResolver(FilterDefinition<P> definition) {
-        return (root, query, cb) -> {
-            // Value validation at execution time
-            if (!(definition.value() instanceof String prefix) || prefix.isBlank()) {
-                throw new IllegalArgumentException("STARTS_WITH requires non-blank String value");
-            }
-            
-            String fieldName = definition.ref().name().toLowerCase();
-            return cb.like(root.get(fieldName), prefix + "%");
-        };
-    }
-}
-```
-
-### OperatorProviderRegistry
-
-```java
-package io.github.cyfko.filterql.core.spi;
-
-public final class OperatorProviderRegistry {
-    
-    /** Registers a custom operator provider */
-    public static void register(CustomOperatorProvider provider);
-    
-    /** Retrieves a provider by operator code (case-insensitive) */
-    public static Optional<CustomOperatorProvider> getProvider(String code);
-    
-    /** Checks if an operator code is registered */
-    public static boolean isRegistered(String code);
-    
-    /** Unregisters all operators supported by this provider */
-    public static void unregister(CustomOperatorProvider provider);
-    
-    /** Unregisters specific operator codes */
-    public static void unregister(Set<String> codes);
-    
-    /** Clears all registrations */
-    public static void unregisterAll();
-}
-```
 
 ---
 
@@ -651,3 +564,4 @@ public final class OperatorProviderRegistry {
 
 - [JPA Adapter Reference](jpa-adapter) - JpaFilterContext and execution strategies
 - [Spring Adapter Reference](spring-adapter) - Spring annotations and services
+- [Custom Operators Guide](../guides/custom-operators) - Implementing custom operators via PredicateResolverMapping

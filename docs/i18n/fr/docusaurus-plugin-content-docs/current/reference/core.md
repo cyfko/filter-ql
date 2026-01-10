@@ -33,9 +33,7 @@ io.github.cyfko.filterql.core
 │   ├── FilterQuery            # Façade de cycle de vie
 │   ├── PredicateResolver      # Générateur de prédicats différés
 │   ├── ExecutionStrategy      # Contrat de stratégie d'exécution
-│   ├── QueryExecutor          # Coordinateur d'exécution
-│   ├── CustomOperatorProvider # Extension d'opérateur personnalisé
-│   └── OperatorProviderRegistry # Enregistrement d'opérateurs
+│   └── QueryExecutor          # Coordinateur d'exécution
 ├── model/                      # Structures de données immutables
 │   ├── FilterRequest          # Conteneur de requête
 │   ├── FilterDefinition       # Spécification de filtre atomique
@@ -262,23 +260,22 @@ public interface PredicateResolver<E> {
 
 ### QueryExecutor (SPI)
 
-Coordinateur d'exécution de requête.
+Coordinateur d'exécution de requête avec support de contexte générique.
 
 ```java
 package io.github.cyfko.filterql.core.spi;
 
-import jakarta.persistence.EntityManager;
-
-public interface QueryExecutor<R> {
+public interface QueryExecutor<Result> {
     
     /**
      * Exécute avec la stratégie spécifiée.
      * 
-     * @param em l'EntityManager JPA
+     * @param <Context> le type de contexte d'exécution (ex: EntityManager pour JPA)
+     * @param ctx le contexte d'exécution
      * @param strategy la stratégie d'exécution
      * @return résultats de la requête
      */
-    R executeWith(EntityManager em, ExecutionStrategy<R> strategy);
+    <Context> Result executeWith(Context ctx, ExecutionStrategy<Result> strategy);
 }
 ```
 
@@ -286,22 +283,24 @@ public interface QueryExecutor<R> {
 
 ### ExecutionStrategy (SPI)
 
-Contrat de stratégie d'exécution.
+Contrat de stratégie d'exécution avec support de contexte générique.
 
 ```java
 package io.github.cyfko.filterql.core.spi;
 
+@FunctionalInterface
 public interface ExecutionStrategy<R> {
     
     /**
-     * Retourne la classe de projection DTO.
+     * Exécute la requête FilterQL avec la logique spécifique de cette stratégie.
+     * 
+     * @param <Context> le type de contexte d'exécution (ex: EntityManager pour JPA)
+     * @param ctx le contexte d'exécution
+     * @param pr le PredicateResolver pour construire les prédicats de filtre
+     * @param params paramètres d'exécution (projection, pagination, tri)
+     * @return résultat de type R
      */
-    Class<?> getProjectionClass();
-    
-    /**
-     * Exécute la requête et retourne les résultats.
-     */
-    R execute(/* paramètres dépendants de l'implémentation */);
+    <Context> R execute(Context ctx, PredicateResolver<?> pr, QueryExecutionParams params);
 }
 ```
 
@@ -558,92 +557,6 @@ public class FilterDefinitionException extends RuntimeException {
 Lancée pour :
 - Référence de propriété null
 - Code d'opérateur null ou vide
-- Opérateur personnalisé non enregistré
-
----
-
-## SPI d'Opérateurs Personnalisés
-
-### CustomOperatorProvider
-
-```java
-package io.github.cyfko.filterql.core.spi;
-
-/**
- * Contrat pour fournir des implémentations d'opérateurs de filtre personnalisés.
- * Les implémentations indiquent quels codes d'opérateurs elles supportent et fournissent
- * des méthodes pour résoudre les instances FilterDefinition en PredicateResolver exécutables.
- */
-public interface CustomOperatorProvider {
-    
-    /**
-     * Retourne l'ensemble des codes d'opérateurs supportés par ce provider.
-     * Chaque code doit être unique parmi tous les providers enregistrés.
-     * Utilisez la convention UPPER_SNAKE_CASE pour la cohérence.
-     */
-    Set<String> supportedOperators();
-    
-    /**
-     * Résout une FilterDefinition en PredicateResolver pour la construction de requêtes.
-     * La validation des valeurs doit être effectuée à l'intérieur du PredicateResolver retourné.
-     */
-    <P extends Enum<P> & PropertyReference> 
-    PredicateResolver<?> toResolver(FilterDefinition<P> definition);
-}
-```
-
-### Exemple d'implémentation
-
-```java
-public class StartsWithOperatorProvider implements CustomOperatorProvider {
-    
-    @Override
-    public Set<String> supportedOperators() {
-        return Set.of("STARTS_WITH");
-    }
-
-    @Override
-    public <P extends Enum<P> & PropertyReference> 
-    PredicateResolver<?> toResolver(FilterDefinition<P> definition) {
-        return (root, query, cb) -> {
-            // Validation de la valeur au moment de l'exécution
-            if (!(definition.value() instanceof String prefix) || prefix.isBlank()) {
-                throw new IllegalArgumentException("STARTS_WITH requiert une valeur String non vide");
-            }
-            
-            String fieldName = definition.ref().name().toLowerCase();
-            return cb.like(root.get(fieldName), prefix + "%");
-        };
-    }
-}
-```
-
-### OperatorProviderRegistry
-
-```java
-package io.github.cyfko.filterql.core.spi;
-
-public final class OperatorProviderRegistry {
-    
-    /** Enregistre un fournisseur d'opérateur personnalisé */
-    public static void register(CustomOperatorProvider provider);
-    
-    /** Récupère un provider par code d'opérateur (insensible à la casse) */
-    public static Optional<CustomOperatorProvider> getProvider(String code);
-    
-    /** Vérifie si un code d'opérateur est enregistré */
-    public static boolean isRegistered(String code);
-    
-    /** Désenregistre tous les opérateurs supportés par ce provider */
-    public static void unregister(CustomOperatorProvider provider);
-    
-    /** Désenregistre des codes d'opérateurs spécifiques */
-    public static void unregister(Set<String> codes);
-    
-    /** Efface toutes les enregistrements */
-    public static void unregisterAll();
-}
-```
 
 ---
 
@@ -651,3 +564,4 @@ public final class OperatorProviderRegistry {
 
 - [Référence JPA Adapter](jpa-adapter) - JpaFilterContext et stratégies d'exécution
 - [Référence Spring Adapter](spring-adapter) - Annotations et services Spring
+- [Guide Opérateurs Personnalisés](../guides/custom-operators) - Implémenter des opérateurs personnalisés via PredicateResolverMapping

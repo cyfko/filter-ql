@@ -1,7 +1,7 @@
 package io.github.cyfko;
 
+import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.validation.Op;
-import io.github.cyfko.filterql.jpa.mappings.PredicateResolverMapping;
 import io.github.cyfko.filterql.spring.ExposedAs;
 import org.springframework.stereotype.Component;
 
@@ -18,10 +18,10 @@ public class UserTenancyService {
             value = "HAS_ORG",
             operators = {Op.EQ}
     )
-    public PredicateResolverMapping<Person> isWithinCurrentOrg() {
+    public PredicateResolver<Person> isWithinCurrentOrg(String op, Object[] args) {
         // In real scenario, this would check current user's organization
-        return (root, query, cb, params) -> {
-            Boolean hasOrg = (Boolean) params[0];
+        return (root, query, cb) -> {
+            Boolean hasOrg = args.length > 0 ? (Boolean) args[0] : false;
             if (Boolean.TRUE.equals(hasOrg)) {
                 return cb.isNotNull(root.get("email"));
             } else {

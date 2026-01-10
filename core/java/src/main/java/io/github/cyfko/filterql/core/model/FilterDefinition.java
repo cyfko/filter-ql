@@ -2,7 +2,6 @@ package io.github.cyfko.filterql.core.model;
 
 import io.github.cyfko.filterql.core.exception.FilterDefinitionException;
 import io.github.cyfko.filterql.core.validation.Op;
-import io.github.cyfko.filterql.core.spi.OperatorProviderRegistry;
 import io.github.cyfko.filterql.core.validation.PropertyReference;
 
 import java.util.Objects;
@@ -31,8 +30,8 @@ import java.util.Objects;
  *     <ul>
  *       <li><strong>Standard Operator:</strong> One of the 14 operators defined in {@link Op}
  *           (EQ, NE, GT, LT, GTE, LTE, MATCHES, NOT_MATCHES, IN, NOT_IN, IS_NULL, NOT_NULL, RANGE, NOT_RANGE)</li>
- *       <li><strong>Custom Operator:</strong> A custom operator code registered in
- *           {@link OperatorProviderRegistry} for domain-specific filtering logic</li>
+ *       <li><strong>Custom Operator:</strong> A custom operator code handled by
+ *           PredicateResolverMapping in the JPA adapter for domain-specific filtering logic</li>
  *     </ul>
  *     Operator codes are case-insensitive and automatically normalized to uppercase.
  *   </dd>
@@ -116,8 +115,23 @@ import java.util.Objects;
  *
  * <h3>Custom Operators</h3>
  * <pre>{@code
- * // Register custom operator first
- * OperatorProviderRegistry.register("SOUNDEX", new SoundexOperatorProvider());
+ * // Custom operators are now defined via PredicateResolverMapping in JpaFilterContext
+ * // Example: Define SOUNDEX operator for NAME field
+ * JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
+ *     UserProperty.class,
+ *     ref -> switch (ref) {
+ *         case NAME -> (op, args) -> (root, query, cb) -> {
+ *             if ("SOUNDEX".equals(op)) {
+ *                 return cb.equal(
+ *                     cb.function("SOUNDEX", String.class, root.get("name")),
+ *                     cb.function("SOUNDEX", String.class, cb.literal((String) args[0]))
+ *                 );
+ *             }
+ *             throw new IllegalArgumentException("Unsupported operator: " + op);
+ *         };
+ *         // ...
+ *     }
+ * );
  *
  * // Use custom operator by code
  * var soundexFilter = new FilterDefinition<>(
@@ -136,7 +150,6 @@ import java.util.Objects;
  *
  * @see PropertyReference
  * @see Op
- * @see OperatorProviderRegistry
  * @see FilterRequest
  *
  * @author Frank KOSSI
@@ -193,7 +206,7 @@ public record FilterDefinition<P extends Enum<P> & PropertyReference>(
     /**
      * Returns the {@link Op} instance corresponding to the operator code.
      * <p>
-     * If this returns {@link Op#CUSTOM}, the caller should use {@link OperatorProviderRegistry}
+     * If this returns {@link Op#CUSTOM}, the caller should use PredicateResolverMapping
      * with {@link #op()} for resolving the custom operator behavior.
      * </p>
      *
@@ -208,7 +221,7 @@ public record FilterDefinition<P extends Enum<P> & PropertyReference>(
      * <p>
      * Returns {@code true} if the operator code is not one of the standard operators
      * defined in {@link Op} enum (excluding {@link Op#CUSTOM} itself, which is reserved).
-     * Custom operators are resolved through {@link OperatorProviderRegistry}.
+     * Custom operators are resolved via PredicateResolverMapping in the JPA adapter.
      * </p>
      *
      * <p><strong>Example usage:</strong></p>

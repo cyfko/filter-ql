@@ -97,7 +97,6 @@ FilterQL follows a layered architecture with clear separation of concerns:
 - **Validation:** Type checking, operator compatibility, value validation
 - **Models:** Immutable data structures (`FilterRequest`, `FilterDefinition`, `Pagination`)
 - **SPI Contracts:** Interfaces for backend adapters (`FilterContext`, `PredicateResolver`, `ExecutionStrategy`)
-- **Operator Registry:** Manages standard and custom operators via `OperatorProviderRegistry`
 - **Caching:** Structural caching system for reusing parsed filter structures
 
 #### **2. JPA Adapter (`filterql-jpa`)**
@@ -447,37 +446,37 @@ List<ProductDto> dtos = filterQuery.execute(request, em, strategy);
 
 ### Custom Operators
 
+Custom operators are implemented via `PredicateResolverMapping` in the JPA adapter:
+
 ```java
-// 1. Implement CustomOperatorProvider
-public class SoundexOperatorProvider implements CustomOperatorProvider {
-    
-    @Override
-    public Set<String> supportedOperators() {
-        return Set.of("SOUNDEX");
-    }
-    
-    @Override
-    public <P extends Enum<P> & PropertyReference> 
-    PredicateResolver<?> toResolver(FilterDefinition<P> definition) {
-        return (root, query, cb) -> {
-            // Value validation at execution time
-            if (!(definition.value() instanceof String searchValue) || searchValue.isBlank()) {
-                throw new IllegalArgumentException("SOUNDEX requires non-blank String value");
+// Define in JpaFilterContext mapping
+JpaFilterContext<UserPropertyRef> context = new JpaFilterContext<>(
+    UserPropertyRef.class,
+    ref -> switch (ref) {
+        case USERNAME -> "username";  // Simple path
+        case EMAIL -> "email";
+        
+        // Custom SOUNDEX operator
+        case LAST_NAME -> new PredicateResolverMapping<User>() {
+            @Override
+            public PredicateResolver<User> map(String op, Object[] args) {
+                return (root, query, cb) -> {
+                    if ("SOUNDEX".equals(op)) {
+                        String searchValue = (String) args[0];
+                        return cb.equal(
+                            cb.function("SOUNDEX", String.class, root.get("lastName")),
+                            cb.function("SOUNDEX", String.class, cb.literal(searchValue))
+                        );
+                    }
+                    // Default behavior
+                    return cb.equal(root.get("lastName"), args[0]);
+                };
             }
-            
-            String fieldName = definition.ref().name().toLowerCase();
-            return cb.equal(
-                cb.function("SOUNDEX", String.class, root.get(fieldName)),
-                cb.function("SOUNDEX", String.class, cb.literal(searchValue))
-            );
         };
     }
-}
+);
 
-// 2. Register the operator
-OperatorProviderRegistry.register(new SoundexOperatorProvider());
-
-// 3. Use in filter
+// Use custom operator in filter
 var soundexFilter = new FilterDefinition<>(
     UserPropertyRef.LAST_NAME, 
     "SOUNDEX",  // custom operator

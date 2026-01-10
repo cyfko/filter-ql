@@ -97,18 +97,20 @@ public class FilterContextGenerator {
             if (field.isVirtual()) {
                 FieldMetadata.VirtualFieldDetails details = field.virtualFieldDetails();
                 
-                // Virtual field method returns PredicateResolverMapping directly!
+                // PredicateResolver<E> method(String op, Object[] args)
+                // Wrap into PredicateResolverMapping using raw type to avoid generics issues
                 if (details.isStatic()) {
-                    sb.append(details.resolverClassName()).append(".").append(field.name()).append("();");
+                    sb.append("(PredicateResolverMapping) (op, args) -> ")
+                      .append(details.resolverClassName()).append(".").append(field.name()).append("(op, args);");
                 } else {
-                    sb.append("ProjectionUtils.invoke(instanceResolver, ")
+                    sb.append("(PredicateResolverMapping) (op, args) -> (PredicateResolver) ProjectionUtils.invoke(instanceResolver, ")
                       .append(details.resolverClassName()).append(".class, ");
                     if (details.beanName() != null) {
                         sb.append("\"").append(details.beanName()).append("\", ");
                     } else {
-                      sb.append("null").append(", ");
+                        sb.append("null, ");
                     }
-                     sb.append("\"").append(field.name()).append("\");");
+                    sb.append("\"").append(field.name()).append("\", op, args);");
                 }
             } else {
                 // Champ régulier : JPA path

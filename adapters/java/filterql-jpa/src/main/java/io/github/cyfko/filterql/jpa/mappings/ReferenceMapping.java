@@ -35,9 +35,9 @@ package io.github.cyfko.filterql.jpa.mappings;
  * // 2. Complex resolver mapping
  * BiFunction<UserPropertyRef, String, Object> complexMapping = (ref, op) -> switch (ref) {
  *     case NAME -> "firstName";
- *     case FULL_NAME -> (PredicateResolverMapping<User>) (root, query, cb, params) -> {
+ *     case FULL_NAME -> (PredicateResolverMapping<User>) (op, args) -> (root, query, cb) -> {
  *         // Complex logic combining firstName and lastName
- *         String search = (String) params[0];
+ *         String search = (String) args[0];
  *         return cb.or(
  *             cb.like(root.get("firstName"), "%" + search + "%"),
  *             cb.like(root.get("lastName"), "%" + search + "%")

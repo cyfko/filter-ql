@@ -72,5 +72,11 @@ public record FieldMetadata(
         }
     }
 
+    /**
+     * Details for virtual fields.
+     * @param resolverClassName Fully qualified class name containing the resolver method
+     * @param beanName Spring bean name (null for static methods)
+     * @param isStatic Whether the method is static
+     */
     public record VirtualFieldDetails(String resolverClassName, String beanName, boolean isStatic){ }
 }

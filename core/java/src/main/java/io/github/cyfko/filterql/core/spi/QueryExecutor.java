@@ -1,6 +1,5 @@
 package io.github.cyfko.filterql.core.spi;
 
-import jakarta.persistence.EntityManager;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 
 /**
@@ -24,73 +23,72 @@ import io.github.cyfko.filterql.core.model.QueryExecutionParams;
  *
  * <h3>Usage Examples:</h3>
  * <pre>{@code
- * // Execute to get a list of DTOs
- * QueryExecutor<List<UserDto>> listExecutor = filterQuery.resolve(request, List.class);
- * List<UserDto> users = listExecutor.executeWith(em, new MultiQueryExecutionStrategy<>());
+ * // Execute to get a list of DTOs (JPA adapter example)
+ * QueryExecutor<List<UserDto>> listExecutor = filterQuery.toExecutor(request);
+ * List<UserDto> users = listExecutor.executeWith(entityManager, new MultiQueryFetchStrategy<>());
  *
  * // Execute to get a page of results
- * QueryExecutor<Page<UserDto>> pageExecutor = filterQuery.resolve(request, Page.class);
- * Page<UserDto> page = pageExecutor.executeWith(em, new PagedExecutionStrategy<>());
+ * QueryExecutor<Page<UserDto>> pageExecutor = filterQuery.toExecutor(request);
+ * Page<UserDto> page = pageExecutor.executeWith(entityManager, new PagedFetchStrategy<>());
  *
  * // Execute to get a count
- * QueryExecutor<Long> countExecutor = filterQuery.resolve(request, Long.class);
- * Long count = countExecutor.executeWith(em, new CountExecutionStrategy<>());
+ * QueryExecutor<Long> countExecutor = filterQuery.toExecutor(request);
+ * Long count = countExecutor.executeWith(entityManager, new CountStrategy<>());
  * }</pre>
  *
  * <h3>Thread Safety:</h3>
  * <p>
  * Implementations should be thread-safe if they maintain internal state.
- * However, the {@link EntityManager} passed to {@code executeWith} is typically
- * not thread-safe and should be managed per-thread.
+ * The context object passed to {@code executeWith} should be managed appropriately
+ * for thread safety (e.g., per-thread EntityManager in JPA).
  * </p>
  *
- * @param <R> Result type produced by this executor (e.g. {@code List<UserDto>}, {@code Page<UserDto>}, {@code Long})
+ * @param <Result> Result type produced by this executor (e.g. {@code List<UserDto>}, {@code Page<UserDto>}, {@code Long})
  *
  * @see ExecutionStrategy
  * @see FilterQuery
  */
-public interface QueryExecutor<R> {
+public interface QueryExecutor<Result> {
 
     /**
      * Executes the query using the provided strategy.
      *
      * <p>
      * The strategy defines <b>how</b> the query is executed (single query, multi-query,
-     * native SQL, cached, etc.) while the executor type {@code R} defines <b>what</b>
+     * native SQL, cached, etc.) while the executor type {@code Result} defines <b>what</b>
      * is returned.
      * </p>
      *
      * <p>
      * The executor orchestrates the execution by providing the strategy with:
      * <ul>
-     *   <li>The {@link EntityManager} for database access</li>
+     *   <li>The execution context (e.g., EntityManager for JPA)</li>
      *   <li>The {@link PredicateResolver} for building filter predicates</li>
      *   <li>The {@link QueryExecutionParams} containing projection, pagination, sorting, etc.</li>
      * </ul>
      * </p>
      *
-     * <h4>Examples:</h4>
+     * <h4>Examples (JPA adapter):</h4>
      * <pre>{@code
      * // List execution
      * QueryExecutor<List<UserDto>> listExecutor = ...;
-     * List<UserDto> users = listExecutor.executeWith(em, new MultiQueryExecutionStrategy<>());
+     * List<UserDto> users = listExecutor.executeWith(entityManager, new MultiQueryFetchStrategy<>());
      *
      * // Paginated execution
      * QueryExecutor<Page<UserDto>> pageExecutor = ...;
-     * Page<UserDto> page = pageExecutor.executeWith(em, new PagedExecutionStrategy<>());
+     * Page<UserDto> page = pageExecutor.executeWith(entityManager, new PagedFetchStrategy<>());
      *
      * // Count execution
      * QueryExecutor<Long> countExecutor = ...;
-     * Long total = countExecutor.executeWith(em, new CountExecutionStrategy<>());
+     * Long total = countExecutor.executeWith(entityManager, new CountStrategy<>());
      * }</pre>
      *
-     * @param em the {@link EntityManager} to use for query execution.
-     *           Must not be null. Should be an active, transaction-aware EntityManager.
+     * @param <Context> the type of execution context (e.g., EntityManager for JPA)
+     * @param ctx the execution context. Must not be null.
      * @param strategy the execution strategy defining the execution logic.
-     *                Must not be null and must produce results of type {@code R}.
-     * @return a result of type {@code R}
-     * @throws IllegalArgumentException if em or strategy is null
-     * @throws jakarta.persistence.PersistenceException if query execution fails
+     *                Must not be null and must produce results of type {@code Result}.
+     * @return a result of type {@code Result}
+     * @throws IllegalArgumentException if ctx or strategy is null
      */
-    R executeWith(EntityManager em, ExecutionStrategy<R> strategy);
+    <Context> Result executeWith(Context ctx, ExecutionStrategy<Result> strategy);
 }

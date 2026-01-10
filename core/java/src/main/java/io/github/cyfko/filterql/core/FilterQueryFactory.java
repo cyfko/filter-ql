@@ -16,7 +16,6 @@ import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 import io.github.cyfko.filterql.core.spi.QueryExecutor;
 import io.github.cyfko.filterql.core.spi.FilterQuery;
 import io.github.cyfko.filterql.core.validation.PropertyReference;
-import jakarta.persistence.EntityManager;
 
 import java.util.*;
 import java.util.logging.Logger;
@@ -289,18 +288,15 @@ public class FilterQueryFactory {
          * </ol>
          * </p>
          *
-         * @param em       {@link EntityManager} used to execute the query
+         * @param <Context> the type of execution context (e.g., EntityManager for JPA)
+         * @param ctx      Execution context used to execute the query (e.g., EntityManager for JPA)
          * @param strategy Execution strategy (e.g. {@code MultiQueryExecutionStrategy})
-         * @return Typed list of results
+         * @return Typed result from the execution strategy
          */
         @Override
-        public R executeWith(EntityManager em, ExecutionStrategy<R> strategy) {
-            Objects.requireNonNull(em, "EntityManager cannot be null");
+        public <Context> R executeWith(Context ctx, ExecutionStrategy<R> strategy) {
+            Objects.requireNonNull(ctx, "Execution context cannot be null");
             Objects.requireNonNull(strategy, "ExecutionStrategy cannot be null");
-
-            if (!em.isOpen()) {
-                throw new IllegalStateException("EntityManager is closed. Cannot execute query.");
-            }
 
             log.fine(() -> String.format(
                     "Executing FilterQL query: projection=%s, pagination=%s",
@@ -309,7 +305,7 @@ public class FilterQueryFactory {
             ));
 
             long start = System.nanoTime();
-            R results = strategy.execute(em, resolver, params);
+            R results = strategy.execute(ctx, resolver, params);
             long durationMs = (System.nanoTime() - start) / 1_000_000;
 
             log.info(() -> String.format(

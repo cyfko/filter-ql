@@ -1,7 +1,6 @@
 package io.github.cyfko.filterql.core.spi;
 
 import io.github.cyfko.filterql.core.model.FilterRequest;
-import jakarta.persistence.EntityManager;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 
 /**
@@ -103,7 +102,7 @@ public interface ExecutionStrategy<R> {
      * <p>
      * This method receives all necessary components to build and execute the query:
      * <ul>
-     *   <li>The {@link EntityManager} for database interaction</li>
+     *   <li>The execution context (e.g., EntityManager for JPA)</li>
      *   <li>The {@link PredicateResolver} for constructing filter predicates</li>
      *   <li>The {@link QueryExecutionParams} with projection, pagination, sorting, etc.</li>
      * </ul>
@@ -112,7 +111,7 @@ public interface ExecutionStrategy<R> {
      * <p>
      * Implementations are responsible for:
      * <ul>
-     *   <li>Building the appropriate query (CriteriaQuery, native SQL, etc.)</li>
+     *   <li>Building the appropriate query using the context</li>
      *   <li>Applying filters from the PredicateResolver</li>
      *   <li>Applying projection, pagination, and sorting from params</li>
      *   <li>Executing the query</li>
@@ -120,7 +119,7 @@ public interface ExecutionStrategy<R> {
      * </ul>
      * </p>
      *
-     * <h4>Example Implementation Sketch:</h4>
+     * <h4>Example Implementation Sketch (JPA adapter):</h4>
      * <pre>{@code
      * public List<UserDto> execute(EntityManager em, PredicateResolver<?> pr, QueryExecutionParams params) {
      *     CriteriaBuilder cb = em.getCriteriaBuilder();
@@ -128,7 +127,7 @@ public interface ExecutionStrategy<R> {
      *     Root<?> root = query.from(pr.getEntityType());
      *
      *     // Apply filters
-     *     query.where(pr.toPredicate(root, query, cb));
+     *     query.where(pr.resolve(root, query, cb));
      *
      *     // Apply projection
      *     query.select(buildProjection(params, root));
@@ -149,15 +148,15 @@ public interface ExecutionStrategy<R> {
      * }
      * }</pre>
      *
-     * @param em the {@link EntityManager} used to build and execute the query.
-     *           Must not be null. Should be transaction-aware and active.
+     * @param <Context> the type of execution context (e.g., EntityManager for JPA)
+     * @param ctx the execution context used to build and execute the query.
+     *           Must not be null.
      * @param pr the {@link PredicateResolver} responsible for building filter predicates
      *           from the FilterQL request. Must not be null.
      * @param params execution parameters including projection, pagination, sorting, etc.
      *              Must not be null.
      * @return Result of type {@code R} as defined by this strategy implementation
      * @throws IllegalArgumentException if any parameter is null
-     * @throws jakarta.persistence.PersistenceException if query building or execution fails
      */
-    R execute(EntityManager em, PredicateResolver<?> pr, QueryExecutionParams params);
+    <Context> R execute(Context ctx, PredicateResolver<?> pr, QueryExecutionParams params);
 }

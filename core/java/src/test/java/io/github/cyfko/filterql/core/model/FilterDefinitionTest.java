@@ -1,41 +1,21 @@
 package io.github.cyfko.filterql.core.model;
 
-import io.github.cyfko.filterql.core.spi.CustomOperatorProvider;
-import io.github.cyfko.filterql.core.spi.OperatorProviderRegistry;
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.exception.FilterDefinitionException;
-import io.github.cyfko.filterql.core.exception.FilterValidationException;
 import io.github.cyfko.filterql.core.validation.Op;
 import io.github.cyfko.filterql.core.validation.DefinedPropertyReference;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.Set;
-
+/**
+ * Tests for FilterDefinition record.
+ * 
+ * <p>
+ * Note: Custom operator validation is now handled via PredicateResolverMapping
+ * in the JPA adapter, not via OperatorProviderRegistry.
+ * </p>
+ */
 class FilterDefinitionTest {
-
-    private CustomOperatorProvider testProvider;
-
-    @BeforeEach
-    void setUp() {
-        // Register a test custom operator provider for testing
-        testProvider = new CustomOperatorProvider() {
-            @Override
-            public Set<String> supportedOperators() {
-                return Set.of("SOUNDEX", "GEO_DISTANCE");
-            }
-
-            @Override
-            public <P extends Enum<P> & PropertyReference>
-            PredicateResolver<?> toResolver(FilterDefinition<P> definition) {
-                return (root, query, cb) -> cb.conjunction();
-            }
-        };
-        OperatorProviderRegistry.unregister(testProvider.supportedOperators());
-    }
 
     // ============================================================================
     // Standard Constructor Tests
@@ -110,7 +90,7 @@ class FilterDefinitionTest {
     }
 
     // ============================================================================
-    // String Operator Constructor Tests (Alternative Constructor)
+    // String Operator Constructor Tests
     // ============================================================================
 
     @Test
@@ -120,7 +100,7 @@ class FilterDefinitionTest {
         FilterDefinition<DefinedPropertyReference> definition =
             new FilterDefinition<>(
                 DefinedPropertyReference.USER_NAME,
-                "EQ",  // String operator code
+                "EQ",
                 "test"
             );
 
@@ -133,22 +113,23 @@ class FilterDefinitionTest {
     @Test
     @DisplayName("Should create FilterDefinition using string constructor for custom operator")
     void shouldCreateFilterDefinitionUsingStringConstructorForCustomOperator() {
-        // Given
-        OperatorProviderRegistry.register(testProvider);
-
+        // Custom operators are now handled via PredicateResolverMapping in JPA adapter
+        // Here we just test that custom operator codes are accepted at construction time
+        
         // Given & When
         FilterDefinition<DefinedPropertyReference> definition =
             new FilterDefinition<>(
                 DefinedPropertyReference.USER_NAME,
-                "SOUNDEX",  // Custom operator code (registered in setUp)
+                "SOUNDEX",  // Custom operator code
                 "Smith"
             );
 
         // Then
         assertEquals(Op.CUSTOM, definition.operator(), "Should resolve to CUSTOM operator");
-        assertEquals("SOUNDEX", definition.op(), "RegistryKey should be set to SOUNDEX");
+        assertEquals("SOUNDEX", definition.op(), "op() should return SOUNDEX");
         assertEquals("Smith", definition.value());
         assertEquals(DefinedPropertyReference.USER_NAME, definition.ref());
+        assertTrue(definition.isCustomOperator(), "Should be identified as custom operator");
     }
 
     @Test
@@ -180,7 +161,7 @@ class FilterDefinitionTest {
             FilterDefinitionException.class,
             () -> new FilterDefinition<>(
                 DefinedPropertyReference.USER_NAME,
-                (String) null,  // Null operator string
+                (String) null,
                 "value"
             ),
             "Should throw exception for null operator string"
@@ -191,15 +172,15 @@ class FilterDefinitionTest {
     }
 
     @Test
-    @DisplayName("Should allow creating FilterDefinition with unregistered custom operator (lazy validation)")
-    void shouldAllowCreatingFilterDefinitionWithUnregisteredCustomOperator() {
-        // With lazy validation, FilterDefinition construction succeeds
-        // Validation happens later during FilterContext.toCondition()
+    @DisplayName("Should allow creating FilterDefinition with custom operator (lazy validation)")
+    void shouldAllowCreatingFilterDefinitionWithCustomOperator() {
+        // With the new architecture, custom operators are validated at execution time
+        // by PredicateResolverMapping in the JPA adapter, not at construction time
         
         // When
         FilterDefinition<DefinedPropertyReference> definition = new FilterDefinition<>(
             DefinedPropertyReference.USER_NAME,
-            "UNKNOWN_CUSTOM_OP",  // Not registered - OK at construction time
+            "UNKNOWN_CUSTOM_OP",
             "value"
         );
 
@@ -207,43 +188,52 @@ class FilterDefinitionTest {
         assertNotNull(definition);
         assertEquals("UNKNOWN_CUSTOM_OP", definition.op());
         assertTrue(definition.isCustomOperator());
-        
-        // Note: Validation will happen later when FilterContext.toCondition() is called
     }
 
     @Test
     @DisplayName("Should handle case-insensitive operator lookup in string constructor")
     void shouldHandleCaseInsensitiveOperatorLookupInStringConstructor() {
-        // Uppercase should succeed
+        // Lowercase should be normalized to uppercase
         FilterDefinition<DefinedPropertyReference> definition =
             new FilterDefinition<>(DefinedPropertyReference.USER_NAME, "eQ", "value");
         assertEquals(Op.EQ, definition.operator());
     }
 
     // ============================================================================
-    // CUSTOM Operator and RegistryKey Validation Tests
+    // Custom Operator Tests
     // ============================================================================
 
     @Test
-    @DisplayName("Should create FilterDefinition with CUSTOM operator and op")
-    void shouldCreateFilterDefinitionWithCustomOperatorAndRegistryKey() {
-        // Given
-        OperatorProviderRegistry.register(testProvider);
+    @DisplayName("Should identify custom operators correctly")
+    void shouldIdentifyCustomOperatorsCorrectly() {
+        // Standard operator
+        FilterDefinition<DefinedPropertyReference> standardDef =
+            new FilterDefinition<>(DefinedPropertyReference.USER_NAME, Op.EQ, "value");
+        assertFalse(standardDef.isCustomOperator());
 
+        // Custom operator
+        FilterDefinition<DefinedPropertyReference> customDef =
+            new FilterDefinition<>(DefinedPropertyReference.USER_NAME, "SOUNDEX", "Smith");
+        assertTrue(customDef.isCustomOperator());
+        assertEquals(Op.CUSTOM, customDef.operator());
+    }
+
+    @Test
+    @DisplayName("Should create FilterDefinition with custom operator code")
+    void shouldCreateFilterDefinitionWithCustomOperatorCode() {
         // When
         FilterDefinition<DefinedPropertyReference> definition =
             new FilterDefinition<>(
                 DefinedPropertyReference.USER_NAME,
-                "SOUNDEX",
-                "Smith"
+                "GEO_DISTANCE",
+                "48.8566,2.3522,10"
             );
 
         // Then
         assertEquals(Op.CUSTOM, definition.operator());
-        assertEquals("SOUNDEX", definition.op());
-        assertEquals("Smith", definition.value());
+        assertEquals("GEO_DISTANCE", definition.op());
+        assertEquals("48.8566,2.3522,10", definition.value());
     }
-
 
     @Test
     @DisplayName("Should throw exception when CUSTOM operator has blank op")
@@ -256,7 +246,7 @@ class FilterDefinitionTest {
                 "   ",
                 "value"
             ),
-            "Should throw exception for blank op with CUSTOM operator"
+            "Should throw exception for blank op"
         );
 
         assertTrue(exception.getMessage().contains("operator cannot be null nor blank"),
@@ -264,28 +254,9 @@ class FilterDefinitionTest {
     }
 
     @Test
-    @DisplayName("Should allow creating FilterDefinition with non-existent registry key (lazy validation)")
-    void shouldAllowCreatingFilterDefinitionWithNonExistentRegistryKey() {
-        // With lazy validation, construction succeeds even if operator not registered
-        // Validation happens later during FilterContext.toCondition()
-        
-        // When
-        FilterDefinition<DefinedPropertyReference> definition = new FilterDefinition<>(
-            DefinedPropertyReference.USER_NAME,
-            "NONEXISTENT_OP",  // Not in registry - OK at construction
-            "value"
-        );
-
-        // Then
-        assertNotNull(definition);
-        assertEquals("NONEXISTENT_OP", definition.op());
-        assertTrue(definition.isCustomOperator());
-    }
-
-    @Test
     @DisplayName("Should allow exact enum name op for standard operators")
-    void shouldAllowNullRegistryKeyForStandardOperators() {
-        // When - All standard operators should work with null op
+    void shouldAllowExactEnumNameOpForStandardOperators() {
+        // When - All standard operators should work
         FilterDefinition<DefinedPropertyReference> eqDef =
             new FilterDefinition<>(DefinedPropertyReference.USER_NAME, Op.EQ, "value");
         FilterDefinition<DefinedPropertyReference> gtDef =
@@ -298,37 +269,8 @@ class FilterDefinitionTest {
         assertEquals(Op.GT, gtDef.operator());
     }
 
-    @Test
-    @DisplayName("Should validate multiple custom operators from same provider")
-    void shouldValidateMultipleCustomOperatorsFromSameProvider() {
-        // Given
-        OperatorProviderRegistry.register(testProvider);
-
-        // When - Both SOUNDEX and GEO_DISTANCE are registered by testProvider
-        FilterDefinition<DefinedPropertyReference> soundexDef =
-            new FilterDefinition<>(
-                DefinedPropertyReference.USER_NAME,
-                "SOUNDEX",
-                "Smith"
-            );
-
-        FilterDefinition<DefinedPropertyReference> geoDef =
-            new FilterDefinition<>(
-                DefinedPropertyReference.USER_NAME,
-                "GEO_DISTANCE",
-                "48.8566,2.3522,10"
-            );
-
-        // Then
-        assertEquals(Op.CUSTOM, soundexDef.operator());
-        assertEquals("SOUNDEX", soundexDef.op());
-
-        assertEquals(Op.CUSTOM, geoDef.operator());
-        assertEquals("GEO_DISTANCE", geoDef.op());
-    }
-
     // ============================================================================
-    // Existing Validation Tests
+    // Validation Tests
     // ============================================================================
 
     @Test
@@ -368,7 +310,7 @@ class FilterDefinitionTest {
             () -> new FilterDefinition<>(
                 DefinedPropertyReference.USER_NAME,
                 Op.IS_NULL,
-                "non-null value"  // Should be null
+                "non-null value"
             ),
             "Should throw exception when IS_NULL operator has non-null value"
         );

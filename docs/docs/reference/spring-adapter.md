@@ -216,6 +216,32 @@ public enum UserDTO_ implements PropertyReference {
 }
 ```
 
+#### Virtual Fields
+
+Virtual fields allow custom predicate logic without a corresponding entity field:
+
+```java
+import io.github.cyfko.filterql.core.spi.PredicateResolver;
+
+@ExposedAs(value = "FULL_NAME", operators = {Op.MATCHES})
+public static PredicateResolver<User> fullNameSearch(String op, Object[] args) {
+    return (root, query, cb) -> {
+        String pattern = "%" + args[0] + "%";
+        return cb.or(
+            cb.like(root.get("firstName"), pattern),
+            cb.like(root.get("lastName"), pattern)
+        );
+    };
+}
+```
+
+**Method requirements:**
+- Must be `public static` (or instance method if managed by Spring)
+- Return type: `PredicateResolver<E>` where `E` is the entity type
+- Parameters: `(String op, Object[] args)` — the operator and filter arguments
+
+Virtual fields can also be non-static (instance methods) when they need to access Spring beans.
+
 ---
 
 ## Services

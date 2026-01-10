@@ -216,6 +216,32 @@ public enum UserDTO_ implements PropertyReference {
 }
 ```
 
+#### Champs Virtuels
+
+Les champs virtuels permettent une logique de prédicat personnalisée sans champ d'entité correspondant :
+
+```java
+import io.github.cyfko.filterql.core.spi.PredicateResolver;
+
+@ExposedAs(value = "FULL_NAME", operators = {Op.MATCHES})
+public static PredicateResolver<User> fullNameSearch(String op, Object[] args) {
+    return (root, query, cb) -> {
+        String pattern = "%" + args[0] + "%";
+        return cb.or(
+            cb.like(root.get("firstName"), pattern),
+            cb.like(root.get("lastName"), pattern)
+        );
+    };
+}
+```
+
+**Exigences de la méthode :**
+- Doit être `public static` (ou méthode d'instance si gérée par Spring)
+- Type de retour : `PredicateResolver<E>` où `E` est le type de l'entité
+- Paramètres : `(String op, Object[] args)` — l'opérateur et les arguments du filtre
+
+Les champs virtuels peuvent aussi être non-statiques (méthodes d'instance) quand ils ont besoin d'accéder aux beans Spring.
+
 ---
 
 ## Services

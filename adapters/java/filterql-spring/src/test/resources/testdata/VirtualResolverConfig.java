@@ -1,7 +1,7 @@
 package io.github.cyfko.example;
 
+import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.validation.Op;
-import io.github.cyfko.filterql.jpa.mappings.PredicateResolverMapping;
 import io.github.cyfko.filterql.spring.ExposedAs;
 
 /**
@@ -16,9 +16,9 @@ public class VirtualResolverConfig {
             value = "IS_ADMIN",
             operators = {Op.EQ}
     )
-    public static PredicateResolverMapping<Person> isAdminUser() {
-        return (root, query, cb, params) -> {
-            Boolean isAdmin = (Boolean) params[0];
+    public static PredicateResolver<Person> isAdminUser(String op, Object[] args) {
+        return (root, query, cb) -> {
+            Boolean isAdmin = args.length > 0 ? (Boolean) args[0] : false;
             if (Boolean.TRUE.equals(isAdmin)) {
                 // Filter for admin users
                 return cb.equal(root.get("username"), "admin");

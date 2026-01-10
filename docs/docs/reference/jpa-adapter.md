@@ -107,8 +107,8 @@ JpaFilterContext<UserPropertyRef> context = new JpaFilterContext<>(
         case CITY -> "address.city.name";  // Nested path
         
         // Custom mapping (PredicateResolverMapping)
-        case FULL_NAME -> (PredicateResolverMapping<User>) (root, query, cb, params) -> {
-            String search = (String) params[0];
+        case FULL_NAME -> (PredicateResolverMapping<User>) (op, args) -> (root, query, cb) -> {
+            String search = (String) args[0];
             return cb.or(
                 cb.like(cb.lower(root.get("firstName")), "%" + search.toLowerCase() + "%"),
                 cb.like(cb.lower(root.get("lastName")), "%" + search.toLowerCase() + "%")
@@ -144,26 +144,19 @@ Interface for custom predicate logic.
 ```java
 package io.github.cyfko.filterql.jpa.mappings;
 
-import jakarta.persistence.criteria.*;
+import io.github.cyfko.filterql.core.spi.PredicateResolver;
 
 @FunctionalInterface
-public interface PredicateResolverMapping<E> {
+public interface PredicateResolverMapping<E> extends ReferenceMapping<E> {
     
     /**
-     * Resolves a custom JPA predicate.
+     * Resolves a PredicateResolver given the operator code and arguments.
      * 
-     * @param root entity root
-     * @param query criteria query
-     * @param cb criteria builder
-     * @param params filter parameters (values transformed by operator)
-     * @return JPA predicate
+     * @param op the filter operator to apply (e.g., "EQ", "LIKE", "SOUNDEX")
+     * @param args the arguments of the filter's operator
+     * @return the PredicateResolver for deferred predicate generation
      */
-    Predicate resolve(
-        Root<E> root, 
-        CriteriaQuery<?> query, 
-        CriteriaBuilder cb, 
-        Object[] params
-    );
+    PredicateResolver<E> map(String op, Object[] args);
 }
 ```
 
@@ -172,43 +165,58 @@ public interface PredicateResolverMapping<E> {
 #### Multi-Field Search
 
 ```java
-case FULL_NAME -> (PredicateResolverMapping<User>) (root, query, cb, params) -> {
-    String search = (String) params[0];
-    String pattern = "%" + search.toLowerCase() + "%";
-    return cb.or(
-        cb.like(cb.lower(root.get("firstName")), pattern),
-        cb.like(cb.lower(root.get("lastName")), pattern),
-        cb.like(cb.lower(cb.concat(
-            cb.concat(root.get("firstName"), " "),
-            root.get("lastName")
-        )), pattern)
-    );
+case FULL_NAME -> new PredicateResolverMapping<User>() {
+    @Override
+    public PredicateResolver<User> map(String op, Object[] args) {
+        return (root, query, cb) -> {
+            String search = (String) args[0];
+            String pattern = "%" + search.toLowerCase() + "%";
+            return cb.or(
+                cb.like(cb.lower(root.get("firstName")), pattern),
+                cb.like(cb.lower(root.get("lastName")), pattern),
+                cb.like(cb.lower(cb.concat(
+                    cb.concat(root.get("firstName"), " "),
+                    root.get("lastName")
+                )), pattern)
+            );
+        };
+    }
 };
 ```
 
 #### Age Range Calculation
 
 ```java
-case AGE_RANGE -> (PredicateResolverMapping<User>) (root, query, cb, params) -> {
-    List<?> range = (List<?>) params[0];
-    int minAge = (int) range.get(0);
-    int maxAge = (int) range.get(1);
-    LocalDate now = LocalDate.now();
-    LocalDate maxBirthDate = now.minusYears(minAge);
-    LocalDate minBirthDate = now.minusYears(maxAge + 1);
-    return cb.between(root.get("birthDate"), minBirthDate, maxBirthDate);
+case AGE_RANGE -> new PredicateResolverMapping<User>() {
+    @Override
+    public PredicateResolver<User> map(String op, Object[] args) {
+        return (root, query, cb) -> {
+            List<?> range = (List<?>) args[0];
+            int minAge = (int) range.get(0);
+            int maxAge = (int) range.get(1);
+            LocalDate now = LocalDate.now();
+            LocalDate maxBirthDate = now.minusYears(minAge);
+            LocalDate minBirthDate = now.minusYears(maxAge + 1);
+            return cb.between(root.get("birthDate"), minBirthDate, maxBirthDate);
+        };
+    }
 };
 ```
 
 #### Subquery
 
 ```java
-case HAS_ORDERS -> (PredicateResolverMapping<User>) (root, query, cb, params) -> {
-    Subquery<Long> subquery = query.subquery(Long.class);
-    Root<Order> orderRoot = subquery.from(Order.class);
-    subquery.select(cb.count(orderRoot))
-            .where(cb.equal(orderRoot.get("user"), root));
-    return cb.greaterThan(subquery, 0L);
+case HAS_ORDERS -> new PredicateResolverMapping<User>() {
+    @Override
+    public PredicateResolver<User> map(String op, Object[] args) {
+        return (root, query, cb) -> {
+            Subquery<Long> subquery = query.subquery(Long.class);
+            Root<Order> orderRoot = subquery.from(Order.class);
+            subquery.select(cb.count(orderRoot))
+                    .where(cb.equal(orderRoot.get("user"), root));
+            return cb.greaterThan(subquery, 0L);
+        };
+    }
 };
 ```
 

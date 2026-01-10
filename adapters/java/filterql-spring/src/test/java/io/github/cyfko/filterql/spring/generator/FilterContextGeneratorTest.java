@@ -114,8 +114,8 @@ class FilterContextGeneratorTest {
 
         assertTrue(result.contains("case FULL_NAME ->"),
             "Should contain case for virtual field");
-        assertTrue(result.contains("UserResolver.getFullName();"),
-            "Should call static method directly");
+        assertTrue(result.contains("(PredicateResolverMapping) (op, args) -> com.example.resolvers.UserResolver.getFullName(op, args);"),
+            "Should generate PredicateResolverMapping wrapper for static method");
     }
 
     @Test
@@ -136,8 +136,8 @@ class FilterContextGeneratorTest {
 
         assertTrue(result.contains("case TENANT ->"),
             "Should contain case for virtual field");
-        assertTrue(result.contains("ProjectionUtils.invoke("),
-            "Should use ProjectionUtils for instance method");
+        assertTrue(result.contains("(PredicateResolver) ProjectionUtils.invoke("),
+            "Should use ProjectionUtils.invoke with cast for instance method");
         assertTrue(result.contains("UserTenancyService.class"),
             "Should reference resolver class");
     }
@@ -233,10 +233,10 @@ class FilterContextGeneratorTest {
         assertFalse(result.contains("import com.example.resolvers.ResolverA"), "Should not have ResolverA import statement");
         assertFalse(result.contains("import com.example.resolvers.ResolverB"), "Should not have ResolverB statement");
 
-        assertTrue(result.contains("com.example.resolvers.ResolverA.methodA()"), "Should have static invocation for method1");
-        assertTrue(result.contains("ProjectionUtils.invoke(instanceResolver, com.example.resolvers.ResolverB.class, \"myBeanName\", \"methodB\")"),
+        assertTrue(result.contains("com.example.resolvers.ResolverA.methodA(op, args)"), "Should have static invocation for methodA");
+        assertTrue(result.contains("(PredicateResolver) ProjectionUtils.invoke(instanceResolver, com.example.resolvers.ResolverB.class, \"myBeanName\", \"methodB\", op, args)"),
                 "Should have instance invocation for method B");
-        assertTrue(result.contains("ProjectionUtils.invoke(instanceResolver, com.example.resolvers.ResolverB.class, null, \"methodC\")"),
+        assertTrue(result.contains("(PredicateResolver) ProjectionUtils.invoke(instanceResolver, com.example.resolvers.ResolverB.class, null, \"methodC\", op, args)"),
                 "Should have instance invocation for method C");
     }
 
@@ -284,7 +284,7 @@ class FilterContextGeneratorTest {
         assertTrue(result.contains("case COMPUTED ->"), "Should have case for COMPUTED");
         assertTrue(result.contains("case AGE ->"), "Should have case for AGE");
         assertTrue(result.contains("\"name\""), "Should have JPA path for NAME. Generated:\n" + result);
-        assertTrue(result.contains("Resolver.resolve();"), "Should have resolver call for COMPUTED");
+        assertTrue(result.contains("com.example.Resolver.resolve(op, args);"), "Should have resolver call for COMPUTED");
         assertTrue(result.contains("\"age\""), "Should have JPA path for AGE");
     }
 
@@ -337,9 +337,9 @@ class FilterContextGeneratorTest {
         generator.register("com.example", "EntityPropertyRef", fields);
         String result = generator.generate();
 
-        // Should import Resolver only once (distinct in generateVirtualImports)
-        assertTrue(result.contains("com.example.Resolver.method1()"), "Should handle method1 call");
-        assertTrue(result.contains("com.example.Resolver.method2()"), "Should handle method2 call");
+        // Should handle both method calls with PredicateResolverMapping wrapper
+        assertTrue(result.contains("com.example.Resolver.method1(op, args)"), "Should handle method1 call");
+        assertTrue(result.contains("com.example.Resolver.method2(op, args)"), "Should handle method2 call");
     }
 
     @Test

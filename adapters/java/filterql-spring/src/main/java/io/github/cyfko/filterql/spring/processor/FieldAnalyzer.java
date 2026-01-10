@@ -92,25 +92,34 @@ public class FieldAnalyzer {
         if (annotation == null) return null;
 
         ExecutableElement method = (ExecutableElement) element;
-
-        // Validate return type
         TypeMirror returnType = method.getReturnType();
-        if (!returnType.toString().contains("PredicateResolverMapping")) {
+        List<? extends VariableElement> params = method.getParameters();
+        
+        // Only accept: PredicateResolver<E> method(String op, Object[] args)
+        if (!returnType.toString().contains("PredicateResolver")) {
             processingEnv.getMessager().printMessage(
                     Diagnostic.Kind.ERROR,
-                    "method annotated with @ExposedAs must return PredicateResolverMapping<E>",
+                    "method annotated with @ExposedAs must return PredicateResolver<E>",
                     element
             );
             return null;
         }
-
-        // Validate NO parameters (parameter passed to resolve() method)
-        List<? extends VariableElement> params = method.getParameters();
-        if (!params.isEmpty()) {
+        
+        // Validate parameters: must be (String, Object[])
+        if (params.size() != 2) {
             processingEnv.getMessager().printMessage(
                     Diagnostic.Kind.ERROR,
-                    "method annotated with @ExposedAs must have NO parameters. " +
-                            "The filter parameter is passed to the resolve() method of PredicateResolverMapping.",
+                    "method annotated with @ExposedAs must have exactly 2 parameters: (String op, Object[] args)",
+                    element
+            );
+            return null;
+        }
+        String param0Type = params.get(0).asType().toString();
+        String param1Type = params.get(1).asType().toString();
+        if (!param0Type.equals("java.lang.String") || !param1Type.equals("java.lang.Object[]")) {
+            processingEnv.getMessager().printMessage(
+                    Diagnostic.Kind.ERROR,
+                    "method annotated with @ExposedAs must have parameters (String op, Object[] args), found: (" + param0Type + ", " + param1Type + ")",
                     element
             );
             return null;
@@ -122,7 +131,7 @@ public class FieldAnalyzer {
 
         return FieldMetadata.virtualField(
                 annotation.value(),
-                methodName,  // Type Object par défaut (paramètre passé à resolve())
+                methodName,
                 annotation.operators(),
                 resolverClassName,
                 beanName,

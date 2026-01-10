@@ -146,8 +146,8 @@ public class PersonDTO {
     // Virtual field: static method returning PredicateResolverMapping
     @ExposedAs(value = "FULL_NAME", operators = {Op.MATCHES})
     public static PredicateResolverMapping<Person> fullNameMatches() {
-        return (root, query, cb, params) -> {
-            String searchTerm = (String) params[0];
+        return (op, args) -> (root, query, cb) -> {
+            String searchTerm = (String) args[0];
             String pattern = "%" + searchTerm + "%";
             Predicate firstName = cb.like(root.get("firstName"), pattern);
             Predicate lastName = cb.like(root.get("lastName"), pattern);

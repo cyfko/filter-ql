@@ -197,8 +197,8 @@ JpaFilterContext<UserPropertyRef> context = new JpaFilterContext<>(
         case EMAIL -> "email";
         
         // Custom full-name search across multiple fields
-        case FULL_NAME -> (PredicateResolverMapping<User>) (root, query, cb, params) -> {
-            String search = (String) params[0];
+        case FULL_NAME -> (PredicateResolverMapping<User>) (op, args) -> (root, query, cb) -> {
+            String search = (String) args[0];
             return cb.or(
                 cb.like(root.get("firstName"), "%" + search + "%"),
                 cb.like(root.get("lastName"), "%" + search + "%")

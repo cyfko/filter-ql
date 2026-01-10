@@ -6,8 +6,6 @@ import io.github.cyfko.filterql.core.config.FilterConfig;
 import io.github.cyfko.filterql.core.exception.FilterDefinitionException;
 import io.github.cyfko.filterql.core.model.FilterDefinition;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
-import io.github.cyfko.filterql.core.spi.CustomOperatorProvider;
-import io.github.cyfko.filterql.core.spi.OperatorProviderRegistry;
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.utils.TypeConversionUtils;
 import io.github.cyfko.filterql.core.utils.FilterConfigUtils;
@@ -32,7 +30,7 @@ import java.util.function.Supplier;
  * </p>
  * <ul>
  *   <li>Enum-based {@link PropertyReference} definitions</li>
- *   <li>Operator semantics defined by {@link Op} and {@link OperatorProviderRegistry}</li>
+ *   <li>Standard operator semantics defined by {@link Op}</li>
  *   <li>Type conversion rules encapsulated in {@link FilterConfig} and {@link TypeConversionUtils}</li>
  *   <li>Custom predicate implementations via {@link PredicateResolverMapping}</li>
  * </ul>
@@ -211,20 +209,23 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
      * Creates a {@link Condition} for the given argument key, property reference, and operator.
      *
      * <p>
-     * Validates argument key, reference type compatibility, and operator support (including
-     * presence of a {@link CustomOperatorProvider} for {@link Op#CUSTOM}). The created
+     * Validates argument key, reference type compatibility, and operator support. The created
      * {@link Condition} holds a {@link PredicateResolver} that retrieves its parameter
      * lazily from the thread-local arguments registry.
+     * </p>
+     * 
+     * <p>
+     * For custom operators (Op.CUSTOM), the property's mapping function must return a
+     * {@link PredicateResolverMapping} instead of a path string.
      * </p>
      *
      * @param argKey Argument key used to look up values in {@link QueryExecutionParams#arguments()}
      * @param ref    Property reference enum
-     * @param op     Operator string (e.g. "EQ", "IN", "CUSTOM")
+     * @param op     Operator string (e.g. "EQ", "IN", "SOUNDEX")
      * @param <Q>    Property enum type implementing {@link PropertyReference}
      * @return Condition bound to property and operator, but not yet to concrete values
      *
      * @throws IllegalArgumentException  if key is blank, ref is null, or type mismatches
-     * @throws FilterDefinitionException if CUSTOM operator has no registered provider
      */
     @Override
     public <Q extends Enum<Q> & PropertyReference> Condition toCondition(String argKey, Q ref, String op) {
@@ -240,9 +241,6 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
                     enumClass,
                     ref.getClass()
             ));
-        }
-        if (Op.fromString(op) == Op.CUSTOM && OperatorProviderRegistry.getProvider(op).isEmpty()) {
-            throw new FilterDefinitionException("Unknown operator : " + op);
         }
         if (!enumClass.isAssignableFrom(ref.getClass())) {
             throw new IllegalArgumentException(String.format(
@@ -271,7 +269,7 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
             @SuppressWarnings({"rawtypes", "unchecked"})
             PredicateResolver<?> resolver = (root, query, cb) -> {
                 Object[] paramArray = toParameterArray(param.get());
-                return prm.resolve((Root) root, query, cb, paramArray);
+                return prm.map(op, paramArray).resolve((Root) root, query, cb);
             };
             return new JpaCondition<>(resolver);
         }
@@ -487,13 +485,10 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
                     yield cb.not(between);
                 }
 
-                case CUSTOM -> {
-                    Optional<CustomOperatorProvider> provider = OperatorProviderRegistry.getProvider(definition.op());
-                    if (provider.isPresent()) {
-                        yield provider.get().toResolver(definition).resolve((Root) root, query, cb);
-                    }
-                    throw new IllegalStateException("No provider found for CUSTOM operator <" + definition.op() + ">");
-                }
+                case CUSTOM -> throw new IllegalStateException(
+                    "CUSTOM operator should be handled via PredicateResolverMapping, not path-based resolution. " +
+                    "Ensure the property reference returns a PredicateResolverMapping instead of a path string."
+                );
             };
         };
     }
@@ -947,9 +942,9 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
 //     *     case EMAIL -> "email";
 //     *     case CITY -> "address.city.name";
 //     *     case FULL_NAME_SEARCH -> (PredicateResolverMapping<User>)
-//     *         (root, query, cb, params) -> cb.or(
-//     *             cb.like(root.get("firstName"), "%" + params[0] + "%"),
-//     *             cb.like(root.get("lastName"), "%" + params[0] + "%")
+//     *         (op, args) -> (root, query, cb) -> cb.or(
+//     *             cb.like(root.get("firstName"), "%" + args[0] + "%"),
+//     *             cb.like(root.get("lastName"), "%" + args[0] + "%")
 //     *         );
 //     * };
 //     *

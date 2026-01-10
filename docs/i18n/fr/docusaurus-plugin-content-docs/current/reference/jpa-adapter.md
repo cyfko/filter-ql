@@ -107,8 +107,8 @@ JpaFilterContext<UserPropertyRef> context = new JpaFilterContext<>(
         case CITY -> "address.city.name";  // Chemin imbriqué
         
         // Mapping personnalisé (PredicateResolverMapping)
-        case FULL_NAME -> (PredicateResolverMapping<User>) (root, query, cb, params) -> {
-            String search = (String) params[0];
+        case FULL_NAME -> (PredicateResolverMapping<User>) (op, args) -> (root, query, cb) -> {
+            String search = (String) args[0];
             return cb.or(
                 cb.like(cb.lower(root.get("firstName")), "%" + search.toLowerCase() + "%"),
                 cb.like(cb.lower(root.get("lastName")), "%" + search.toLowerCase() + "%")
@@ -144,26 +144,19 @@ Interface pour la logique de prédicat personnalisée.
 ```java
 package io.github.cyfko.filterql.jpa.mappings;
 
-import jakarta.persistence.criteria.*;
+import io.github.cyfko.filterql.core.spi.PredicateResolver;
 
 @FunctionalInterface
-public interface PredicateResolverMapping<E> {
+public interface PredicateResolverMapping<E> extends ReferenceMapping<E> {
     
     /**
-     * Résout un prédicat JPA personnalisé.
+     * Résout un PredicateResolver pour le code opérateur et les arguments donnés.
      * 
-     * @param root racine de l'entité
-     * @param query requête criteria
-     * @param cb constructeur criteria
-     * @param params paramètres du filtre (valeurs transformées par l'opérateur)
-     * @return prédicat JPA
+     * @param op le code opérateur du filtre (ex: "EQ", "LIKE", "SOUNDEX")
+     * @param args les arguments de l'opérateur du filtre
+     * @return le PredicateResolver pour la génération différée du prédicat
      */
-    Predicate resolve(
-        Root<E> root, 
-        CriteriaQuery<?> query, 
-        CriteriaBuilder cb, 
-        Object[] params
-    );
+    PredicateResolver<E> map(String op, Object[] args);
 }
 ```
 
@@ -172,8 +165,8 @@ public interface PredicateResolverMapping<E> {
 #### Recherche Multi-Champs
 
 ```java
-case FULL_NAME -> (PredicateResolverMapping<User>) (root, query, cb, params) -> {
-    String search = (String) params[0];
+case FULL_NAME -> (PredicateResolverMapping<User>) (op, args) -> (root, query, cb) -> {
+    String search = (String) args[0];
     String pattern = "%" + search.toLowerCase() + "%";
     return cb.or(
         cb.like(cb.lower(root.get("firstName")), pattern),
@@ -189,8 +182,8 @@ case FULL_NAME -> (PredicateResolverMapping<User>) (root, query, cb, params) -> 
 #### Calcul de Plage d'Âge
 
 ```java
-case AGE_RANGE -> (PredicateResolverMapping<User>) (root, query, cb, params) -> {
-    List<?> range = (List<?>) params[0];
+case AGE_RANGE -> (PredicateResolverMapping<User>) (op, args) -> (root, query, cb) -> {
+    List<?> range = (List<?>) args[0];
     int minAge = (int) range.get(0);
     int maxAge = (int) range.get(1);
     LocalDate now = LocalDate.now();
@@ -203,7 +196,7 @@ case AGE_RANGE -> (PredicateResolverMapping<User>) (root, query, cb, params) -> 
 #### Sous-Requête
 
 ```java
-case HAS_ORDERS -> (PredicateResolverMapping<User>) (root, query, cb, params) -> {
+case HAS_ORDERS -> (PredicateResolverMapping<User>) (op, args) -> (root, query, cb) -> {
     Subquery<Long> subquery = query.subquery(Long.class);
     Root<Order> orderRoot = subquery.from(Order.class);
     subquery.select(cb.count(orderRoot))

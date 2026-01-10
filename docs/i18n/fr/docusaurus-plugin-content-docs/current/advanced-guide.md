@@ -299,7 +299,7 @@ public class Book {
 
 ## Opérateurs Personnalisés {#custom-operators}
 
-FilterQL permet d'ajouter vos propres opérateurs via SPI.
+FilterQL permet d'ajouter des opérateurs personnalisés via `PredicateResolverMapping` dans l'adaptateur JPA.
 
 ### Cas d'Usage
 
@@ -310,61 +310,38 @@ FilterQL permet d'ajouter vos propres opérateurs via SPI.
 
 ### Implémentation
 
-**1. Créer le provider :**
+**1. Définir le mapping personnalisé dans JpaFilterContext :**
 
 ```java
-public class SoundexOperatorProvider implements CustomOperatorProvider {
-    
-    @Override
-    public Set<String> supportedOperators() {
-        return Set.of("SOUNDEX");
-    }
-    
-    @Override
-    public <P extends Enum<P> & PropertyReference> 
-    PredicateResolver<?> toResolver(FilterDefinition<P> definition) {
-        return (root, query, cb) -> {
-            // Validation de la valeur au moment de l'exécution
-            if (!(definition.value() instanceof String searchValue) || searchValue.isBlank()) {
-                throw new IllegalArgumentException("SOUNDEX requiert une valeur String non vide");
+JpaFilterContext<UserPropertyRef> context = new JpaFilterContext<>(
+    UserPropertyRef.class,
+    ref -> switch (ref) {
+        case NAME -> new PredicateResolverMapping<User>() {
+            @Override
+            public PredicateResolver<User> map(String op, Object[] args) {
+                return (root, query, cb) -> {
+                    if ("SOUNDEX".equals(op)) {
+                        String searchValue = (String) args[0];
+                        if (searchValue == null || searchValue.isBlank()) {
+                            throw new IllegalArgumentException("SOUNDEX nécessite une valeur non vide");
+                        }
+                        return cb.equal(
+                            cb.function("SOUNDEX", String.class, root.get("name")),
+                            cb.function("SOUNDEX", String.class, cb.literal(searchValue))
+                        );
+                    }
+                    // Comportement par défaut pour les opérateurs standards
+                    return cb.equal(root.get("name"), args[0]);
+                };
             }
-            
-            String fieldName = definition.ref().name().toLowerCase();
-            return cb.equal(
-                cb.function("SOUNDEX", String.class, root.get(fieldName)),
-                cb.function("SOUNDEX", String.class, cb.literal(searchValue))
-            );
         };
-    }
-}
-```
-
-**2. Enregistrer le provider :**
-
-```java
-@Configuration
-public class FilterConfig {
-    
-    @PostConstruct
-    public void registerOperators() {
-        OperatorProviderRegistry.register(new SoundexOperatorProvider());
-    }
-}
-```
-
-**3. Autoriser l'opérateur dans PropertyReference :**
-
-```java
-@Override
-public Set<Op> getSupportedOperators() {
-    return switch (this) {
-        case NAME -> Set.of(Op.EQ, Op.MATCHES, Op.CUSTOM); // CUSTOM autorise les opérateurs enregistrés
+        case EMAIL -> "email";  // Mapping simple
         // ...
-    };
-}
+    }
+);
 ```
 
-**4. Utiliser dans une requête :**
+**2. Utiliser dans une requête :**
 
 ```json
 {
@@ -460,9 +437,47 @@ public class UserDTO {
 }
 ```
 
-### Champ Virtuel avec Prédicat Personnalisé
+## Champs Virtuels {#virtual-fields}
 
-Vous pouvez créer des champs "virtuels" qui exécutent une logique personnalisée :
+Les champs virtuels sont l'une des fonctionnalités les plus puissantes de FilterQL. Ils permettent de définir des **propriétés filtrables qui ne correspondent pas directement à des champs d'entité**, permettant une logique de requête complexe via une API simple.
+
+### Pourquoi les Champs Virtuels ?
+
+| Cas d'utilisation | Exemple |
+|-------------------|---------|
+| **Propriétés calculées** | Filtrer par `fullName` (combine prénom + nom) |
+| **Alias sémantiques** | `isActive` au lieu de vérifications de statut complexes |
+| **Encapsulation métier** | `hasAccess` avec vérification de rôles/permissions |
+| **Recherches multi-champs** | Rechercher dans plusieurs colonnes simultanément |
+| **Agrégations** | `orderCount > 10` basé sur des sous-requêtes |
+| **Filtrage dynamique** | `withinMyOrg` basé sur le contexte de l'utilisateur courant |
+
+### Syntaxe de Base
+
+```java
+import io.github.cyfko.filterql.core.spi.PredicateResolver;
+
+@ExposedAs(value = "NOM_CHAMP", operators = {Op.MATCHES, Op.EQ})
+public static PredicateResolver<Entity> nomMethode(String op, Object[] args) {
+    return (root, query, cb) -> {
+        // Logique de prédicat personnalisée utilisant l'API Criteria JPA
+        return cb.equal(root.get("champ"), args[0]);
+    };
+}
+```
+
+**Exigences de la méthode :**
+- **Type de retour :** `PredicateResolver<E>` où `E` est le type de l'entité
+- **Paramètres :** `(String op, Object[] args)` — l'opérateur et les arguments du filtre
+- **Visibilité :** `public static` (ou méthode d'instance pour les beans Spring)
+
+---
+
+### Champs Virtuels Statiques
+
+Les méthodes statiques sont idéales pour la **logique de prédicat pure** qui ne nécessite pas de dépendances externes.
+
+#### Exemple : Recherche par Nom Complet
 
 ```java
 @Projection(entity = Person.class)
@@ -476,14 +491,13 @@ public class PersonDTO {
     private String lastName;
 
     /**
-     * Champ virtuel : cherche dans firstName ET lastName.
-     * La méthode statique retourne un PredicateResolverMapping.
+     * Champ virtuel : recherche dans firstName OU lastName.
      */
     @ExposedAs(value = "FULL_NAME", operators = {Op.MATCHES})
-    public static PredicateResolverMapping<Person> fullNameMatches() {
-        return (root, query, cb, params) -> {
-            if (params.length == 0) return cb.conjunction();
-            String pattern = "%" + params[0] + "%";
+    public static PredicateResolver<Person> fullNameMatches(String op, Object[] args) {
+        return (root, query, cb) -> {
+            if (args.length == 0) return cb.conjunction();
+            String pattern = "%" + args[0] + "%";
             return cb.or(
                 cb.like(root.get("firstName"), pattern),
                 cb.like(root.get("lastName"), pattern)
@@ -493,7 +507,7 @@ public class PersonDTO {
 }
 ```
 
-**Usage :**
+**Utilisation :**
 ```json
 {
   "filters": {
@@ -503,13 +517,297 @@ public class PersonDTO {
 }
 ```
 
-Cherche "john" dans `firstName` OU `lastName`.
+Recherche "john" dans `firstName` OU `lastName`.
+
+#### Exemple : Filtre Utilisateur Admin
+
+```java
+/**
+ * Champ virtuel défini dans une classe de résolution dédiée.
+ */
+public class VirtualResolverConfig {
+
+    @ExposedAs(value = "IS_ADMIN", operators = {Op.EQ})
+    public static PredicateResolver<Person> isAdminUser(String op, Object[] args) {
+        return (root, query, cb) -> {
+            Boolean isAdmin = args.length > 0 ? (Boolean) args[0] : false;
+            if (Boolean.TRUE.equals(isAdmin)) {
+                return cb.equal(root.get("role"), "ADMIN");
+            } else {
+                return cb.notEqual(root.get("role"), "ADMIN");
+            }
+        };
+    }
+}
+
+// Enregistrer comme provider dans le DTO
+@Projection(
+    entity = Person.class,
+    providers = @Provider(VirtualResolverConfig.class)
+)
+public class PersonDTO { /* ... */ }
+```
+
+**Utilisation :**
+```json
+{
+  "filters": {
+    "admins": { "ref": "IS_ADMIN", "op": "EQ", "value": true }
+  },
+  "combineWith": "admins"
+}
+```
+
+---
+
+### Champs Virtuels d'Instance (Beans Spring)
+
+Les méthodes d'instance sont puissantes pour le **filtrage contextuel** qui nécessite des services Spring, le contexte de sécurité, ou d'autres dépendances injectées.
+
+#### Exemple : Filtrage Multi-Tenant
+
+```java
+@Component
+public class UserTenancyService {
+
+    @Autowired
+    private SecurityContext securityContext;
+
+    /**
+     * Champ virtuel : filtre les utilisateurs de l'organisation de l'utilisateur courant.
+     */
+    @ExposedAs(value = "WITHIN_MY_ORG", operators = {Op.EQ})
+    public PredicateResolver<Person> withinCurrentOrg(String op, Object[] args) {
+        // Accéder à l'utilisateur courant depuis le contexte de sécurité
+        String currentUserOrg = securityContext.getCurrentUser().getOrganization();
+        
+        return (root, query, cb) -> {
+            Boolean withinOrg = args.length > 0 ? (Boolean) args[0] : true;
+            if (Boolean.TRUE.equals(withinOrg)) {
+                return cb.equal(root.get("organizationId"), currentUserOrg);
+            } else {
+                return cb.notEqual(root.get("organizationId"), currentUserOrg);
+            }
+        };
+    }
+}
+
+// Enregistrer comme provider dans le DTO
+@Projection(
+    entity = Person.class,
+    providers = @Provider(UserTenancyService.class)
+)
+public class PersonDTO { /* ... */ }
+```
+
+**Utilisation :**
+```json
+{
+  "filters": {
+    "myOrg": { "ref": "WITHIN_MY_ORG", "op": "EQ", "value": true }
+  },
+  "combineWith": "myOrg"
+}
+```
+
+#### Exemple : Contrôle d'Accès Basé sur les Rôles
+
+```java
+@Component
+public class AccessControlService {
+
+    @Autowired
+    private PermissionService permissions;
+
+    /**
+     * Filtre les ressources auxquelles l'utilisateur courant a accès.
+     */
+    @ExposedAs(value = "HAS_ACCESS", operators = {Op.EQ})
+    public PredicateResolver<Document> hasAccess(String op, Object[] args) {
+        List<Long> accessibleIds = permissions.getAccessibleResourceIds();
+        
+        return (root, query, cb) -> {
+            Boolean hasAccess = args.length > 0 ? (Boolean) args[0] : true;
+            if (Boolean.TRUE.equals(hasAccess)) {
+                return root.get("id").in(accessibleIds);
+            } else {
+                return cb.not(root.get("id").in(accessibleIds));
+            }
+        };
+    }
+}
+```
+
+---
+
+### Patterns Avancés
+
+#### Utiliser l'Argument Opérateur
+
+Le paramètre `op` vous donne un contrôle total sur le comportement spécifique à chaque opérateur :
+
+```java
+@ExposedAs(value = "COMPUTED_SCORE", operators = {Op.EQ, Op.GT, Op.LT, Op.GTE, Op.LTE})
+public static PredicateResolver<Product> computedScore(String op, Object[] args) {
+    return (root, query, cb) -> {
+        // Calculer le score comme : rating * 10 + reviewCount
+        var score = cb.sum(
+            cb.prod(root.get("rating"), 10),
+            root.get("reviewCount")
+        );
+        
+        Integer threshold = (Integer) args[0];
+        
+        return switch (op) {
+            case "EQ" -> cb.equal(score, threshold);
+            case "GT" -> cb.gt(score, threshold);
+            case "LT" -> cb.lt(score, threshold);
+            case "GTE" -> cb.ge(score, threshold);
+            case "LTE" -> cb.le(score, threshold);
+            default -> cb.conjunction();
+        };
+    };
+}
+```
+
+#### Champs Virtuels Basés sur des Sous-Requêtes
+
+```java
+@ExposedAs(value = "ORDER_COUNT", operators = {Op.GT, Op.LT, Op.EQ})
+public static PredicateResolver<Customer> orderCount(String op, Object[] args) {
+    return (root, query, cb) -> {
+        // Sous-requête pour compter les commandes
+        var subquery = query.subquery(Long.class);
+        var orderRoot = subquery.from(Order.class);
+        subquery.select(cb.count(orderRoot))
+               .where(cb.equal(orderRoot.get("customer"), root));
+        
+        Long count = ((Number) args[0]).longValue();
+        
+        return switch (op) {
+            case "GT" -> cb.gt(subquery, count);
+            case "LT" -> cb.lt(subquery, count);
+            case "EQ" -> cb.equal(subquery, count);
+            default -> cb.conjunction();
+        };
+    };
+}
+```
+
+**Utilisation :**
+```json
+{
+  "filters": {
+    "bigCustomers": { "ref": "ORDER_COUNT", "op": "GT", "value": 10 }
+  },
+  "combineWith": "bigCustomers"
+}
+```
+
+#### Combiner Champs Virtuels et Champs Réguliers
+
+Les champs virtuels fonctionnent parfaitement avec les champs réguliers dans les expressions de filtre :
+
+```json
+{
+  "filters": {
+    "age": { "ref": "AGE", "op": "GT", "value": 18 },
+    "name": { "ref": "FULL_NAME", "op": "MATCHES", "value": "John" },
+    "myOrg": { "ref": "WITHIN_MY_ORG", "op": "EQ", "value": true }
+  },
+  "combineWith": "age & (name | myOrg)"
+}
+```
+
+---
+
+### Enregistrement des Providers
+
+Les méthodes de champs virtuels peuvent être définies dans :
+
+1. **La classe DTO elle-même** (pour une logique fortement couplée)
+2. **Des classes de résolution dédiées** (pour une logique réutilisable)
+3. **Des beans Spring** (pour une logique contextuelle)
+
+Enregistrez-les avec `@Provider` :
+
+```java
+@Projection(
+    entity = Person.class,
+    providers = {
+        @Provider(VirtualResolverConfig.class),  // Méthodes statiques
+        @Provider(UserTenancyService.class)      // Bean Spring (méthodes d'instance)
+    }
+)
+@Exposure(value = "persons", basePath = "/api")
+public class PersonDTO {
+    // ...
+}
+```
+
+---
+
+### Bonnes Pratiques
+
+#### 1. Valider les Arguments
+
+Toujours vérifier `args` avant d'y accéder :
+
+```java
+public static PredicateResolver<User> filter(String op, Object[] args) {
+    return (root, query, cb) -> {
+        if (args.length == 0 || args[0] == null) {
+            return cb.conjunction();  // Aucun filtre appliqué
+        }
+        // Continuer avec la logique du filtre...
+    };
+}
+```
+
+#### 2. Utiliser des Noms Descriptifs
+
+```java
+// ❌ Obscur
+@ExposedAs(value = "F1", operators = {Op.EQ})
+
+// ✅ Auto-documenté
+@ExposedAs(value = "IS_PREMIUM_CUSTOMER", operators = {Op.EQ})
+```
+
+#### 3. Limiter les Opérateurs
+
+N'exposez que les opérateurs qui ont du sens pour le champ virtuel :
+
+```java
+// ❌ Trop permissif pour un champ booléen
+@ExposedAs(value = "IS_ACTIVE", operators = {Op.EQ, Op.GT, Op.LT, Op.MATCHES})
+
+// ✅ Approprié pour une sémantique booléenne
+@ExposedAs(value = "IS_ACTIVE", operators = {Op.EQ})
+```
+
+#### 4. Documenter la Logique Complexe
+
+```java
+/**
+ * Champ virtuel : Filtre les produits par score de popularité calculé.
+ * 
+ * Formule du score : (rating * 10) + (reviewCount * 2) + (salesCount / 100)
+ * 
+ * Opérateurs :
+ * - GT/GTE : Produits avec score au-dessus du seuil
+ * - LT/LTE : Produits avec score en-dessous du seuil
+ * - EQ : Produits avec score exact (rarement utile)
+ */
+@ExposedAs(value = "POPULARITY_SCORE", operators = {Op.GT, Op.GTE, Op.LT, Op.LTE})
+public static PredicateResolver<Product> popularityScore(String op, Object[] args) {
+    // ...
+}
+```
 
 ---
 
 ## Bonnes Pratiques
-
-### 1. Limitez les Opérateurs
 
 N'autorisez que les opérateurs nécessaires :
 

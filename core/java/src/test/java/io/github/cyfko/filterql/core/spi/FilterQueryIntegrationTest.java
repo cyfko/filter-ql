@@ -1,9 +1,9 @@
 package io.github.cyfko.filterql.core.spi;
 
 import io.github.cyfko.filterql.core.model.FilterRequest;
+import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 import io.github.cyfko.filterql.core.validation.Op;
 import io.github.cyfko.filterql.core.validation.PropertyReference;
-import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
@@ -12,9 +12,22 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+/**
+ * Integration tests for FilterQuery SPI interfaces using a generic context.
+ * These tests verify the contract of the SPI interfaces without any
+ * JPA-specific dependencies, demonstrating backend-agnostic design.
+ */
 class FilterQueryIntegrationTest {
 
     static class DummyEntity {}
+    
+    /**
+     * A simple context object representing any backend context.
+     * In a real JPA implementation this would be EntityManager,
+     * in MongoDB it could be MongoDatabase, etc.
+     */
+    record TestContext(String name) {}
+    
     enum DummyProperty implements PropertyReference {
         NAME;
         public Class<?> getType() { return String.class; }
@@ -26,29 +39,77 @@ class FilterQueryIntegrationTest {
         }
     }
 
+    /**
+     * Concrete implementation of ExecutionStrategy for testing.
+     * Required because ExecutionStrategy.execute() is a generic method
+     * and lambdas cannot implement generic methods.
+     */
+    static class TestListMapStrategy implements ExecutionStrategy<List<Map<String,Object>>> {
+        @Override
+        public <Context> List<Map<String, Object>> execute(
+                Context ctx,
+                PredicateResolver<?> predicateResolver,
+                QueryExecutionParams params) {
+            return List.of(Map.of("name", "John"));
+        }
+    }
+
+    static class TestEntityListStrategy implements ExecutionStrategy<List<DummyEntity>> {
+        private final boolean shouldThrow;
+        
+        TestEntityListStrategy(boolean shouldThrow) {
+            this.shouldThrow = shouldThrow;
+        }
+        
+        @Override
+        public <Context> List<DummyEntity> execute(
+                Context ctx,
+                PredicateResolver<?> predicateResolver,
+                QueryExecutionParams params) {
+            if (shouldThrow) {
+                throw new RuntimeException("fail");
+            }
+            return List.of(new DummyEntity());
+        }
+    }
+
+    static class TestStringListStrategy implements ExecutionStrategy<List<String>> {
+        @Override
+        public <Context> List<String> execute(
+                Context ctx,
+                PredicateResolver<?> predicateResolver,
+                QueryExecutionParams params) {
+            return List.of("ok");
+        }
+    }
+
     @Test
     void testQueryExecutorExecutesWithCustomStrategy() {
         FilterQuery<List<Map<String,Object>>> handler = mock(FilterQuery.class);
         FilterRequest<DummyProperty> request = mock(FilterRequest.class);
         QueryExecutor<List<Map<String,Object>>> executor = mock(QueryExecutor.class);
-        ExecutionStrategy<List<Map<String,Object>>> strategy = mock(ExecutionStrategy.class);
+        ExecutionStrategy<List<Map<String,Object>>> strategy = new TestListMapStrategy();
 
+        TestContext ctx = new TestContext("test");
+        
         when(handler.toExecutor(request)).thenReturn((QueryExecutor) executor);
-        when(executor.executeWith(any(EntityManager.class), eq(strategy))).thenReturn(List.of(Map.of("name", "John")));
+        when(executor.executeWith(eq(ctx), eq(strategy))).thenReturn(List.of(Map.of("name", "John")));
 
-        List<Map<String,Object>> results = handler.<DummyProperty, List<Map<String,Object>>>toExecutor(request).executeWith(mock(EntityManager.class), strategy);
+        List<Map<String,Object>> results = handler.<DummyProperty, List<Map<String,Object>>>toExecutor(request).executeWith(ctx, strategy);
         assertEquals(1, results.size());
         assertEquals("John", results.getFirst().get("name"));
-        verify(executor).executeWith(any(EntityManager.class), eq(strategy));
+        verify(executor).executeWith(eq(ctx), eq(strategy));
     }
 
     @Test
     void testHandlerDefaultExecuteMethod() {
         FilterQuery<List<DummyEntity>> handler = mock(FilterQuery.class);
         FilterRequest<DummyProperty> request = mock(FilterRequest.class);
-        ExecutionStrategy<List<DummyEntity>> strategy = mock(ExecutionStrategy.class);
-        when(handler.execute(eq(request), any(EntityManager.class), eq(strategy))).thenReturn(List.of(new DummyEntity()));
-        List<DummyEntity> results = handler.execute(request, mock(EntityManager.class), strategy);
+        ExecutionStrategy<List<DummyEntity>> strategy = new TestEntityListStrategy(false);
+        TestContext ctx = new TestContext("test");
+        
+        when(handler.execute(eq(request), eq(ctx), eq(strategy))).thenReturn(List.of(new DummyEntity()));
+        List<DummyEntity> results = handler.execute(request, ctx, strategy);
         assertEquals(1, results.size());
     }
 
@@ -57,12 +118,13 @@ class FilterQueryIntegrationTest {
         FilterQuery<Map<String,Object>> handler = mock(FilterQuery.class);
         FilterRequest<DummyProperty> request = mock(FilterRequest.class);
         QueryExecutor<List<Map<String,Object>>> executor = mock(QueryExecutor.class);
-        ExecutionStrategy<List<Map<String,Object>>> strategy = mock(ExecutionStrategy.class);
+        ExecutionStrategy<List<Map<String,Object>>> strategy = new TestListMapStrategy();
+        TestContext ctx = new TestContext("test");
 
         when(handler.toExecutor(request)).thenReturn((QueryExecutor) executor);
-        when(executor.executeWith(any(EntityManager.class), eq(strategy))).thenReturn(List.of(Map.of("field", 42)));
+        when(executor.executeWith(eq(ctx), eq(strategy))).thenReturn(List.of(Map.of("field", 42)));
 
-        List<Map<String,Object>> results = handler.<DummyProperty, List<Map<String,Object>>>toExecutor(request).executeWith(mock(EntityManager.class), strategy);
+        List<Map<String,Object>> results = handler.<DummyProperty, List<Map<String,Object>>>toExecutor(request).executeWith(ctx, strategy);
         assertEquals(42, results.getFirst().get("field"));
     }
 
@@ -73,12 +135,11 @@ class FilterQueryIntegrationTest {
         QueryExecutor<List<DummyEntity>> executor = mock(QueryExecutor.class);
         when(handler.<DummyProperty, List<DummyEntity>>toExecutor(request)).thenReturn(executor);
 
-        ExecutionStrategy<List<DummyEntity>> strategy = (em, pr, params) -> {
-            throw new RuntimeException("fail");
-        };
+        ExecutionStrategy<List<DummyEntity>> strategy = new TestEntityListStrategy(true);
+        TestContext ctx = new TestContext("test");
 
-        when(executor.executeWith(any(EntityManager.class), any())).thenThrow(new RuntimeException("fail"));
-        assertThrows(RuntimeException.class, () -> handler.<DummyProperty, List<DummyEntity>>toExecutor(request).executeWith(mock(EntityManager.class), strategy));
+        when(executor.executeWith(eq(ctx), any())).thenThrow(new RuntimeException("fail"));
+        assertThrows(RuntimeException.class, () -> handler.<DummyProperty, List<DummyEntity>>toExecutor(request).executeWith(ctx, strategy));
     }
 
     @Test
@@ -86,12 +147,13 @@ class FilterQueryIntegrationTest {
         FilterQuery<List<String>> handler = mock(FilterQuery.class);
         FilterRequest<DummyProperty> request = mock(FilterRequest.class);
         QueryExecutor<List<String>> executor = mock(QueryExecutor.class);
-        ExecutionStrategy<List<String>> strategy = mock(ExecutionStrategy.class);
+        ExecutionStrategy<List<String>> strategy = new TestStringListStrategy();
+        TestContext ctx = new TestContext("test");
 
         when(handler.<DummyProperty,List<String>>toExecutor(request)).thenReturn(executor);
-        when(executor.executeWith(any(EntityManager.class), eq(strategy))).thenReturn(List.of("ok"));
+        when(executor.executeWith(eq(ctx), eq(strategy))).thenReturn(List.of("ok"));
 
-        List<String> results = handler.<DummyProperty,List<String>>toExecutor(request).executeWith(mock(EntityManager.class), strategy);
+        List<String> results = handler.<DummyProperty,List<String>>toExecutor(request).executeWith(ctx, strategy);
         assertEquals(List.of("ok"), results);
     }
 }

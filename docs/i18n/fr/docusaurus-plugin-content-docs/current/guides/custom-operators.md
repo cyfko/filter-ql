@@ -4,167 +4,144 @@ sidebar_position: 5
 
 # Opérateurs Personnalisés
 
-FilterQL permet d'étendre les 14 opérateurs standards avec des opérateurs personnalisés via l'interface SPI `CustomOperatorProvider`.
+FilterQL fournit 14 opérateurs standards pour la plupart des besoins de filtrage. Pour les cas d'usage avancés nécessitant une logique de filtre personnalisée, l'**Adaptateur JPA** prend en charge les prédicats personnalisés via `PredicateResolverMapping`.
+
+:::tip Syntaxe Simplifiée Spring
+Avec l'**Adaptateur Spring** et `@ExposedAs`, vous pouvez utiliser une syntaxe plus simple :
+
+```java
+@ExposedAs(value = "FULL_NAME", operators = {Op.MATCHES})
+public static PredicateResolver<User> fullNameSearch(String op, Object[] args) {
+    return (root, query, cb) -> { /* votre logique */ };
+}
+```
+
+Voir [Adaptateur Spring - Champs Virtuels](../reference/spring-adapter#champs-virtuels) pour les détails.
+:::
 
 ---
 
-## Interface SPI
+## Approche : PredicateResolverMapping
+
+Les opérateurs personnalisés sont implémentés directement dans la fonction de mapping de `JpaFilterContext` en utilisant `PredicateResolverMapping<E>`. Cette approche offre un contrôle total sur la génération des prédicats.
+
+### Interface
 
 ```java
-package io.github.cyfko.filterql.core.spi;
+package io.github.cyfko.filterql.jpa.mappings;
 
-/**
- * Contrat pour fournir des implémentations d'opérateurs de filtre personnalisés.
- * Les implémentations indiquent quels codes d'opérateurs elles supportent et fournissent
- * des méthodes pour résoudre les instances FilterDefinition en PredicateResolver exécutables.
- */
-public interface CustomOperatorProvider {
+@FunctionalInterface
+public interface PredicateResolverMapping<E> extends ReferenceMapping<E> {
     
     /**
-     * Retourne l'ensemble des codes d'opérateurs supportés par ce provider.
-     * Chaque code doit être unique parmi tous les providers enregistrés.
-     * Utilisez la convention UPPER_SNAKE_CASE pour la cohérence.
-     * @return un ensemble non-null et non-vide de codes d'opérateurs
+     * Résout un PredicateResolver à partir du code opérateur et des arguments.
+     *
+     * @param op l'opérateur de filtre à appliquer (ex: "EQ", "LIKE", "SOUNDEX")
+     * @param args les arguments de l'opérateur du filtre
+     * @return le PredicateResolver pour la génération différée du prédicat
      */
-    Set<String> supportedOperators();
-    
-    /**
-     * Résout une FilterDefinition en PredicateResolver pour la construction de requêtes.
-     * La validation des valeurs doit être effectuée à l'intérieur du PredicateResolver retourné.
-     * @param definition la définition de filtre contenant les critères de filtrage
-     * @return un PredicateResolver capable de produire le prédicat de requête
-     */
-    <P extends Enum<P> & PropertyReference> 
-    PredicateResolver<?> toResolver(FilterDefinition<P> definition);
+    PredicateResolver<E> map(String op, Object[] args);
 }
 ```
 
 ---
 
-## Enregistrement d'un Opérateur
+## Exemples d'Implémentation
 
-### Via OperatorProviderRegistry
-
-```java
-import io.github.cyfko.filterql.core.spi.OperatorProviderRegistry;
-import io.github.cyfko.filterql.core.spi.CustomOperatorProvider;
-
-// Enregistrer au démarrage de l'application
-OperatorProviderRegistry.register(new SoundexOperatorProvider());
-```
-
-### Implémentation Exemple : SOUNDEX
+### Opérateur SOUNDEX
 
 ```java
-public class SoundexOperatorProvider implements CustomOperatorProvider {
-    
-    @Override
-    public Set<String> supportedOperators() {
-        return Set.of("SOUNDEX");
-    }
-    
-    @Override
-    public <P extends Enum<P> & PropertyReference> 
-    PredicateResolver<?> toResolver(FilterDefinition<P> definition) {
-        return (root, query, cb) -> {
-            // Validation de la valeur au moment de l'exécution
-            Object value = definition.value();
-            if (value == null) {
-                throw new IllegalArgumentException("La valeur SOUNDEX ne peut pas être null");
+// Définir dans le mapping JpaFilterContext
+JpaFilterContext<UserPropertyRef> context = new JpaFilterContext<>(
+    UserPropertyRef.class,
+    ref -> switch (ref) {
+        case USERNAME -> "username";  // Mapping simple
+        case EMAIL -> "email";
+        
+        // Opérateur SOUNDEX personnalisé
+        case LAST_NAME -> new PredicateResolverMapping<User>() {
+            @Override
+            public PredicateResolver<User> map(String op, Object[] args) {
+                return (root, query, cb) -> {
+                    if (!"SOUNDEX".equals(op)) {
+                        // Comportement par défaut pour les autres opérateurs
+                        return cb.equal(root.get("lastName"), args[0]);
+                    }
+                    
+                    String searchValue = (String) args[0];
+                    if (searchValue == null || searchValue.isBlank()) {
+                        throw new IllegalArgumentException("SOUNDEX nécessite une valeur non vide");
+                    }
+                    
+                    return cb.equal(
+                        cb.function("SOUNDEX", String.class, root.get("lastName")),
+                        cb.function("SOUNDEX", String.class, cb.literal(searchValue))
+                    );
+                };
             }
-            if (!(value instanceof String strValue)) {
-                throw new IllegalArgumentException("SOUNDEX requiert une valeur String");
-            }
-            if (strValue.isBlank()) {
-                throw new IllegalArgumentException("La valeur SOUNDEX ne peut pas être vide");
-            }
-            
-            String fieldName = definition.ref().name().toLowerCase();
-            return cb.equal(
-                cb.function("SOUNDEX", String.class, root.get(fieldName)),
-                cb.function("SOUNDEX", String.class, cb.literal(strValue))
-            );
         };
     }
-}
+);
 ```
-
----
-
-## Exemples d'Opérateurs Personnalisés
 
 ### Recherche Full-Text
 
 ```java
-public class FullTextOperatorProvider implements CustomOperatorProvider {
-    
+case DESCRIPTION -> new PredicateResolverMapping<Product>() {
     @Override
-    public Set<String> supportedOperators() {
-        return Set.of("FULLTEXT");
-    }
-    
-    @Override
-    public <P extends Enum<P> & PropertyReference> 
-    PredicateResolver<?> toResolver(FilterDefinition<P> definition) {
+    public PredicateResolver<Product> map(String op, Object[] args) {
         return (root, query, cb) -> {
-            Object value = definition.value();
-            if (!(value instanceof String searchQuery)) {
-                throw new IllegalArgumentException("FULLTEXT requiert une requête String");
+            if (!"FULLTEXT".equals(op)) {
+                return cb.like(root.get("description"), "%" + args[0] + "%");
             }
             
-            // Nettoyer et préparer la requête full-text
+            String searchQuery = (String) args[0];
             String cleanedQuery = searchQuery.trim().replaceAll("\\s+", " & ");
-            String fieldName = definition.ref().name().toLowerCase();
             
             // PostgreSQL ts_vector / ts_query
             return cb.isTrue(
                 cb.function(
                     "to_tsvector",
                     Boolean.class,
-                    cb.literal("french"),
-                    root.get(fieldName)
+                    cb.literal("english"),
+                    root.get("description")
                 ).in(
                     cb.function(
                         "to_tsquery",
                         Object.class,
-                        cb.literal("french"),
+                        cb.literal("english"),
                         cb.literal(cleanedQuery)
                     )
                 )
             );
         };
     }
-}
+};
 ```
 
-### Distance Géographique
+### Distance Géographique (GEO_WITHIN)
 
 ```java
-public class GeoDistanceOperatorProvider implements CustomOperatorProvider {
-    
+case LOCATION -> new PredicateResolverMapping<Store>() {
     @Override
-    public Set<String> supportedOperators() {
-        return Set.of("GEO_WITHIN");
-    }
-    
-    @Override
-    public <P extends Enum<P> & PropertyReference> 
-    PredicateResolver<?> toResolver(FilterDefinition<P> definition) {
+    public PredicateResolver<Store> map(String op, Object[] args) {
         return (root, query, cb) -> {
-            Object value = definition.value();
-            if (!(value instanceof Map<?, ?> params)) {
-                throw new IllegalArgumentException("GEO_WITHIN requiert un Map avec lat, lng, radiusKm");
+            if (!"GEO_WITHIN".equals(op)) {
+                throw new IllegalArgumentException("LOCATION supporte uniquement l'opérateur GEO_WITHIN");
             }
             
-            Double lat = (Double) params.get("lat");
-            Double lng = (Double) params.get("lng");
-            Double radiusKm = (Double) params.get("radiusKm");
+            @SuppressWarnings("unchecked")
+            Map<String, Double> params = (Map<String, Double>) args[0];
+            
+            Double lat = params.get("lat");
+            Double lng = params.get("lng");
+            Double radiusKm = params.get("radiusKm");
             
             if (lat == null || lng == null || radiusKm == null) {
                 throw new IllegalArgumentException("lat, lng et radiusKm sont requis");
             }
             
-            // Formule Haversine simplifiée
+            // Fonction de distance Haversine (spécifique à la base de données)
             Expression<Double> distance = cb.function(
                 "haversine_distance",
                 Double.class,
@@ -177,94 +154,55 @@ public class GeoDistanceOperatorProvider implements CustomOperatorProvider {
             return cb.lessThanOrEqualTo(distance, radiusKm);
         };
     }
-}
+};
 ```
 
-### Opérateur JSON (PostgreSQL)
+---
+
+## Recherche Multi-Champs
+
+Un cas d'usage courant est la recherche sur plusieurs champs :
 
 ```java
-public class JsonContainsOperatorProvider implements CustomOperatorProvider {
-    
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    
+case FULL_NAME -> new PredicateResolverMapping<User>() {
     @Override
-    public Set<String> supportedOperators() {
-        return Set.of("JSON_CONTAINS");
-    }
-    
-    @Override
-    public <P extends Enum<P> & PropertyReference> 
-    PredicateResolver<?> toResolver(FilterDefinition<P> definition) {
+    public PredicateResolver<User> map(String op, Object[] args) {
         return (root, query, cb) -> {
-            Object value = definition.value();
-            if (!(value instanceof Map<?, ?> jsonValue)) {
-                throw new IllegalArgumentException("JSON_CONTAINS requiert une valeur Map");
-            }
+            String search = (String) args[0];
+            String pattern = "%" + search.toLowerCase() + "%";
             
-            // Convertir en chaîne JSON
-            String jsonString;
-            try {
-                jsonString = objectMapper.writeValueAsString(jsonValue);
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Échec de la sérialisation en JSON", e);
-            }
-            
-            String fieldName = definition.ref().name().toLowerCase();
-            // Opérateur PostgreSQL @>
-            return cb.isTrue(
-                cb.function(
-                    "jsonb_contains",
-                    Boolean.class,
-                    root.get(fieldName),
-                    cb.literal(jsonString)
-                )
+            return cb.or(
+                cb.like(cb.lower(root.get("firstName")), pattern),
+                cb.like(cb.lower(root.get("lastName")), pattern),
+                cb.like(cb.lower(cb.concat(
+                    cb.concat(root.get("firstName"), " "),
+                    root.get("lastName")
+                )), pattern)
             );
         };
     }
-}
+};
 ```
 
 ---
 
-## Enregistrement au Démarrage Spring
+## Utilisation dans FilterRequest
+
+Une fois configurés dans `JpaFilterContext`, les opérateurs personnalisés s'utilisent comme les opérateurs standards :
 
 ```java
-import org.springframework.context.annotation.Configuration;
-import jakarta.annotation.PostConstruct;
-import io.github.cyfko.filterql.core.spi.OperatorProviderRegistry;
-
-@Configuration
-public class FilterQlOperatorConfig {
-    
-    @PostConstruct
-    public void registerCustomOperators() {
-        OperatorProviderRegistry.register(new SoundexOperatorProvider());
-        OperatorProviderRegistry.register(new FullTextOperatorProvider());
-        OperatorProviderRegistry.register(new GeoDistanceOperatorProvider());
-        OperatorProviderRegistry.register(new JsonContainsOperatorProvider());
-    }
-}
-```
-
----
-
-## Utilisation
-
-Une fois enregistré, l'opérateur personnalisé s'utilise comme un opérateur standard :
-
-```java
-// Utilisation avec code string
-var soundexFilter = new FilterDefinition<>(
-    UserPropertyRef.FULL_NAME,
-    "SOUNDEX",  // Code de l'opérateur personnalisé
-    "Smith"
-);
-
-// Dans une requête complète
+// Utilisation de l'opérateur SOUNDEX personnalisé
 FilterRequest<UserPropertyRef> request = FilterRequest.<UserPropertyRef>builder()
-    .filter("soundexName", UserPropertyRef.FULL_NAME, "SOUNDEX", "Smith")
+    .filter("soundexName", UserPropertyRef.LAST_NAME, "SOUNDEX", "Smith")
     .filter("active", UserPropertyRef.STATUS, Op.EQ, UserStatus.ACTIVE)
     .combineWith("soundexName & active")
+    .build();
+
+// Utilisation de l'opérateur GEO_WITHIN personnalisé
+FilterRequest<StorePropertyRef> geoRequest = FilterRequest.<StorePropertyRef>builder()
+    .filter("nearby", StorePropertyRef.LOCATION, "GEO_WITHIN", 
+        Map.of("lat", 48.8566, "lng", 2.3522, "radiusKm", 10.0))
+    .combineWith("nearby")
     .build();
 ```
 
@@ -274,15 +212,72 @@ FilterRequest<UserPropertyRef> request = FilterRequest.<UserPropertyRef>builder(
 
 | Aspect | Recommandation |
 |--------|----------------|
-| **Nommage** | Utiliser des codes en MAJUSCULES descriptifs (SOUNDEX, FULLTEXT, GEO_WITHIN) |
-| **Validation** | Valider rigoureusement dans `toResolver()` au moment de l'exécution |
+| **Nommage** | Utiliser des codes descriptifs en MAJUSCULES (SOUNDEX, FULLTEXT, GEO_WITHIN) |
+| **Validation** | Valider les arguments dans le PredicateResolver |
 | **Messages d'erreur** | Fournir des messages clairs et exploitables |
-| **Documentation** | Documenter les paramètres attendus et le comportement |
-| **Tests** | Écrire des tests unitaires pour chaque opérateur |
+| **Comportement par défaut** | Gérer les opérateurs standards en fallback |
+| **Tests** | Écrire des tests unitaires pour chaque mapping personnalisé |
+| **Documentation** | Documenter les types de paramètres attendus et les formats |
+
+---
+
+## Méthodes Utilitaires
+
+Pour des opérateurs personnalisés réutilisables, créez des méthodes statiques :
+
+```java
+public final class CustomMappings {
+    
+    private CustomMappings() {}
+    
+    /**
+     * Crée un mapping SOUNDEX pour n'importe quel champ texte.
+     */
+    public static <E> PredicateResolverMapping<E> soundexMapping(String fieldName) {
+        return new PredicateResolverMapping<>() {
+            @Override
+            public PredicateResolver<E> map(String op, Object[] args) {
+                return (root, query, cb) -> {
+                    String searchValue = (String) args[0];
+                    return cb.equal(
+                        cb.function("SOUNDEX", String.class, root.get(fieldName)),
+                        cb.function("SOUNDEX", String.class, cb.literal(searchValue))
+                    );
+                };
+            }
+        };
+    }
+    
+    /**
+     * Crée un mapping LIKE insensible à la casse.
+     */
+    public static <E> PredicateResolverMapping<E> caseInsensitiveLike(String fieldName) {
+        return new PredicateResolverMapping<>() {
+            @Override
+            public PredicateResolver<E> map(String op, Object[] args) {
+                return (root, query, cb) -> {
+                    String pattern = "%" + ((String) args[0]).toLowerCase() + "%";
+                    return cb.like(cb.lower(root.get(fieldName)), pattern);
+                };
+            }
+        };
+    }
+}
+
+// Utilisation
+JpaFilterContext<UserPropertyRef> context = new JpaFilterContext<>(
+    UserPropertyRef.class,
+    ref -> switch (ref) {
+        case LAST_NAME -> CustomMappings.soundexMapping("lastName");
+        case USERNAME -> CustomMappings.caseInsensitiveLike("username");
+        default -> ref.name().toLowerCase();
+    }
+);
+```
 
 ---
 
 ## Prochaines Étapes
 
 - [Référence Core](../reference/core) - API complète du module core
-- [Référence JPA Adapter](../reference/jpa-adapter) - PredicateResolver en détail
+- [Référence Adaptateur JPA](../reference/jpa-adapter) - PredicateResolverMapping en détail

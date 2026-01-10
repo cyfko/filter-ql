@@ -77,9 +77,7 @@ io.github.cyfko.filterql.core
 │   ├── FilterQuery            # Query lifecycle facade
 │   ├── PredicateResolver      # Deferred predicate generator
 │   ├── ExecutionStrategy      # Execution strategy contract
-│   ├── QueryExecutor          # Query execution coordinator
-│   ├── CustomOperatorProvider # Custom operator extension
-│   └── OperatorProviderRegistry # Operator registration
+│   └── QueryExecutor          # Query execution coordinator
 ├── model/                      # Immutable data structures
 │   ├── FilterRequest          # Request container
 │   ├── FilterDefinition       # Atomic filter spec
@@ -349,8 +347,8 @@ query.where(resolver.resolve(root, query, cb));
 List<User> results = em.createQuery(query).getResultList();
 
 // Mid-level approach (strategy-based)
-QueryExecutor<UserDto> executor = filterQuery.toExecutor(request);
-List<UserDto> dtos = executor.executeWith(em, new MultiQueryFetchStrategy<>());
+QueryExecutor<List<UserDto>> executor = filterQuery.toExecutor(request);
+List<UserDto> dtos = executor.executeWith(em, new MultiQueryFetchStrategy<>(UserDto.class));
 ```
 
 ### FilterContext
@@ -745,90 +743,49 @@ ProjectionPolicy.builder()
 
 ## Custom Operators
 
-FilterQL supports custom operators via the SPI mechanism.
+FilterQL provides 14 standard operators for most filtering needs. For advanced use cases requiring custom filter logic, the **JPA Adapter** supports custom predicates via `PredicateResolverMapping`.
 
-### 1. Implement CustomOperatorProvider
+See the [Custom Operators Guide](../../docs/docs/guides/custom-operators.md) for implementation examples.
+
+### Example: Custom Mapping in JpaFilterContext
 
 ```java
-public class GeoOperatorProvider implements CustomOperatorProvider {
-    
+case COORDINATES -> new PredicateResolverMapping<Location>() {
     @Override
-    public Set<String> supportedOperators() {
-        return Set.of("NEAR", "WITHIN_RADIUS", "IN_POLYGON");
-    }
-    
-    @Override
-    public <E, P extends Enum<P> & PropertyReference> 
-    PredicateResolver<E> toResolver(FilterDefinition<P> definition) {
-        String op = definition.op().toUpperCase();
-        return switch (op) {
-            case "NEAR" -> createNearResolver(definition);
-            case "WITHIN_RADIUS" -> createRadiusResolver(definition);
-            case "IN_POLYGON" -> createPolygonResolver(definition);
-            default -> throw new IllegalArgumentException("Unsupported operator: " + op);
-        };
-    }
-    
-    private <E, P extends Enum<P> & PropertyReference>
-    PredicateResolver<E> createNearResolver(FilterDefinition<P> definition) {
+    public PredicateResolver<Location> map(String op, Object[] args) {
         return (root, query, cb) -> {
-            // Custom predicate logic
-            // Example: ST_Distance(location, point) < threshold
-            // ... implementation specific to your backend
-            return cb.conjunction(); // placeholder
+            if ("NEAR".equals(op)) {
+                @SuppressWarnings("unchecked")
+                Map<String, Double> params = (Map<String, Double>) args[0];
+                Double lat = params.get("lat");
+                Double lon = params.get("lon");
+                Double distance = params.get("distance");
+                
+                // Custom predicate logic - ST_Distance(location, point) < threshold
+                return cb.lessThan(
+                    cb.function("ST_Distance", Double.class, 
+                        root.get("location"),
+                        cb.function("ST_Point", Object.class,
+                            cb.literal(lon), cb.literal(lat))
+                    ),
+                    distance
+                );
+            }
+            throw new IllegalArgumentException("Unsupported operator: " + op);
         };
     }
-    
-    // Similar implementations for other operators...
-}
+};
 ```
 
-### 2. Register Custom Operator
+### Usage
 
 ```java
-// Register provider
-CustomOperatorProvider geoProvider = new GeoOperatorProvider();
-OperatorProviderRegistry.register(geoProvider);
-
-// Use custom operator
 FilterDefinition<LocationPropertyRef> customFilter = new FilterDefinition<>(
     LocationPropertyRef.COORDINATES,
     "NEAR",  // Custom operator code
     Map.of("lat", 48.8566, "lon", 2.3522, "distance", 10.0)
 );
-
-// Unregister when no longer needed
-OperatorProviderRegistry.unregister(geoProvider);
-
-// Or unregister specific operators
-OperatorProviderRegistry.unregister(Set.of("NEAR", "WITHIN_RADIUS"));
 ```
-
-### 3. PropertyReference Integration
-
-```java
-public enum LocationPropertyRef implements PropertyReference {
-    COORDINATES,
-    ADDRESS;
-
-    @Override
-    public Set<Op> getSupportedOperators() {
-        return switch (this) {
-            case COORDINATES -> Set.of(
-                Op.EQ, 
-                Op.IS_NULL, 
-                Op.NOT_NULL
-                // Note: Custom operators validated at runtime
-            );
-            case ADDRESS -> OperatorUtils.FOR_TEXT;
-        };
-    }
-    
-    // ... other methods
-}
-```
-
-**Note:** PropertyReference only validates standard operators (`Op` enum). Custom operators are validated at execution time by the operator provider.
 
 ---
 
@@ -924,13 +881,10 @@ public class MyBackendFilterContext implements FilterContext {
         Op operator = Op.fromString(op);
         
         // Check if standard operator
-        if (operator != null) {
+        if (operator != null && operator != Op.CUSTOM) {
             ref.validateOperator(operator);
-        } else {
-            // Check custom operator registry
-            var provider = OperatorProviderRegistry.getProvider(op)
-                .orElseThrow(() -> new IllegalArgumentException("Unknown operator: " + op));
         }
+        // Custom operators are handled by PredicateResolverMapping in JpaFilterContext
         
         // Return deferred condition (no value yet)
         return new MyBackendCondition(argKey, ref, op);
@@ -966,10 +920,13 @@ public class MyBackendFilterContext implements FilterContext {
 public class MyCustomStrategy<R> implements ExecutionStrategy<R> {
     
     @Override
-    public R execute(
-            EntityManager em,
+    public <Context> R execute(
+            Context ctx,
             PredicateResolver<?> resolver,
             QueryExecutionParams params) {
+        
+        // Cast context to your specific type (e.g., EntityManager for JPA)
+        EntityManager em = (EntityManager) ctx;
         
         // Access execution parameters
         List<String> projection = params.projection();

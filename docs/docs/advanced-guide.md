@@ -300,7 +300,7 @@ public class Book {
 
 ## Custom Operators {#custom-operators}
 
-FilterQL allows adding your own operators via SPI.
+FilterQL allows adding custom operators via `PredicateResolverMapping` in the JPA adapter.
 
 ### Use Cases
 
@@ -311,61 +311,38 @@ FilterQL allows adding your own operators via SPI.
 
 ### Implementation
 
-**1. Create the provider:**
+**1. Define the custom mapping in JpaFilterContext:**
 
 ```java
-public class SoundexOperatorProvider implements CustomOperatorProvider {
-    
-    @Override
-    public Set<String> supportedOperators() {
-        return Set.of("SOUNDEX");
-    }
-    
-    @Override
-    public <P extends Enum<P> & PropertyReference> 
-    PredicateResolver<?> toResolver(FilterDefinition<P> definition) {
-        return (root, query, cb) -> {
-            // Value validation at execution time
-            if (!(definition.value() instanceof String searchValue) || searchValue.isBlank()) {
-                throw new IllegalArgumentException("SOUNDEX requires non-blank String value");
+JpaFilterContext<UserPropertyRef> context = new JpaFilterContext<>(
+    UserPropertyRef.class,
+    ref -> switch (ref) {
+        case NAME -> new PredicateResolverMapping<User>() {
+            @Override
+            public PredicateResolver<User> map(String op, Object[] args) {
+                return (root, query, cb) -> {
+                    if ("SOUNDEX".equals(op)) {
+                        String searchValue = (String) args[0];
+                        if (searchValue == null || searchValue.isBlank()) {
+                            throw new IllegalArgumentException("SOUNDEX requires non-blank value");
+                        }
+                        return cb.equal(
+                            cb.function("SOUNDEX", String.class, root.get("name")),
+                            cb.function("SOUNDEX", String.class, cb.literal(searchValue))
+                        );
+                    }
+                    // Default behavior for standard operators
+                    return cb.equal(root.get("name"), args[0]);
+                };
             }
-            
-            String fieldName = definition.ref().name().toLowerCase();
-            return cb.equal(
-                cb.function("SOUNDEX", String.class, root.get(fieldName)),
-                cb.function("SOUNDEX", String.class, cb.literal(searchValue))
-            );
         };
-    }
-}
-```
-
-**2. Register the provider:**
-
-```java
-@Configuration
-public class FilterConfig {
-    
-    @PostConstruct
-    public void registerOperators() {
-        OperatorProviderRegistry.register(new SoundexOperatorProvider());
-    }
-}
-```
-
-**3. Allow the operator in PropertyReference:**
-
-```java
-@Override
-public Set<Op> getSupportedOperators() {
-    return switch (this) {
-        case NAME -> Set.of(Op.EQ, Op.MATCHES, Op.CUSTOM); // CUSTOM allows registered operators
+        case EMAIL -> "email";  // Simple path mapping
         // ...
-    };
-}
+    }
+);
 ```
 
-**4. Use in a request:**
+**2. Use in a request:**
 
 ```json
 {
@@ -461,9 +438,47 @@ public class UserDTO {
 }
 ```
 
-### Virtual Field with Custom Predicate
+## Virtual Fields {#virtual-fields}
 
-You can create "virtual" fields that execute custom logic:
+Virtual fields are one of FilterQL's most powerful features. They allow you to define **filterable properties that don't directly map to entity fields**, enabling complex query logic through a simple API.
+
+### Why Virtual Fields?
+
+| Use Case | Example |
+|----------|---------|
+| **Calculated properties** | Filter by `fullName` (combines firstName + lastName) |
+| **Semantic aliases** | `isActive` instead of complex status checks |
+| **Business logic encapsulation** | `hasAccess` with role/permission verification |
+| **Multi-field searches** | Search across multiple columns simultaneously |
+| **Aggregations** | `orderCount > 10` based on subqueries |
+| **Dynamic filtering** | `withinMyOrg` based on current user's context |
+
+### Basic Syntax
+
+```java
+import io.github.cyfko.filterql.core.spi.PredicateResolver;
+
+@ExposedAs(value = "FIELD_NAME", operators = {Op.MATCHES, Op.EQ})
+public static PredicateResolver<Entity> methodName(String op, Object[] args) {
+    return (root, query, cb) -> {
+        // Custom predicate logic using JPA Criteria API
+        return cb.equal(root.get("field"), args[0]);
+    };
+}
+```
+
+**Method requirements:**
+- **Return type:** `PredicateResolver<E>` where `E` is the entity type
+- **Parameters:** `(String op, Object[] args)` — the operator and filter arguments
+- **Visibility:** `public static` (or instance method for Spring beans)
+
+---
+
+### Static Virtual Fields
+
+Static methods are ideal for **pure predicate logic** that doesn't require external dependencies.
+
+#### Example: Full Name Search
 
 ```java
 @Projection(entity = Person.class)
@@ -477,14 +492,13 @@ public class PersonDTO {
     private String lastName;
 
     /**
-     * Virtual field: searches in firstName AND lastName.
-     * The static method returns a PredicateResolverMapping.
+     * Virtual field: searches in firstName OR lastName.
      */
     @ExposedAs(value = "FULL_NAME", operators = {Op.MATCHES})
-    public static PredicateResolverMapping<Person> fullNameMatches() {
-        return (root, query, cb, params) -> {
-            if (params.length == 0) return cb.conjunction();
-            String pattern = "%" + params[0] + "%";
+    public static PredicateResolver<Person> fullNameMatches(String op, Object[] args) {
+        return (root, query, cb) -> {
+            if (args.length == 0) return cb.conjunction();
+            String pattern = "%" + args[0] + "%";
             return cb.or(
                 cb.like(root.get("firstName"), pattern),
                 cb.like(root.get("lastName"), pattern)
@@ -505,6 +519,292 @@ public class PersonDTO {
 ```
 
 Searches for "john" in `firstName` OR `lastName`.
+
+#### Example: Admin User Filter
+
+```java
+/**
+ * Virtual field defined in a dedicated resolver class.
+ */
+public class VirtualResolverConfig {
+
+    @ExposedAs(value = "IS_ADMIN", operators = {Op.EQ})
+    public static PredicateResolver<Person> isAdminUser(String op, Object[] args) {
+        return (root, query, cb) -> {
+            Boolean isAdmin = args.length > 0 ? (Boolean) args[0] : false;
+            if (Boolean.TRUE.equals(isAdmin)) {
+                return cb.equal(root.get("role"), "ADMIN");
+            } else {
+                return cb.notEqual(root.get("role"), "ADMIN");
+            }
+        };
+    }
+}
+
+// Register as provider in the DTO
+@Projection(
+    entity = Person.class,
+    providers = @Provider(VirtualResolverConfig.class)
+)
+public class PersonDTO { /* ... */ }
+```
+
+**Usage:**
+```json
+{
+  "filters": {
+    "admins": { "ref": "IS_ADMIN", "op": "EQ", "value": true }
+  },
+  "combineWith": "admins"
+}
+```
+
+---
+
+### Instance Virtual Fields (Spring Beans)
+
+Instance methods are powerful for **context-aware filtering** that requires Spring services, security context, or other injected dependencies.
+
+#### Example: Multi-Tenant Filtering
+
+```java
+@Component
+public class UserTenancyService {
+
+    @Autowired
+    private SecurityContext securityContext;
+
+    /**
+     * Virtual field: filters users within the current user's organization.
+     */
+    @ExposedAs(value = "WITHIN_MY_ORG", operators = {Op.EQ})
+    public PredicateResolver<Person> withinCurrentOrg(String op, Object[] args) {
+        // Access current user from security context
+        String currentUserOrg = securityContext.getCurrentUser().getOrganization();
+        
+        return (root, query, cb) -> {
+            Boolean withinOrg = args.length > 0 ? (Boolean) args[0] : true;
+            if (Boolean.TRUE.equals(withinOrg)) {
+                return cb.equal(root.get("organizationId"), currentUserOrg);
+            } else {
+                return cb.notEqual(root.get("organizationId"), currentUserOrg);
+            }
+        };
+    }
+}
+
+// Register as provider in the DTO
+@Projection(
+    entity = Person.class,
+    providers = @Provider(UserTenancyService.class)
+)
+public class PersonDTO { /* ... */ }
+```
+
+**Usage:**
+```json
+{
+  "filters": {
+    "myOrg": { "ref": "WITHIN_MY_ORG", "op": "EQ", "value": true }
+  },
+  "combineWith": "myOrg"
+}
+```
+
+#### Example: Role-Based Access Control
+
+```java
+@Component
+public class AccessControlService {
+
+    @Autowired
+    private PermissionService permissions;
+
+    /**
+     * Filters resources the current user has access to.
+     */
+    @ExposedAs(value = "HAS_ACCESS", operators = {Op.EQ})
+    public PredicateResolver<Document> hasAccess(String op, Object[] args) {
+        List<Long> accessibleIds = permissions.getAccessibleResourceIds();
+        
+        return (root, query, cb) -> {
+            Boolean hasAccess = args.length > 0 ? (Boolean) args[0] : true;
+            if (Boolean.TRUE.equals(hasAccess)) {
+                return root.get("id").in(accessibleIds);
+            } else {
+                return cb.not(root.get("id").in(accessibleIds));
+            }
+        };
+    }
+}
+```
+
+---
+
+### Advanced Patterns
+
+#### Using the Operator Argument
+
+The `op` parameter gives you full control over operator-specific behavior:
+
+```java
+@ExposedAs(value = "COMPUTED_SCORE", operators = {Op.EQ, Op.GT, Op.LT, Op.GTE, Op.LTE})
+public static PredicateResolver<Product> computedScore(String op, Object[] args) {
+    return (root, query, cb) -> {
+        // Calculate score as: rating * 10 + reviewCount
+        var score = cb.sum(
+            cb.prod(root.get("rating"), 10),
+            root.get("reviewCount")
+        );
+        
+        Integer threshold = (Integer) args[0];
+        
+        return switch (op) {
+            case "EQ" -> cb.equal(score, threshold);
+            case "GT" -> cb.gt(score, threshold);
+            case "LT" -> cb.lt(score, threshold);
+            case "GTE" -> cb.ge(score, threshold);
+            case "LTE" -> cb.le(score, threshold);
+            default -> cb.conjunction();
+        };
+    };
+}
+```
+
+#### Subquery-Based Virtual Fields
+
+```java
+@ExposedAs(value = "ORDER_COUNT", operators = {Op.GT, Op.LT, Op.EQ})
+public static PredicateResolver<Customer> orderCount(String op, Object[] args) {
+    return (root, query, cb) -> {
+        // Subquery to count orders
+        var subquery = query.subquery(Long.class);
+        var orderRoot = subquery.from(Order.class);
+        subquery.select(cb.count(orderRoot))
+               .where(cb.equal(orderRoot.get("customer"), root));
+        
+        Long count = ((Number) args[0]).longValue();
+        
+        return switch (op) {
+            case "GT" -> cb.gt(subquery, count);
+            case "LT" -> cb.lt(subquery, count);
+            case "EQ" -> cb.equal(subquery, count);
+            default -> cb.conjunction();
+        };
+    };
+}
+```
+
+**Usage:**
+```json
+{
+  "filters": {
+    "bigCustomers": { "ref": "ORDER_COUNT", "op": "GT", "value": 10 }
+  },
+  "combineWith": "bigCustomers"
+}
+```
+
+#### Combining Virtual and Regular Fields
+
+Virtual fields work seamlessly with regular fields in filter expressions:
+
+```json
+{
+  "filters": {
+    "age": { "ref": "AGE", "op": "GT", "value": 18 },
+    "name": { "ref": "FULL_NAME", "op": "MATCHES", "value": "John" },
+    "myOrg": { "ref": "WITHIN_MY_ORG", "op": "EQ", "value": true }
+  },
+  "combineWith": "age & (name | myOrg)"
+}
+```
+
+---
+
+### Provider Registration
+
+Virtual field methods can be defined in:
+
+1. **The DTO class itself** (for tightly coupled logic)
+2. **Dedicated resolver classes** (for reusable logic)
+3. **Spring beans** (for context-aware logic)
+
+Register them using `@Provider`:
+
+```java
+@Projection(
+    entity = Person.class,
+    providers = {
+        @Provider(VirtualResolverConfig.class),  // Static methods
+        @Provider(UserTenancyService.class)      // Spring bean (instance methods)
+    }
+)
+@Exposure(value = "persons", basePath = "/api")
+public class PersonDTO {
+    // ...
+}
+```
+
+---
+
+### Best Practices
+
+#### 1. Validate Arguments
+
+Always check `args` before accessing:
+
+```java
+public static PredicateResolver<User> filter(String op, Object[] args) {
+    return (root, query, cb) -> {
+        if (args.length == 0 || args[0] == null) {
+            return cb.conjunction();  // No filter applied
+        }
+        // Continue with filter logic...
+    };
+}
+```
+
+#### 2. Use Descriptive Names
+
+```java
+// ❌ Obscure
+@ExposedAs(value = "F1", operators = {Op.EQ})
+
+// ✅ Self-documenting
+@ExposedAs(value = "IS_PREMIUM_CUSTOMER", operators = {Op.EQ})
+```
+
+#### 3. Limit Operators
+
+Only expose operators that make sense for the virtual field:
+
+```java
+// ❌ Too permissive for a boolean-like field
+@ExposedAs(value = "IS_ACTIVE", operators = {Op.EQ, Op.GT, Op.LT, Op.MATCHES})
+
+// ✅ Appropriate for boolean semantics
+@ExposedAs(value = "IS_ACTIVE", operators = {Op.EQ})
+```
+
+#### 4. Document Complex Logic
+
+```java
+/**
+ * Virtual field: Filters products by computed popularity score.
+ * 
+ * Score formula: (rating * 10) + (reviewCount * 2) + (salesCount / 100)
+ * 
+ * Operators:
+ * - GT/GTE: Products with score above threshold
+ * - LT/LTE: Products with score below threshold
+ * - EQ: Products with exact score (rarely useful)
+ */
+@ExposedAs(value = "POPULARITY_SCORE", operators = {Op.GT, Op.GTE, Op.LT, Op.LTE})
+public static PredicateResolver<Product> popularityScore(String op, Object[] args) {
+    // ...
+}
+```
 
 ---
 
