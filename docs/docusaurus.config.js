@@ -5,7 +5,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 const config = {
   title: 'FilterQL',
   tagline: 'Type-safe dynamic filtering for Java',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/logo.png',
 
   url: 'https://cyfko.github.io',
   baseUrl: '/filter-ql/',
@@ -55,7 +55,7 @@ const config = {
         title: 'FilterQL',
         logo: {
           alt: 'FilterQL Logo',
-          src: 'img/logo.svg',
+          src: 'img/logo.png',
           href: '/docs/',
         },
         items: [
