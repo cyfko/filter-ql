@@ -564,4 +564,4 @@ Lancée pour :
 
 - [Référence JPA Adapter](jpa-adapter) - JpaFilterContext et stratégies d'exécution
 - [Référence Spring Adapter](spring-adapter) - Annotations et services Spring
-- [Guide Opérateurs Personnalisés](../guides/custom-operators) - Implémenter des opérateurs personnalisés via PredicateResolverMapping
+- [Guide Opérateurs Personnalisés](../guides/custom-operators) - Implémenter des opérateurs personnalisés via CustomOperatorResolver ou PredicateResolverMapping

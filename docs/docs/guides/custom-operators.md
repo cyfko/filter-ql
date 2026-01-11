@@ -4,7 +4,10 @@ sidebar_position: 5
 
 # Custom Operators
 
-FilterQL provides 14 standard operators for most filtering needs. For advanced use cases requiring custom filter logic, the **JPA Adapter** supports custom predicates via `PredicateResolverMapping`.
+FilterQL provides 14 standard operators for most filtering needs. For advanced use cases requiring custom filter logic, the **JPA Adapter** offers two complementary approaches:
+
+1. **`CustomOperatorResolver`** - Centralized handler for operators that apply to multiple properties
+2. **`PredicateResolverMapping`** - Per-property custom logic for property-specific behavior
 
 :::tip Spring Simplified Syntax
 When using the **Spring Adapter** with `@ExposedAs`, you can use a simpler syntax:
@@ -21,9 +24,100 @@ See [Spring Adapter - Virtual Fields](../reference/spring-adapter#virtual-fields
 
 ---
 
-## Approach: PredicateResolverMapping
+## Approach 1: CustomOperatorResolver
+
+The `CustomOperatorResolver` interface provides a centralized way to handle custom operators. It's called before the default resolution mechanism, allowing you to intercept any operator for any property.
+
+**Best for:** Operators like SOUNDEX, FULL_TEXT, GEO_WITHIN that apply to multiple properties with similar logic.
+
+### Interface
+
+```java
+@FunctionalInterface
+public interface CustomOperatorResolver<P extends Enum<P> & PropertyReference> {
+    
+    /**
+     * Resolves a custom operator to a PredicateResolver.
+     *
+     * @param ref  the property reference being filtered
+     * @param op   the operator code (e.g., "SOUNDEX", "GEO_WITHIN")
+     * @param args the filter arguments
+     * @return PredicateResolver to handle this operation, or null to delegate to default
+     */
+    PredicateResolver<?> resolve(P ref, String op, Object[] args);
+}
+```
+
+### Basic Usage
+
+```java
+JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
+        UserProperty.class, 
+        mappingBuilder
+    ).withCustomOperatorResolver((ref, op, args) -> {
+        // Return null to delegate to default handling
+        if (!"SOUNDEX".equals(op)) {
+            return null;
+        }
+        
+        // Handle SOUNDEX operator for applicable properties
+        String fieldPath = switch (ref) {
+            case FIRST_NAME -> "firstName";
+            case LAST_NAME -> "lastName";
+            default -> throw new IllegalArgumentException(
+                "SOUNDEX not supported for " + ref);
+        };
+        
+        return (root, query, cb) -> cb.equal(
+            cb.function("SOUNDEX", String.class, root.get(fieldPath)),
+            cb.function("SOUNDEX", String.class, cb.literal((String) args[0]))
+        );
+    });
+```
+
+### Multiple Custom Operators
+
+```java
+CustomOperatorResolver<UserProperty> resolver = (ref, op, args) -> {
+    return switch (op) {
+        case "SOUNDEX" -> handleSoundex(ref, args);
+        case "LEVENSHTEIN" -> handleLevenshtein(ref, args);
+        case "GEO_WITHIN" -> handleGeoWithin(ref, args);
+        case "FULL_TEXT" -> handleFullText(ref, args);
+        default -> null;  // Delegate to default handling
+    };
+};
+
+JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
+        UserProperty.class, 
+        mappingBuilder
+    ).withCustomOperatorResolver(resolver);
+```
+
+### Override Standard Operators
+
+You can override standard operators for specific properties:
+
+```java
+CustomOperatorResolver<UserProperty> resolver = (ref, op, args) -> {
+    // Make MATCHES case-insensitive for EMAIL
+    if (ref == UserProperty.EMAIL && "MATCHES".equals(op)) {
+        return (root, query, cb) -> {
+            String pattern = ((String) args[0]).toLowerCase();
+            return cb.like(cb.lower(root.get("email")), pattern);
+        };
+    }
+    return null;
+};
+```
+
+---
+
+## Approach 2: PredicateResolverMapping
 
 Custom operators are implemented directly in the `JpaFilterContext` mapping function using `PredicateResolverMapping<E>`. This approach provides full control over predicate generation.
+
+**Best for:** Property-specific logic like multi-field search (FULL_NAME), calculated fields, or subqueries that are unique to a single property.
 
 ### Interface
 

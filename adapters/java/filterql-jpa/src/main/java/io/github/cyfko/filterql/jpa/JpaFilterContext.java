@@ -11,6 +11,7 @@ import io.github.cyfko.filterql.core.utils.TypeConversionUtils;
 import io.github.cyfko.filterql.core.utils.FilterConfigUtils;
 import io.github.cyfko.filterql.core.validation.Op;
 import io.github.cyfko.filterql.core.validation.PropertyReference;
+import io.github.cyfko.filterql.jpa.mappings.CustomOperatorResolver;
 import io.github.cyfko.filterql.jpa.mappings.PredicateResolverMapping;
 import io.github.cyfko.filterql.jpa.utils.PathResolverUtils;
 import jakarta.persistence.criteria.*;
@@ -84,6 +85,19 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
      * </ul>
      */
     private Function<P, Object> mappingBuilder;
+
+    /**
+     * Optional custom operator resolver for handling custom operators or overriding
+     * default operator behavior. Called before the default resolution mechanism.
+     * <p>
+     * When this resolver returns a non-null {@link PredicateResolver}, it is used
+     * directly. When it returns {@code null}, the default path-based or
+     * {@link PredicateResolverMapping} handling is applied.
+     * </p>
+     *
+     * @since 2.0.0
+     */
+    private CustomOperatorResolver<P> customOperatorResolver;
 
     /**
      * Returns the enum class used as property reference in this context.
@@ -206,6 +220,56 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
     }
 
     /**
+     * Configures a custom operator resolver for this context.
+     * <p>
+     * The resolver is called <strong>before</strong> the default resolution mechanism
+     * (path-based or {@link PredicateResolverMapping}). If the resolver returns a
+     * non-null {@link PredicateResolver}, it is used directly. If it returns {@code null},
+     * the default handling is applied.
+     * </p>
+     *
+     * <p><strong>Example - Custom SOUNDEX operator:</strong></p>
+     * <pre>{@code
+     * JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
+     *         UserProperty.class, mappingBuilder
+     *     ).withCustomOperatorResolver((ref, op, args) -> {
+     *         if (!"SOUNDEX".equals(op)) return null;
+     *         
+     *         String fieldPath = switch (ref) {
+     *             case FIRST_NAME -> "firstName";
+     *             case LAST_NAME -> "lastName";
+     *             default -> throw new IllegalArgumentException(
+     *                 "SOUNDEX not supported for " + ref);
+     *         };
+     *         
+     *         return (root, query, cb) -> cb.equal(
+     *             cb.function("SOUNDEX", String.class, root.get(fieldPath)),
+     *             cb.function("SOUNDEX", String.class, cb.literal((String) args[0]))
+     *         );
+     *     });
+     * }</pre>
+     *
+     * @param resolver the custom operator resolver, or {@code null} to disable
+     * @return this context for method chaining
+     * @since 2.0.0
+     * @see CustomOperatorResolver
+     */
+    public JpaFilterContext<P> withCustomOperatorResolver(CustomOperatorResolver<P> resolver) {
+        this.customOperatorResolver = resolver;
+        return this;
+    }
+
+    /**
+     * Returns the currently configured custom operator resolver.
+     *
+     * @return the custom operator resolver, or {@code null} if not configured
+     * @since 2.0.0
+     */
+    public CustomOperatorResolver<P> getCustomOperatorResolver() {
+        return this.customOperatorResolver;
+    }
+
+    /**
      * Creates a {@link Condition} for the given argument key, property reference, and operator.
      *
      * <p>
@@ -251,7 +315,7 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
         }
 
         @SuppressWarnings("unchecked")
-        Object mapping = mappingBuilder.apply((P) ref);
+        P typedRef = (P) ref;
 
         // Supplier that will resolve the parameter from the thread-local registry
         Supplier<Object> param = () -> {
@@ -264,6 +328,34 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
             }
             return registry.get(argKey);
         };
+
+        // Try custom operator resolver first (if configured)
+        if (customOperatorResolver != null) {
+            // We need to check at resolution time, so we wrap the logic
+            PredicateResolver<?> wrappedResolver = (root, query, cb) -> {
+                Object[] paramArray = toParameterArray(param.get());
+                PredicateResolver<?> customResolved = customOperatorResolver.resolve(typedRef, op, paramArray);
+                if (customResolved != null) {
+                    // Safe cast: the resolver works with any root type
+                    @SuppressWarnings("unchecked")
+                    PredicateResolver<Object> typedCustomResolver = (PredicateResolver<Object>) customResolved;
+                    return typedCustomResolver.resolve(root, query, cb);
+                }
+                // Delegate to default handling
+                return resolveWithDefaultMechanism(typedRef, op, param, root, query, cb);
+            };
+            return new JpaCondition<>(wrappedResolver);
+        }
+
+        // Default handling when no custom resolver is configured
+        return resolveWithDefaultMechanismCondition(typedRef, op, param);
+    }
+
+    /**
+     * Creates a Condition using the default resolution mechanism (path or PredicateResolverMapping).
+     */
+    private Condition resolveWithDefaultMechanismCondition(P ref, String op, Supplier<Object> param) {
+        Object mapping = mappingBuilder.apply(ref);
 
         if (mapping instanceof PredicateResolverMapping<?> prm) {
             @SuppressWarnings({"rawtypes", "unchecked"})
@@ -281,6 +373,32 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
                     () -> new FilterDefinition<>(ref, op, param.get())
             );
             return new JpaCondition<>(resolver);
+        }
+
+        throw new IllegalArgumentException("Invalid mapping function: only String and PredicateResolverMapping are supported");
+    }
+
+    /**
+     * Resolves a predicate using the default mechanism (path or PredicateResolverMapping).
+     * Used when customOperatorResolver returns null.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private Predicate resolveWithDefaultMechanism(P ref, String op, Supplier<Object> param,
+                                                   Root<?> root, CriteriaQuery<?> query, CriteriaBuilder cb) {
+        Object mapping = mappingBuilder.apply(ref);
+
+        if (mapping instanceof PredicateResolverMapping<?> prm) {
+            Object[] paramArray = toParameterArray(param.get());
+            return prm.map(op, paramArray).resolve((Root) root, query, cb);
+        }
+
+        if (mapping instanceof String pathName) {
+            PredicateResolver<?> resolver = getResolverFromPath(
+                    this.filterConfig,
+                    pathName,
+                    () -> new FilterDefinition<>(ref, op, param.get())
+            );
+            return resolver.resolve((Root) root, query, cb);
         }
 
         throw new IllegalArgumentException("Invalid mapping function: only String and PredicateResolverMapping are supported");

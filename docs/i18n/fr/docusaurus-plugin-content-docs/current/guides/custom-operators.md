@@ -4,7 +4,10 @@ sidebar_position: 5
 
 # Opérateurs Personnalisés
 
-FilterQL fournit 14 opérateurs standards pour la plupart des besoins de filtrage. Pour les cas d'usage avancés nécessitant une logique de filtre personnalisée, l'**Adaptateur JPA** prend en charge les prédicats personnalisés via `PredicateResolverMapping`.
+FilterQL fournit 14 opérateurs standards pour la plupart des besoins de filtrage. Pour les cas d'usage avancés nécessitant une logique de filtre personnalisée, l'**Adaptateur JPA** offre deux approches complémentaires :
+
+1. **`CustomOperatorResolver`** - Gestionnaire centralisé pour les opérateurs qui s'appliquent à plusieurs propriétés
+2. **`PredicateResolverMapping`** - Logique personnalisée par propriété pour un comportement spécifique
 
 :::tip Syntaxe Simplifiée Spring
 Avec l'**Adaptateur Spring** et `@ExposedAs`, vous pouvez utiliser une syntaxe plus simple :
@@ -21,9 +24,100 @@ Voir [Adaptateur Spring - Champs Virtuels](../reference/spring-adapter#champs-vi
 
 ---
 
-## Approche : PredicateResolverMapping
+## Approche 1 : CustomOperatorResolver
+
+L'interface `CustomOperatorResolver` fournit un moyen centralisé de gérer les opérateurs personnalisés. Elle est appelée avant le mécanisme de résolution par défaut, vous permettant d'intercepter n'importe quel opérateur pour n'importe quelle propriété.
+
+**Idéal pour :** Les opérateurs comme SOUNDEX, FULL_TEXT, GEO_WITHIN qui s'appliquent à plusieurs propriétés avec une logique similaire.
+
+### Interface
+
+```java
+@FunctionalInterface
+public interface CustomOperatorResolver<P extends Enum<P> & PropertyReference> {
+    
+    /**
+     * Résout un opérateur personnalisé vers un PredicateResolver.
+     *
+     * @param ref  la référence de propriété filtrée
+     * @param op   le code de l'opérateur (ex: "SOUNDEX", "GEO_WITHIN")
+     * @param args les arguments du filtre
+     * @return PredicateResolver pour gérer cette opération, ou null pour déléguer au défaut
+     */
+    PredicateResolver<?> resolve(P ref, String op, Object[] args);
+}
+```
+
+### Utilisation de Base
+
+```java
+JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
+        UserProperty.class, 
+        mappingBuilder
+    ).withCustomOperatorResolver((ref, op, args) -> {
+        // Retourner null pour déléguer au mécanisme par défaut
+        if (!"SOUNDEX".equals(op)) {
+            return null;
+        }
+        
+        // Gérer l'opérateur SOUNDEX pour les propriétés applicables
+        String fieldPath = switch (ref) {
+            case FIRST_NAME -> "firstName";
+            case LAST_NAME -> "lastName";
+            default -> throw new IllegalArgumentException(
+                "SOUNDEX non supporté pour " + ref);
+        };
+        
+        return (root, query, cb) -> cb.equal(
+            cb.function("SOUNDEX", String.class, root.get(fieldPath)),
+            cb.function("SOUNDEX", String.class, cb.literal((String) args[0]))
+        );
+    });
+```
+
+### Plusieurs Opérateurs Personnalisés
+
+```java
+CustomOperatorResolver<UserProperty> resolver = (ref, op, args) -> {
+    return switch (op) {
+        case "SOUNDEX" -> handleSoundex(ref, args);
+        case "LEVENSHTEIN" -> handleLevenshtein(ref, args);
+        case "GEO_WITHIN" -> handleGeoWithin(ref, args);
+        case "FULL_TEXT" -> handleFullText(ref, args);
+        default -> null;  // Déléguer au mécanisme par défaut
+    };
+};
+
+JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
+        UserProperty.class, 
+        mappingBuilder
+    ).withCustomOperatorResolver(resolver);
+```
+
+### Surcharger les Opérateurs Standards
+
+Vous pouvez surcharger les opérateurs standards pour des propriétés spécifiques :
+
+```java
+CustomOperatorResolver<UserProperty> resolver = (ref, op, args) -> {
+    // Rendre MATCHES insensible à la casse pour EMAIL
+    if (ref == UserProperty.EMAIL && "MATCHES".equals(op)) {
+        return (root, query, cb) -> {
+            String pattern = ((String) args[0]).toLowerCase();
+            return cb.like(cb.lower(root.get("email")), pattern);
+        };
+    }
+    return null;
+};
+```
+
+---
+
+## Approche 2 : PredicateResolverMapping
 
 Les opérateurs personnalisés sont implémentés directement dans la fonction de mapping de `JpaFilterContext` en utilisant `PredicateResolverMapping<E>`. Cette approche offre un contrôle total sur la génération des prédicats.
+
+**Idéal pour :** La logique spécifique à une propriété comme la recherche multi-champs (FULL_NAME), les champs calculés, ou les sous-requêtes uniques à une seule propriété.
 
 ### Interface
 

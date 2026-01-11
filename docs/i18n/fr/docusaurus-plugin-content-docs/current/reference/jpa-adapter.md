@@ -35,7 +35,8 @@ io.github.cyfko.filterql.jpa
 ├── JpaFilterContext           # Implémentation principale de FilterContext
 ├── JpaCondition               # Wrapper de condition JPA
 ├── mappings/
-│   ├── PredicateResolverMapping # Interface de mapping de prédicat personnalisé
+│   ├── CustomOperatorResolver   # Gestionnaire centralisé d'opérateurs personnalisés
+│   ├── PredicateResolverMapping # Mapping de prédicat par propriété
 │   └── InstanceResolver        # Résolution de beans IoC
 ├── strategies/
 │   ├── MultiQueryFetchStrategy      # Stratégie DTO avec batch (RECOMMANDÉE)
@@ -204,6 +205,56 @@ case HAS_ORDERS -> (PredicateResolverMapping<User>) (op, args) -> (root, query, 
     return cb.greaterThan(subquery, 0L);
 };
 ```
+
+---
+
+## CustomOperatorResolver
+
+Interface centralisée pour gérer les opérateurs personnalisés sur toutes les propriétés. Ajoutée via la méthode fluide `withCustomOperatorResolver()`.
+
+```java
+package io.github.cyfko.filterql.jpa.mappings;
+
+@FunctionalInterface
+public interface CustomOperatorResolver<P extends Enum<P> & PropertyReference> {
+    
+    /**
+     * Résout un opérateur personnalisé vers un PredicateResolver.
+     *
+     * @param ref  la référence de propriété filtrée
+     * @param op   le code de l'opérateur (ex: "SOUNDEX", "GEO_WITHIN")
+     * @param args les arguments du filtre
+     * @return PredicateResolver pour gérer cette opération, ou null pour déléguer au défaut
+     */
+    PredicateResolver<?> resolve(P ref, String op, Object[] args);
+}
+```
+
+### Flux de Résolution
+
+1. `CustomOperatorResolver.resolve()` est appelé en premier
+2. S'il retourne un `PredicateResolver` non-null, ce resolver est utilisé
+3. S'il retourne `null`, le mécanisme par défaut (path ou `PredicateResolverMapping`) est utilisé
+
+### Utilisation
+
+```java
+JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
+        UserProperty.class, 
+        mappingBuilder
+    ).withCustomOperatorResolver((ref, op, args) -> {
+        return switch (op) {
+            case "SOUNDEX" -> handleSoundex(ref, args);
+            case "GEO_WITHIN" -> handleGeoWithin(ref, args);
+            default -> null;  // Utiliser le mécanisme par défaut
+        };
+    });
+```
+
+:::tip Quand Utiliser
+- **CustomOperatorResolver** : Pour les opérateurs qui s'appliquent à plusieurs propriétés (SOUNDEX, FULL_TEXT, GEO_WITHIN)
+- **PredicateResolverMapping** : Pour une logique spécifique à une propriété où chaque propriété a un comportement unique
+:::
 
 ---
 

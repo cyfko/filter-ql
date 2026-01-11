@@ -298,63 +298,6 @@ public class Book {
 
 ---
 
-## Custom Operators {#custom-operators}
-
-FilterQL allows adding custom operators via `PredicateResolverMapping` in the JPA adapter.
-
-### Use Cases
-
-- Phonetic search (Soundex, Metaphone)
-- Full-text search
-- Geographic operators (distance, within)
-- JSON operators
-
-### Implementation
-
-**1. Define the custom mapping in JpaFilterContext:**
-
-```java
-JpaFilterContext<UserPropertyRef> context = new JpaFilterContext<>(
-    UserPropertyRef.class,
-    ref -> switch (ref) {
-        case NAME -> new PredicateResolverMapping<User>() {
-            @Override
-            public PredicateResolver<User> map(String op, Object[] args) {
-                return (root, query, cb) -> {
-                    if ("SOUNDEX".equals(op)) {
-                        String searchValue = (String) args[0];
-                        if (searchValue == null || searchValue.isBlank()) {
-                            throw new IllegalArgumentException("SOUNDEX requires non-blank value");
-                        }
-                        return cb.equal(
-                            cb.function("SOUNDEX", String.class, root.get("name")),
-                            cb.function("SOUNDEX", String.class, cb.literal(searchValue))
-                        );
-                    }
-                    // Default behavior for standard operators
-                    return cb.equal(root.get("name"), args[0]);
-                };
-            }
-        };
-        case EMAIL -> "email";  // Simple path mapping
-        // ...
-    }
-);
-```
-
-**2. Use in a request:**
-
-```json
-{
-  "filters": {
-    "phonetic": { "ref": "NAME", "op": "SOUNDEX", "value": "Smith" }
-  },
-  "combineWith": "phonetic"
-}
-```
-
----
-
 ## Advanced JPA Mapping {#jpa-mapping}
 
 ### PredicateResolverMapping
@@ -380,6 +323,10 @@ public JpaFilterContext<ProductProperty> productContext(EntityManager em) {
     );
 }
 ```
+
+:::tip Custom Operators
+For handling custom operators like SOUNDEX, GEO_WITHIN, etc., see [Custom Operators](#custom-operators) which provides a more flexible approach with `CustomOperatorResolver`.
+:::
 
 ### Execution Strategies
 
@@ -802,6 +749,205 @@ Only expose operators that make sense for the virtual field:
  */
 @ExposedAs(value = "POPULARITY_SCORE", operators = {Op.GT, Op.GTE, Op.LT, Op.LTE})
 public static PredicateResolver<Product> popularityScore(String op, Object[] args) {
+    // ...
+}
+```
+
+---
+
+## Custom Operators {#custom-operators}
+
+FilterQL supports custom operators beyond the standard set (EQ, MATCHES, GT, etc.). The `CustomOperatorResolver` interface provides a centralized way to handle custom operators or override default operator behavior.
+
+### Why Custom Operators?
+
+| Use Case | Example |
+|----------|---------|
+| **Database functions** | SOUNDEX, LEVENSHTEIN for fuzzy matching |
+| **Geospatial queries** | GEO_WITHIN, GEO_DISTANCE for location filtering |
+| **Full-text search** | FULL_TEXT using database-specific capabilities |
+| **Override behavior** | Custom MATCHES logic for specific properties |
+| **Cross-cutting concerns** | Tenant filtering, soft-delete handling |
+
+### CustomOperatorResolver Interface
+
+```java
+@FunctionalInterface
+public interface CustomOperatorResolver<P extends Enum<P> & PropertyReference> {
+    
+    /**
+     * @param ref  the property reference being filtered
+     * @param op   the operator code (e.g., "SOUNDEX", "EQ")
+     * @param args the filter arguments
+     * @return PredicateResolver to handle this operation, or null to use default
+     */
+    PredicateResolver<?> resolve(P ref, String op, Object[] args);
+}
+```
+
+### Resolution Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    toCondition(ref, op)                      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+              ┌───────────────────────────────┐
+              │ customOperatorResolver != null │
+              │   && resolve() returns non-null│
+              └───────────────────────────────┘
+                    │                    │
+                   YES                  NO
+                    │                    │
+                    ▼                    ▼
+           ┌──────────────┐    ┌──────────────────────┐
+           │ Use returned │    │ Default mechanism    │
+           │   resolver   │    │ (path / Mapping)     │
+           └──────────────┘    └──────────────────────┘
+```
+
+### Basic Usage
+
+```java
+JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
+        UserProperty.class, 
+        mappingBuilder
+    ).withCustomOperatorResolver((ref, op, args) -> {
+        // Return null to delegate to default handling
+        if (!"SOUNDEX".equals(op)) {
+            return null;
+        }
+        
+        // Handle SOUNDEX operator
+        String fieldPath = switch (ref) {
+            case FIRST_NAME -> "firstName";
+            case LAST_NAME -> "lastName";
+            default -> throw new IllegalArgumentException(
+                "SOUNDEX not supported for " + ref);
+        };
+        
+        return (root, query, cb) -> cb.equal(
+            cb.function("SOUNDEX", String.class, root.get(fieldPath)),
+            cb.function("SOUNDEX", String.class, cb.literal((String) args[0]))
+        );
+    });
+```
+
+### Example: Multiple Custom Operators
+
+```java
+CustomOperatorResolver<UserProperty> multiResolver = (ref, op, args) -> {
+    return switch (op) {
+        case "SOUNDEX" -> handleSoundex(ref, args);
+        case "LEVENSHTEIN" -> handleLevenshtein(ref, args);
+        case "GEO_WITHIN" -> handleGeoWithin(ref, args);
+        case "FULL_TEXT" -> handleFullText(ref, args);
+        default -> null;  // Standard operators use default handling
+    };
+};
+
+private static PredicateResolver<?> handleSoundex(UserProperty ref, Object[] args) {
+    String field = getFieldPath(ref);
+    return (root, query, cb) -> cb.equal(
+        cb.function("SOUNDEX", String.class, root.get(field)),
+        cb.function("SOUNDEX", String.class, cb.literal((String) args[0]))
+    );
+}
+
+private static PredicateResolver<?> handleLevenshtein(UserProperty ref, Object[] args) {
+    String field = getFieldPath(ref);
+    String searchValue = (String) args[0];
+    int maxDistance = args.length > 1 ? (Integer) args[1] : 2;
+    
+    return (root, query, cb) -> cb.le(
+        cb.function("LEVENSHTEIN", Integer.class, 
+            root.get(field), 
+            cb.literal(searchValue)),
+        maxDistance
+    );
+}
+```
+
+### Example: Override Standard Operator
+
+You can also override standard operators for specific properties:
+
+```java
+CustomOperatorResolver<UserProperty> emailOverride = (ref, op, args) -> {
+    // Override MATCHES for EMAIL to be case-insensitive
+    if (ref == UserProperty.EMAIL && "MATCHES".equals(op)) {
+        return (root, query, cb) -> {
+            String pattern = ((String) args[0]).toLowerCase();
+            return cb.like(cb.lower(root.get("email")), pattern);
+        };
+    }
+    
+    // Override EQ for STATUS to handle enum aliases
+    if (ref == UserProperty.STATUS && "EQ".equals(op)) {
+        return (root, query, cb) -> {
+            String status = normalizeStatus((String) args[0]);
+            return cb.equal(root.get("status"), status);
+        };
+    }
+    
+    return null;  // Use default for everything else
+};
+```
+
+### Using in Filter Requests
+
+Once configured, custom operators work seamlessly in filter requests:
+
+```json
+{
+  "filters": {
+    "similar": { "ref": "FIRST_NAME", "op": "SOUNDEX", "value": "Jon" },
+    "nearby": { "ref": "LOCATION", "op": "GEO_WITHIN", "value": [48.8566, 2.3522, 10] }
+  },
+  "combineWith": "similar & nearby"
+}
+```
+
+### Best Practices for Custom Operators
+
+#### 1. Validate Supported Properties
+
+```java
+CustomOperatorResolver<UserProperty> resolver = (ref, op, args) -> {
+    if ("SOUNDEX".equals(op)) {
+        // Only allow SOUNDEX on string properties
+        if (!Set.of(UserProperty.FIRST_NAME, UserProperty.LAST_NAME).contains(ref)) {
+            throw new IllegalArgumentException(
+                "SOUNDEX operator not supported for property: " + ref);
+        }
+        return handleSoundex(ref, args);
+    }
+    return null;
+};
+```
+
+#### 2. Document Custom Operators
+
+```java
+/**
+ * Custom operators supported:
+ * 
+ * SOUNDEX - Phonetic matching (FIRST_NAME, LAST_NAME only)
+ *   Usage: { "ref": "FIRST_NAME", "op": "SOUNDEX", "value": "Jon" }
+ * 
+ * GEO_WITHIN - Geographic radius search (LOCATION only)
+ *   Usage: { "ref": "LOCATION", "op": "GEO_WITHIN", "value": [lat, lon, radiusKm] }
+ */
+```
+
+#### 3. Handle Missing Arguments Gracefully
+
+```java
+PredicateResolver<?> handleSoundex(UserProperty ref, Object[] args) {
+    if (args.length == 0 || args[0] == null) {
+        return (root, query, cb) -> cb.conjunction(); // No filter
+    }
     // ...
 }
 ```

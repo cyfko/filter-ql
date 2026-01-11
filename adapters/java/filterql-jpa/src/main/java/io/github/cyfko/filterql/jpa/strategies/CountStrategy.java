@@ -63,7 +63,8 @@ public record CountStrategy(Class<?> projectionClass) implements ExecutionStrate
     }
 
     @Override
-    public Long execute(EntityManager em, PredicateResolver<?> pr, QueryExecutionParams params) {
+    public <Context> Long execute(Context ctx, PredicateResolver<?> pr, QueryExecutionParams params) {
+        EntityManager em = (EntityManager) ctx;
         long startTime = System.nanoTime();
 
         CriteriaBuilder cb = em.getCriteriaBuilder();

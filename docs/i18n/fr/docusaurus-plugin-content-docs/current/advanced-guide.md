@@ -297,63 +297,6 @@ public class Book {
 
 ---
 
-## Opérateurs Personnalisés {#custom-operators}
-
-FilterQL permet d'ajouter des opérateurs personnalisés via `PredicateResolverMapping` dans l'adaptateur JPA.
-
-### Cas d'Usage
-
-- Recherche phonétique (Soundex, Metaphone)
-- Recherche full-text
-- Opérateurs géographiques (distance, within)
-- Opérateurs JSON
-
-### Implémentation
-
-**1. Définir le mapping personnalisé dans JpaFilterContext :**
-
-```java
-JpaFilterContext<UserPropertyRef> context = new JpaFilterContext<>(
-    UserPropertyRef.class,
-    ref -> switch (ref) {
-        case NAME -> new PredicateResolverMapping<User>() {
-            @Override
-            public PredicateResolver<User> map(String op, Object[] args) {
-                return (root, query, cb) -> {
-                    if ("SOUNDEX".equals(op)) {
-                        String searchValue = (String) args[0];
-                        if (searchValue == null || searchValue.isBlank()) {
-                            throw new IllegalArgumentException("SOUNDEX nécessite une valeur non vide");
-                        }
-                        return cb.equal(
-                            cb.function("SOUNDEX", String.class, root.get("name")),
-                            cb.function("SOUNDEX", String.class, cb.literal(searchValue))
-                        );
-                    }
-                    // Comportement par défaut pour les opérateurs standards
-                    return cb.equal(root.get("name"), args[0]);
-                };
-            }
-        };
-        case EMAIL -> "email";  // Mapping simple
-        // ...
-    }
-);
-```
-
-**2. Utiliser dans une requête :**
-
-```json
-{
-  "filters": {
-    "phonetic": { "ref": "NAME", "op": "SOUNDEX", "value": "Smith" }
-  },
-  "combineWith": "phonetic"
-}
-```
-
----
-
 ## Mapping JPA Avancé {#jpa-mapping}
 
 ### PredicateResolverMapping
@@ -379,6 +322,10 @@ public JpaFilterContext<ProductProperty> productContext(EntityManager em) {
     );
 }
 ```
+
+:::tip Opérateurs Personnalisés
+Pour gérer des opérateurs personnalisés comme SOUNDEX, GEO_WITHIN, etc., voir [Opérateurs Personnalisés](#custom-operators) qui offre une approche plus flexible avec `CustomOperatorResolver`.
+:::
 
 ### Stratégies d'Exécution
 
@@ -801,6 +748,205 @@ N'exposez que les opérateurs qui ont du sens pour le champ virtuel :
  */
 @ExposedAs(value = "POPULARITY_SCORE", operators = {Op.GT, Op.GTE, Op.LT, Op.LTE})
 public static PredicateResolver<Product> popularityScore(String op, Object[] args) {
+    // ...
+}
+```
+
+---
+
+## Opérateurs Personnalisés {#custom-operators}
+
+FilterQL supporte des opérateurs personnalisés au-delà de l'ensemble standard (EQ, MATCHES, GT, etc.). L'interface `CustomOperatorResolver` fournit un moyen centralisé de gérer les opérateurs personnalisés ou de surcharger le comportement par défaut.
+
+### Pourquoi des Opérateurs Personnalisés ?
+
+| Cas d'utilisation | Exemple |
+|-------------------|---------|
+| **Fonctions base de données** | SOUNDEX, LEVENSHTEIN pour le matching flou |
+| **Requêtes géospatiales** | GEO_WITHIN, GEO_DISTANCE pour le filtrage par localisation |
+| **Recherche full-text** | FULL_TEXT utilisant les capacités spécifiques à la base |
+| **Surcharge de comportement** | Logique MATCHES personnalisée pour des propriétés spécifiques |
+| **Préoccupations transverses** | Filtrage par tenant, gestion du soft-delete |
+
+### Interface CustomOperatorResolver
+
+```java
+@FunctionalInterface
+public interface CustomOperatorResolver<P extends Enum<P> & PropertyReference> {
+    
+    /**
+     * @param ref  la référence de propriété filtrée
+     * @param op   le code de l'opérateur (ex: "SOUNDEX", "EQ")
+     * @param args les arguments du filtre
+     * @return PredicateResolver pour gérer cette opération, ou null pour utiliser le défaut
+     */
+    PredicateResolver<?> resolve(P ref, String op, Object[] args);
+}
+```
+
+### Flux de Résolution
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    toCondition(ref, op)                      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+              ┌───────────────────────────────┐
+              │ customOperatorResolver != null │
+              │   && resolve() retourne non-null│
+              └───────────────────────────────┘
+                    │                    │
+                   OUI                  NON
+                    │                    │
+                    ▼                    ▼
+           ┌──────────────┐    ┌──────────────────────┐
+           │ Utiliser le  │    │ Mécanisme par défaut │
+           │   resolver   │    │ (path / Mapping)     │
+           └──────────────┘    └──────────────────────┘
+```
+
+### Utilisation de Base
+
+```java
+JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
+        UserProperty.class, 
+        mappingBuilder
+    ).withCustomOperatorResolver((ref, op, args) -> {
+        // Retourner null pour déléguer au mécanisme par défaut
+        if (!"SOUNDEX".equals(op)) {
+            return null;
+        }
+        
+        // Gérer l'opérateur SOUNDEX
+        String fieldPath = switch (ref) {
+            case FIRST_NAME -> "firstName";
+            case LAST_NAME -> "lastName";
+            default -> throw new IllegalArgumentException(
+                "SOUNDEX non supporté pour " + ref);
+        };
+        
+        return (root, query, cb) -> cb.equal(
+            cb.function("SOUNDEX", String.class, root.get(fieldPath)),
+            cb.function("SOUNDEX", String.class, cb.literal((String) args[0]))
+        );
+    });
+```
+
+### Exemple : Plusieurs Opérateurs Personnalisés
+
+```java
+CustomOperatorResolver<UserProperty> multiResolver = (ref, op, args) -> {
+    return switch (op) {
+        case "SOUNDEX" -> handleSoundex(ref, args);
+        case "LEVENSHTEIN" -> handleLevenshtein(ref, args);
+        case "GEO_WITHIN" -> handleGeoWithin(ref, args);
+        case "FULL_TEXT" -> handleFullText(ref, args);
+        default -> null;  // Les opérateurs standards utilisent le mécanisme par défaut
+    };
+};
+
+private static PredicateResolver<?> handleSoundex(UserProperty ref, Object[] args) {
+    String field = getFieldPath(ref);
+    return (root, query, cb) -> cb.equal(
+        cb.function("SOUNDEX", String.class, root.get(field)),
+        cb.function("SOUNDEX", String.class, cb.literal((String) args[0]))
+    );
+}
+
+private static PredicateResolver<?> handleLevenshtein(UserProperty ref, Object[] args) {
+    String field = getFieldPath(ref);
+    String searchValue = (String) args[0];
+    int maxDistance = args.length > 1 ? (Integer) args[1] : 2;
+    
+    return (root, query, cb) -> cb.le(
+        cb.function("LEVENSHTEIN", Integer.class, 
+            root.get(field), 
+            cb.literal(searchValue)),
+        maxDistance
+    );
+}
+```
+
+### Exemple : Surcharger un Opérateur Standard
+
+Vous pouvez aussi surcharger des opérateurs standards pour des propriétés spécifiques :
+
+```java
+CustomOperatorResolver<UserProperty> emailOverride = (ref, op, args) -> {
+    // Surcharger MATCHES pour EMAIL pour être insensible à la casse
+    if (ref == UserProperty.EMAIL && "MATCHES".equals(op)) {
+        return (root, query, cb) -> {
+            String pattern = ((String) args[0]).toLowerCase();
+            return cb.like(cb.lower(root.get("email")), pattern);
+        };
+    }
+    
+    // Surcharger EQ pour STATUS pour gérer les alias d'enum
+    if (ref == UserProperty.STATUS && "EQ".equals(op)) {
+        return (root, query, cb) -> {
+            String status = normalizeStatus((String) args[0]);
+            return cb.equal(root.get("status"), status);
+        };
+    }
+    
+    return null;  // Utiliser le défaut pour tout le reste
+};
+```
+
+### Utilisation dans les Requêtes de Filtre
+
+Une fois configurés, les opérateurs personnalisés fonctionnent naturellement dans les requêtes :
+
+```json
+{
+  "filters": {
+    "similar": { "ref": "FIRST_NAME", "op": "SOUNDEX", "value": "Jon" },
+    "nearby": { "ref": "LOCATION", "op": "GEO_WITHIN", "value": [48.8566, 2.3522, 10] }
+  },
+  "combineWith": "similar & nearby"
+}
+```
+
+### Bonnes Pratiques pour les Opérateurs Personnalisés
+
+#### 1. Valider les Propriétés Supportées
+
+```java
+CustomOperatorResolver<UserProperty> resolver = (ref, op, args) -> {
+    if ("SOUNDEX".equals(op)) {
+        // N'autoriser SOUNDEX que sur les propriétés textuelles
+        if (!Set.of(UserProperty.FIRST_NAME, UserProperty.LAST_NAME).contains(ref)) {
+            throw new IllegalArgumentException(
+                "Opérateur SOUNDEX non supporté pour la propriété : " + ref);
+        }
+        return handleSoundex(ref, args);
+    }
+    return null;
+};
+```
+
+#### 2. Documenter les Opérateurs Personnalisés
+
+```java
+/**
+ * Opérateurs personnalisés supportés :
+ * 
+ * SOUNDEX - Matching phonétique (FIRST_NAME, LAST_NAME uniquement)
+ *   Usage : { "ref": "FIRST_NAME", "op": "SOUNDEX", "value": "Jon" }
+ * 
+ * GEO_WITHIN - Recherche par rayon géographique (LOCATION uniquement)
+ *   Usage : { "ref": "LOCATION", "op": "GEO_WITHIN", "value": [lat, lon, rayonKm] }
+ */
+```
+
+#### 3. Gérer les Arguments Manquants avec Élégance
+
+```java
+PredicateResolver<?> handleSoundex(UserProperty ref, Object[] args) {
+    if (args.length == 0 || args[0] == null) {
+        return (root, query, cb) -> cb.conjunction(); // Pas de filtre
+    }
     // ...
 }
 ```

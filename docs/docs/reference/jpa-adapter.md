@@ -35,7 +35,8 @@ io.github.cyfko.filterql.jpa
 ├── JpaFilterContext           # Main FilterContext implementation
 ├── JpaCondition               # JPA condition wrapper
 ├── mappings/
-│   ├── PredicateResolverMapping # Custom predicate mapping interface
+│   ├── CustomOperatorResolver   # Centralized custom operator handler
+│   ├── PredicateResolverMapping # Per-property predicate mapping
 │   └── InstanceResolver        # IoC bean resolution
 ├── strategies/
 │   ├── MultiQueryFetchStrategy      # DTO strategy with batch (RECOMMENDED)
@@ -219,6 +220,56 @@ case HAS_ORDERS -> new PredicateResolverMapping<User>() {
     }
 };
 ```
+
+---
+
+## CustomOperatorResolver
+
+Centralized interface for handling custom operators across all properties. Added via `withCustomOperatorResolver()` fluent method.
+
+```java
+package io.github.cyfko.filterql.jpa.mappings;
+
+@FunctionalInterface
+public interface CustomOperatorResolver<P extends Enum<P> & PropertyReference> {
+    
+    /**
+     * Resolves a custom operator to a PredicateResolver.
+     *
+     * @param ref  the property reference being filtered
+     * @param op   the operator code (e.g., "SOUNDEX", "GEO_WITHIN")
+     * @param args the filter arguments
+     * @return PredicateResolver to handle this operation, or null to delegate to default
+     */
+    PredicateResolver<?> resolve(P ref, String op, Object[] args);
+}
+```
+
+### Resolution Flow
+
+1. `CustomOperatorResolver.resolve()` is called first
+2. If it returns a non-null `PredicateResolver`, that resolver is used
+3. If it returns `null`, the default mechanism (path or `PredicateResolverMapping`) is used
+
+### Usage
+
+```java
+JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
+        UserProperty.class, 
+        mappingBuilder
+    ).withCustomOperatorResolver((ref, op, args) -> {
+        return switch (op) {
+            case "SOUNDEX" -> handleSoundex(ref, args);
+            case "GEO_WITHIN" -> handleGeoWithin(ref, args);
+            default -> null;  // Use default handling
+        };
+    });
+```
+
+:::tip When to Use
+- **CustomOperatorResolver**: For operators that apply to multiple properties (SOUNDEX, FULL_TEXT, GEO_WITHIN)
+- **PredicateResolverMapping**: For property-specific logic where each property has unique behavior
+:::
 
 ---
 

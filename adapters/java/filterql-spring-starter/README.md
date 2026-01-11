@@ -53,7 +53,7 @@ This starter module serves as a **Bill of Materials (BOM)** for FilterQL Spring 
     <dependency>
         <groupId>io.github.cyfko</groupId>
         <artifactId>filterql-spring-starter</artifactId>
-        <version>4.0.0</version>
+        <version>1.0.0</version>
         <type>pom</type>
     </dependency>
 </dependencies>
@@ -74,7 +74,7 @@ This starter module serves as a **Bill of Materials (BOM)** for FilterQL Spring 
         <dependency>
             <groupId>io.github.cyfko</groupId>
             <artifactId>filterql-spring-starter</artifactId>
-            <version>4.0.0</version>
+            <version>1.0.0</version>
             <type>pom</type>
         </dependency>
         
@@ -104,7 +104,7 @@ This starter module serves as a **Bill of Materials (BOM)** for FilterQL Spring 
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.cyfko:filterql-spring-starter:4.0.0"))
+    implementation(platform("io.github.cyfko:filterql-spring-starter:1.0.0"))
     
     // Spring Boot dependencies
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -121,7 +121,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation platform("io.github.cyfko:filterql-spring-starter:4.0.0")
+    implementation platform("io.github.cyfko:filterql-spring-starter:1.0.0")
     
     implementation "org.springframework.boot:spring-boot-starter-data-jpa"
     implementation "org.springframework.boot:spring-boot-starter-web"
@@ -193,7 +193,7 @@ This starter transitively includes the following FilterQL modules:
 ## Dependency Tree
 
 ```
-filterql-spring-starter:4.0.0 (pom)
+filterql-spring-starter:1.0.0 (pom)
 ├── filterql-spring:4.0.0
 │   ├── filterql-adapter-jpa:2.0.0 (provided scope)
 │   │   └── filterql-core:4.0.0
@@ -275,7 +275,7 @@ filterql-spring-starter:4.0.0 (pom)
     <dependency>
         <groupId>io.github.cyfko</groupId>
         <artifactId>filterql-spring-starter</artifactId>
-        <version>4.0.0</version>
+        <version>1.0.0</version>
         <type>pom</type>
     </dependency>
 </dependencies>
@@ -295,7 +295,7 @@ filterql-spring-starter:4.0.0 (pom)
 <dependency>
     <groupId>io.github.cyfko</groupId>
     <artifactId>filterql-spring-starter</artifactId>
-    <version>4.1.0</version> <!-- Updated -->
+    <version>1.0.0</version>
     <type>pom</type>
 </dependency>
 ```
@@ -328,7 +328,7 @@ ls target/generated-sources/annotations/
         <dependency>
             <groupId>io.github.cyfko</groupId>
             <artifactId>filterql-spring-starter</artifactId>
-            <version>4.0.0</version>
+            <version>1.0.0</version>
             <type>pom</type>
             <scope>import</scope>
         </dependency>
@@ -349,7 +349,7 @@ ls target/generated-sources/annotations/
 <dependency>
     <groupId>io.github.cyfko</groupId>
     <artifactId>filterql-spring-starter</artifactId>
-    <version>4.0.0</version>
+    <version>1.0.0</version>
     <type>pom</type>
     <exclusions>
         <exclusion>
@@ -414,7 +414,7 @@ Ensure annotation processing is enabled:
         <dependency>
             <groupId>io.github.cyfko</groupId>
             <artifactId>filterql-spring-starter</artifactId>
-            <version>4.0.0</version>
+            <version>1.0.0</version>
             <type>pom</type>
             <scope>import</scope>
         </dependency>
@@ -434,7 +434,7 @@ Ensure annotation processing is enabled:
     <dependency>
         <groupId>io.github.cyfko</groupId>
         <artifactId>filterql-spring-starter</artifactId>
-        <version>4.0.0</version>
+        <version>1.0.0</version>
         <type>pom</type>
     </dependency>
     

@@ -150,11 +150,12 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
      * </pre>
      */
     @Override
-    public List<Map<String, Object>> execute(EntityManager em, PredicateResolver<?> pr, QueryExecutionParams params) {
+    public <Context> List<Map<String, Object>> execute(Context ctx, PredicateResolver<?> pr, QueryExecutionParams params) {
+        EntityManager em = (EntityManager) ctx;
         long startTime = System.nanoTime();
 
         // 1. Build execution plan with DTO field mapping
-        QueryContext ctx;
+        QueryContext queryCtx;
         {
             // 0. Transform DTO projection to entity projection and build mapping
             boolean ignoreCase = params.projectionPolicy().fieldCase() == ProjectionPolicy.FieldCase.CASE_INSENSITIVE;
@@ -164,16 +165,16 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
             CriteriaQuery<Tuple> rootQuery = cb.createTupleQuery();
             Root<?> root = rootQuery.from(rootEntityClass);
 
-            ctx = new QueryContext(em, cb, root, rootQuery, pr, transformation);
+            queryCtx = new QueryContext(em, cb, root, rootQuery, pr, transformation);
         }
 
-        MultiQueryExecutionPlan plan = MultiQueryExecutionPlan.build(ctx.root, ctx.projectionSpec);
+        MultiQueryExecutionPlan plan = MultiQueryExecutionPlan.build(queryCtx.root, queryCtx.projectionSpec);
 
         logger.fine(() -> String.format("Execution plan: %d root fields, %d collection levels",
                 plan.getRootScalarFields().size(), plan.getCollectionLevels().size()));
 
         // 2. Execute root query (with DTO aliases)
-        Map<Object, Map<String, Object>> rootResults = executeRootQuery(ctx, plan, params);
+        Map<Object, Map<String, Object>> rootResults = executeRootQuery(queryCtx, plan, params);
 
         if (rootResults.isEmpty()) {
             logger.fine("Root query returned no results");
@@ -199,7 +200,7 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
 
             for (CollectionNode node : level.collections()) {
                 // executeCollectionQuery now returns both results and index
-                BatchQueryResult queryResult = executeCollectionQuery(ctx, node, currentLevelParentIds);
+                BatchQueryResult queryResult = executeCollectionQuery(queryCtx, node, currentLevelParentIds);
 
                 attachToParentsWithIndex(parentIndexByPath, queryResult.childrenByParent(), node);
 
@@ -217,7 +218,7 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
         }
 
         // 5. No transformation needed - results already in DTO format!
-        List<Map<String, Object>> results = new ArrayList<>(handleComputedFields(rootResults.values(), ctx));
+        List<Map<String, Object>> results = new ArrayList<>(handleComputedFields(rootResults.values(), queryCtx));
 
         long durationMs = (System.nanoTime() - startTime) / 1_000_000;
         logger.info(() -> String.format("Multi-query completed in %dms: %d roots",

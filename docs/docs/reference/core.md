@@ -564,4 +564,4 @@ Thrown for:
 
 - [JPA Adapter Reference](jpa-adapter) - JpaFilterContext and execution strategies
 - [Spring Adapter Reference](spring-adapter) - Spring annotations and services
-- [Custom Operators Guide](../guides/custom-operators) - Implementing custom operators via PredicateResolverMapping
+- [Custom Operators Guide](../guides/custom-operators) - Implementing custom operators via CustomOperatorResolver or PredicateResolverMapping

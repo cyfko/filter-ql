@@ -75,8 +75,8 @@ public class TypedMultiQueryFetchStrategy<R> implements ExecutionStrategy<List<R
      * @return a list of transformed results, each of type {@code R}
      */
     @Override
-    public List<R> execute(EntityManager em, PredicateResolver<?> pr, QueryExecutionParams params) {
-        return multiQueryFetchStrategy.execute(em,pr,params).stream().map(resultTransformer).toList();
+    public <Context> List<R> execute(Context ctx, PredicateResolver<?> pr, QueryExecutionParams params) {
+        return multiQueryFetchStrategy.execute(ctx, pr, params).stream().map(resultTransformer).toList();
     }
 }
 

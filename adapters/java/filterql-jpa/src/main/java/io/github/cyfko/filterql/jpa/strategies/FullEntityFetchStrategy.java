@@ -26,7 +26,8 @@ import java.util.Objects;
 public record FullEntityFetchStrategy<E>(Class<E> rootEntityClass) implements ExecutionStrategy<List<E>> {
 
     @Override
-    public List<E> execute(EntityManager em, PredicateResolver<?> predicateResolver, QueryExecutionParams params) {
+    public <Context> List<E> execute(Context ctx, PredicateResolver<?> predicateResolver, QueryExecutionParams params) {
+        EntityManager em = (EntityManager) ctx;
         Objects.requireNonNull(em, "em cannot be null");
         Objects.requireNonNull(predicateResolver, "predicateResolver cannot be null");
         Objects.requireNonNull(params,  "params cannot be null");
