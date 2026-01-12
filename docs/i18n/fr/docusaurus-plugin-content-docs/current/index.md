@@ -158,14 +158,14 @@ public class UserDTO {
 <dependency>
     <groupId>io.github.cyfko</groupId>
     <artifactId>filterql-spring-starter</artifactId>
-    <version>4.0.0</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
 **Gradle** :
 
 ```kotlin
-implementation("io.github.cyfko:filterql-spring-starter:4.0.0")
+implementation("io.github.cyfko:filterql-spring-starter:1.0.0")
 ```
 
 C'est tout ce qu'il faut pour commencer. [→ Passons au Hello World](./hello-world)

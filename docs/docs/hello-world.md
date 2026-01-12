@@ -32,7 +32,7 @@ Add FilterQL to your Spring Boot project.
     <dependency>
         <groupId>io.github.cyfko</groupId>
         <artifactId>filterql-spring-starter</artifactId>
-        <version>4.0.0</version>
+        <version>1.0.0</version>
     </dependency>
     
     <!-- Your existing Spring dependencies -->
@@ -51,7 +51,7 @@ Add FilterQL to your Spring Boot project.
 
 ```kotlin
 dependencies {
-    implementation("io.github.cyfko:filterql-spring-starter:4.0.0")
+    implementation("io.github.cyfko:filterql-spring-starter:1.0.0")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-web")
 }

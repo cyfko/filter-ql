@@ -15,7 +15,7 @@ Documentation de référence complète pour le module `filterql-spring` (version
 <dependency>
     <groupId>io.github.cyfko</groupId>
     <artifactId>filterql-spring-starter</artifactId>
-    <version>4.0.0</version>
+    <version>1.0.0</version>
 </dependency>
 
 <!-- Option 2 : Module seul -->

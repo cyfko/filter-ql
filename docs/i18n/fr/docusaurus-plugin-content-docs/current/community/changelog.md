@@ -15,7 +15,7 @@ Historique complet des versions et changements du projet FilterQL.
 | `filterql-core` | 4.0.0 |
 | `filterql-adapter-jpa` | 2.0.0 |
 | `filterql-spring` | 4.0.0 |
-| `filterql-spring-starter` | 4.0.0 |
+| `filterql-spring-starter` | 1.0.0 |
 
 ---
 
