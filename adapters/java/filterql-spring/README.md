@@ -475,7 +475,7 @@ import io.github.cyfko.filterql.spring.Exposure;
 import io.github.cyfko.filterql.spring.ExposedAs;
 import io.github.cyfko.filterql.core.validation.Op;
 
-@Projection(entity = Person.class)
+@Projection(from = Person.class)
 @Exposure(value = "users", basePath = "/api/v1")
 public class PersonDTO {
     
@@ -736,11 +736,11 @@ Currently no configuration properties are used (FilterQlProperties exists but un
 
 **Impact:** This naming convention is hardcoded and cannot be customized.
 
-### 3. Single Entity Per Projection
+### 3. Single Source Per Projection
 
-**Constraint:** Each `@Projection` class maps to exactly one entity class.
+**Constraint:** Each `@Projection` class maps to exactly one source class.
 
-**Impact:** Cannot create unions or joins of multiple entities in a single projection.
+**Impact:** Cannot create unions or joins of multiple sources in a single projection.
 
 ### 4. Return Type Restriction
 

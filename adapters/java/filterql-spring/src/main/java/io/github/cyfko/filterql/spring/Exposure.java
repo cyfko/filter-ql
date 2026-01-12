@@ -48,7 +48,7 @@ public @interface Exposure {
      * If not specified, the processor automatically looks for a private static method named
      * {@code exposureEndpoint()} in the annotated class:
      * <pre>{@code
-     * @Projection(entity = User.class)
+     * @Projection(from = User.class)
      * @Exposure(value = "users")
      * public class UserDTO {
      *
@@ -61,7 +61,7 @@ public @interface Exposure {
      * <h3>Custom Method Name</h3>
      * Override the method name if you need multiple configurations or prefer a different name:
      * <pre>{@code
-     * @Projection(entity = User.class)
+     * @Projection(from = User.class)
      * @Exposure(
      *   value = "users",
      *   annotationsFrom = @MethodReference(method = "adminSearchConfig")
@@ -89,8 +89,8 @@ public @interface Exposure {
      *   public static void userEndpoint() {}
      * }
      *
-     * // Use in entity
-     * @Projection(entity = User.class)
+     * // Use in DTO
+     * @Projection(from = User.class)
      * @Exposure(
      *   value = "users",
      *   annotationsFrom = @MethodReference(
@@ -98,7 +98,7 @@ public @interface Exposure {
      *     method = "adminEndpoint"
      *   )
      * )
-     * public class User { }
+     * public class UserDTO { }
      * }</pre>
      *
      * <h3>Method Requirements</h3>

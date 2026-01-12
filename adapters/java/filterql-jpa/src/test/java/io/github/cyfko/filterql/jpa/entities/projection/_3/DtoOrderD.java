@@ -5,7 +5,7 @@ import io.github.cyfko.projection.*;
 import java.util.ArrayList;
 import java.util.List;
 
-@Projection(entity = OrderD.class)
+@Projection(from = OrderD.class)
 public class DtoOrderD {
 
     @Projected(from = "id")

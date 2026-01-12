@@ -2,7 +2,7 @@ package io.github.cyfko.filterql.jpa.entities.projection._3;
 
 import io.github.cyfko.projection.Projection;
 
-@Projection(entity = OrderItemD.class)
+@Projection(from = OrderItemD.class)
 public class DtoOrderItemD {
 
     private String productName;

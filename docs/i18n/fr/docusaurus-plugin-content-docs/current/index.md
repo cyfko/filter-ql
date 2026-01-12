@@ -93,7 +93,7 @@ Content-Type: application/json
 ### Ce Que Vous Avez Écrit Côté Serveur
 
 ```java
-@Projection(entity = User.class)
+@Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api")
 public class UserDTO {
 

@@ -34,7 +34,6 @@ import static org.junit.jupiter.api.Assertions.*;
 class MultiEntityIntegrationTest {
 
     @Autowired private TestRestTemplate restTemplate;
-    @Autowired private ApplicationContext ctx;
     @Autowired private PersonRepository personRepository;
     @Autowired private AddressRepository addressRepository;
 

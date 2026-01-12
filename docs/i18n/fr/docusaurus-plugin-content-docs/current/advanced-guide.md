@@ -26,7 +26,7 @@ public class Order {
     private List<OrderItem> items;
 }
 
-@Projection(entity = Order.class)
+@Projection(from = Order.class)
 @Exposure(value = "orders", basePath = "/api")
 public class OrderDTO {
 
@@ -54,7 +54,7 @@ public class OrderDTO {
 Pour des champs qui n'existent pas dans l'entité mais sont calculés à partir d'autres propriétés :
 
 ```java
-@Projection(entity = User.class, providers = @Provider(UserUtils.class))
+@Projection(from = User.class, providers = @Provider(UserUtils.class))
 @Exposure(value = "users", basePath = "/api")
 public class UserDTO {
 
@@ -150,7 +150,7 @@ public class Address {
 **DTO avec relation :**
 
 ```java
-@Projection(entity = User.class)
+@Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api")
 public class UserDTO {
 
@@ -160,7 +160,7 @@ public class UserDTO {
     private AddressDTO address;  // DTO imbriqué
 }
 
-@Projection(entity = Address.class)
+@Projection(from = Address.class)
 public class AddressDTO {
 
     @ExposedAs(value = "CITY", operators = {Op.EQ, Op.MATCHES, Op.IN})
@@ -353,7 +353,7 @@ PaginatedResult<User> result = query.execute(
 ### Personnaliser le Base Path
 
 ```java
-@Projection(entity = User.class)
+@Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api/v2")
 public class UserDTO {
     // ...
@@ -367,7 +367,7 @@ Génère : `POST /api/v2/users/search`
 Pour personnaliser l'exposition d'une propriété :
 
 ```java
-@Projection(entity = User.class)
+@Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api")
 public class UserDTO {
 
@@ -427,7 +427,7 @@ Les méthodes statiques sont idéales pour la **logique de prédicat pure** qui 
 #### Exemple : Recherche par Nom Complet
 
 ```java
-@Projection(entity = Person.class)
+@Projection(from = Person.class)
 @Exposure(value = "persons", basePath = "/api")
 public class PersonDTO {
 

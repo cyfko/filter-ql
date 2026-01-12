@@ -244,7 +244,7 @@ FilterQL offers two approaches to declare filterable properties.
 With Spring Boot, use annotations directly on your DTO:
 
 ```java
-@Projection(entity = User.class)
+@Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api")
 public class UserDTO {
 
@@ -270,7 +270,7 @@ public class UserDTO {
 ```
 
 **What this does:**
-- `@Projection(entity = User.class)`: Links this DTO to the `User` JPA entity
+- `@Projection(from = User.class)`: Links this DTO to the `User` JPA entity
 - `@Exposure(value = "users", basePath = "/api")`: Generates `POST /api/users/search`
 - `@ExposedAs(value = "NAME", operators = {...})`: Declares this field as filterable
 

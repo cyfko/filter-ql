@@ -101,13 +101,13 @@ public class Person {
 **Source:** [PersonDTO.java](src/main/java/io/github/cyfko/PersonDTO.java)
 
 **Key Annotations:**
-- `@Projection(entity = Person.class)` - from [projection-spec](https://github.com/cyfko/projection-spec) (implemented by [projection-metamodel-processor](https://github.com/cyfko/jpa-metamodel-processor))
+- `@Projection(from = Person.class)` - from [projection-spec](https://github.com/cyfko/projection-spec) (implemented by [projection-metamodel-processor](https://github.com/cyfko/jpa-metamodel-processor))
 - `@Exposure(value = "users", basePath = "/api/v1")` - from `filterql-spring`
 - `@ExposedAs(...)` - from `filterql-spring`
 
 ```java
 @Projection(
-    entity = Person.class,
+    from = Person.class,
     providers = {
         @Provider(VirtualResolverConfig.class),
         @Provider(UserTenancyService.class)

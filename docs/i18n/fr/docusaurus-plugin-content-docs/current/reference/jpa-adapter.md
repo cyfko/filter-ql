@@ -492,7 +492,7 @@ Définit une classe DTO avec mapping vers une entité JPA.
 ```java
 import io.github.cyfko.projection.Projection;
 
-@Projection(entity = User.class)
+@Projection(from = User.class)
 public class UserDTO {
     private Long id;
     private String username;
@@ -507,7 +507,7 @@ Personnalise le mapping d'un champ DTO.
 ```java
 import io.github.cyfko.projection.Projected;
 
-@Projection(entity = User.class)
+@Projection(from = User.class)
 public class UserDTO {
     
     @Projected(from = "firstName")  // Mapping explicite
@@ -525,7 +525,7 @@ Définit un champ calculé dynamiquement.
 ```java
 import io.github.cyfko.projection.Computed;
 
-@Projection(entity = User.class)
+@Projection(from = User.class)
 public class UserDTO {
     
     @Computed(provider = AgeCalculator.class, method = "calculateAge")

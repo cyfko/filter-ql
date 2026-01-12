@@ -101,7 +101,7 @@ public @interface Exposure {
 import io.github.cyfko.projection.Projection;
 import io.github.cyfko.filterql.spring.Exposure;
 
-@Projection(entity = User.class)
+@Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api/v1")
 public class UserDTO {
     private Long id;
@@ -117,7 +117,7 @@ Generates an endpoint: `POST /api/v1/users/search`
 To apply annotations (security, cache, etc.) to generated endpoints:
 
 ```java
-@Projection(entity = User.class)
+@Projection(from = User.class)
 @Exposure(value = "users")
 public class UserDTO {
     
@@ -145,7 +145,7 @@ public class SecurityTemplates {
 }
 
 // Usage
-@Projection(entity = User.class)
+@Projection(from = User.class)
 @Exposure(
     value = "users",
     annotationsFrom = @MethodReference(
@@ -189,7 +189,7 @@ public @interface ExposedAs {
 #### Usage
 
 ```java
-@Projection(entity = User.class)
+@Projection(from = User.class)
 @Exposure(value = "users")
 public class UserDTO {
     
@@ -664,7 +664,7 @@ import io.github.cyfko.filterql.spring.Exposure;
 import io.github.cyfko.filterql.spring.ExposedAs;
 import org.springframework.security.access.prepost.PreAuthorize;
 
-@Projection(entity = User.class)
+@Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api/v1")
 public class UserDTO {
     

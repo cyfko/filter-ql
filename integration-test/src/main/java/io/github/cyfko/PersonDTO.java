@@ -14,7 +14,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Projection(
-        entity = Person.class,
+        from = Person.class,
         providers = {
                 @Provider(VirtualResolverConfig.class),
                 @Provider(UserTenancyService.class)

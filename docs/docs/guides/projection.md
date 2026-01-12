@@ -191,7 +191,7 @@ L'annotation `@Projection` provient de [projection-spec](https://github.com/cyfk
 import io.github.cyfko.projection.Projection;
 import io.github.cyfko.projection.Projected;
 
-@Projection(entity = Author.class)
+@Projection(from = Author.class)
 public class AuthorDTO {
     private Long id;
     private String name;
@@ -203,7 +203,7 @@ public class AuthorDTO {
     private Set<AwardDTO> awards;
 }
 
-@Projection(entity = Book.class)
+@Projection(from = Book.class)
 public class BookSummaryDTO {
     private Long id;
     private String title;

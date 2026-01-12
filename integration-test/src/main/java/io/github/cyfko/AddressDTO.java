@@ -10,7 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 /**
  * DTO for Address entity.
  */
-@Projection(entity = Address.class)
+@Projection(from = Address.class)
 @Exposure(
         value = "addresses",
         basePath = "/api/v1",

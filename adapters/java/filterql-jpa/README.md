@@ -223,7 +223,7 @@ Use the `@Projection` annotation from [projection-spec](https://github.com/cyfko
 ```java
 import io.github.cyfko.projection.Projection;  // External dependency
 
-@Projection(entity = User.class)
+@Projection(from = User.class)
 public class UserDTO {
     private Long id;
     private String username;
@@ -304,7 +304,7 @@ public class Book {
 import io.github.cyfko.projection.Projection;
 import io.github.cyfko.projection.Projected;
 
-@Projection(entity = Author.class)
+@Projection(from = Author.class)
 public class AuthorDTO {
     private Long id;
     private String name;
@@ -317,7 +317,7 @@ public class AuthorDTO {
     private Set<AwardDTO> awards;
 }
 
-@Projection(entity = Book.class)
+@Projection(from = Book.class)
 public class BookSummaryDTO {
     private Long id;
     private String title;

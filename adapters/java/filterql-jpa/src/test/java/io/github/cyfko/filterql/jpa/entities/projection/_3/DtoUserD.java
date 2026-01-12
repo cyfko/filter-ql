@@ -4,7 +4,7 @@ import io.github.cyfko.projection.*;
 
 import java.util.List;
 
-@Projection(entity = UserD.class, providers = @Provider(OldApiUtils.class))
+@Projection(from = UserD.class, providers = @Provider(OldApiUtils.class))
 public class DtoUserD {
 
     @Projected(from = "id")

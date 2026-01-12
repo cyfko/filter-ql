@@ -105,7 +105,7 @@ import io.github.cyfko.filterql.spring.Exposure;
 import io.github.cyfko.projection.Projection;
 import com.example.demo.entity.User;
 
-@Projection(entity = User.class)
+@Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api")
 public class UserDTO {
 
@@ -133,7 +133,7 @@ public class UserDTO {
 ```
 
 **Ce que cela signifie :**
-- `@Projection(entity = User.class)` : Ce DTO représente l'entité `User`
+- `@Projection(from = User.class)` : Ce DTO représente l'entité `User`
 - `@Exposure(value = "users", basePath = "/api")` : Génère `POST /api/users/search`
 - `@ExposedAs(value = "NAME", operators = {...})` : Ce champ est filtrable avec ces opérateurs
 

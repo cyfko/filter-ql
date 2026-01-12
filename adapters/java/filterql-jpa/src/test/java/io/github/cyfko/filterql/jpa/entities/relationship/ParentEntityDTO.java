@@ -2,6 +2,6 @@ package io.github.cyfko.filterql.jpa.entities.relationship;
 
 import io.github.cyfko.projection.Projection;
 
-@Projection(entity = ParentEntity.class)
+@Projection(from = ParentEntity.class)
 public class ParentEntityDTO {
 }

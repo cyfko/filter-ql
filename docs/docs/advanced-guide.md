@@ -26,7 +26,7 @@ public class Order {
     private List<OrderItem> items;
 }
 
-@Projection(entity = Order.class)
+@Projection(from = Order.class)
 @Exposure(value = "orders", basePath = "/api")
 public class OrderDTO {
 
@@ -54,7 +54,7 @@ public class OrderDTO {
 For fields that don't exist in the entity but are calculated from other properties:
 
 ```java
-@Projection(entity = User.class, providers = @Provider(UserUtils.class))
+@Projection(from = User.class, providers = @Provider(UserUtils.class))
 @Exposure(value = "users", basePath = "/api")
 public class UserDTO {
 
@@ -150,7 +150,7 @@ public class Address {
 **DTO with relation:**
 
 ```java
-@Projection(entity = User.class)
+@Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api")
 public class UserDTO {
 
@@ -160,7 +160,7 @@ public class UserDTO {
     private AddressDTO address;  // Nested DTO
 }
 
-@Projection(entity = Address.class)
+@Projection(from = Address.class)
 public class AddressDTO {
 
     @ExposedAs(value = "CITY", operators = {Op.EQ, Op.MATCHES, Op.IN})
@@ -354,7 +354,7 @@ PaginatedResult<User> result = query.execute(
 ### Customizing the Base Path
 
 ```java
-@Projection(entity = User.class)
+@Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api/v2")
 public class UserDTO {
     // ...
@@ -368,7 +368,7 @@ Generates: `POST /api/v2/users/search`
 To customize how a property is exposed:
 
 ```java
-@Projection(entity = User.class)
+@Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api")
 public class UserDTO {
 
@@ -428,7 +428,7 @@ Static methods are ideal for **pure predicate logic** that doesn't require exter
 #### Example: Full Name Search
 
 ```java
-@Projection(entity = Person.class)
+@Projection(from = Person.class)
 @Exposure(value = "persons", basePath = "/api")
 public class PersonDTO {
 
