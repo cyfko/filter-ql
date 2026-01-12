@@ -1,4 +1,4 @@
-package io.github.cyfko.filterql.config;
+package io.github.cyfko.filterql.spring.config;
 
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.jpa.mappings.PredicateResolverMapping;
@@ -12,7 +12,6 @@ import javax.annotation.processing.Generated;
 
 @Generated("io.github.cyfko.filterql.spring.processor.ExposureAnnotationProcessor")
 @Configuration
-@SuppressWarnings({"unchecked", "rawtypes"})
 public class FilterQlContextConfig {
 
 ${contextInstances}

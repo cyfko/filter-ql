@@ -49,7 +49,7 @@ class FilterContextGeneratorTest {
         String result = generator.generate();
 
         assertNotNull(result, "Generated config should not be null");
-        assertTrue(result.contains("package io.github.cyfko.filterql.config"),
+        assertTrue(result.contains("package io.github.cyfko.filterql.spring.config"),
             "Should contain correct package");
         assertTrue(result.contains("class FilterQlContextConfig"),
             "Should contain configuration class");
