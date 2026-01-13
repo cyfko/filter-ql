@@ -221,8 +221,7 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
         List<Map<String, Object>> results = new ArrayList<>(handleComputedFields(rootResults.values(), queryCtx));
 
         long durationMs = (System.nanoTime() - startTime) / 1_000_000;
-        logger.info(() -> String.format("Multi-query completed in %dms: %d roots",
-                durationMs, results.size()));
+        logger.info(() -> String.format("Multi-query completed in %dms: %d roots", durationMs, results.size()));
 
         return results;
     }
