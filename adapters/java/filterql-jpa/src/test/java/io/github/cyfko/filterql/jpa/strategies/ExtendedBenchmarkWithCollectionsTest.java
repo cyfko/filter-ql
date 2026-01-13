@@ -155,8 +155,8 @@ class ExtendedBenchmarkWithCollectionsTest {
                     .pagination(0, 10)
                     .build();
 
-            MultiQueryFetchStrategy v1 = new MultiQueryFetchStrategy(UserD.class);
-            MultiQueryFetchStrategyV2 v2 = new MultiQueryFetchStrategyV2(UserD.class);
+            MultiQueryFetchStrategyOld v1 = new MultiQueryFetchStrategyOld(UserD.class);
+            MultiQueryFetchStrategy v2 = new MultiQueryFetchStrategy(UserD.class);
 
             for (int i = 0; i < WARMUP_ITERATIONS; i++) {
                 FilterQueryFactory.of(context).execute(request, em, v1);
@@ -296,8 +296,8 @@ class ExtendedBenchmarkWithCollectionsTest {
                         .pagination(0, USER_COUNT)
                         .build();
 
-                MultiQueryFetchStrategy v1 = new MultiQueryFetchStrategy(UserD.class);
-                MultiQueryFetchStrategyV2 v2 = new MultiQueryFetchStrategyV2(UserD.class);
+                MultiQueryFetchStrategyOld v1 = new MultiQueryFetchStrategyOld(UserD.class);
+                MultiQueryFetchStrategy v2 = new MultiQueryFetchStrategy(UserD.class);
 
                 // Force GC before measurement
                 System.gc();
@@ -341,8 +341,8 @@ class ExtendedBenchmarkWithCollectionsTest {
 
     private BenchmarkResult executeBenchmark(EntityManager em, FilterRequest<UserProperty> request,
             Class<?> projectionClass, String label) {
-        MultiQueryFetchStrategy v1 = new MultiQueryFetchStrategy(projectionClass);
-        MultiQueryFetchStrategyV2 v2 = new MultiQueryFetchStrategyV2(projectionClass);
+        MultiQueryFetchStrategyOld v1 = new MultiQueryFetchStrategyOld(projectionClass);
+        MultiQueryFetchStrategy v2 = new MultiQueryFetchStrategy(projectionClass);
 
         long[] v1Times = new long[BENCHMARK_ITERATIONS];
         long[] v2Times = new long[BENCHMARK_ITERATIONS];

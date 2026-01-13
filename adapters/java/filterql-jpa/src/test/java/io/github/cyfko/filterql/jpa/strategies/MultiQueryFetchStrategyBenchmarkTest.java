@@ -153,8 +153,8 @@ class MultiQueryFetchStrategyBenchmarkTest {
                         .pagination(0, 50)
                         .build();
 
-                MultiQueryFetchStrategy strategyV1 = new MultiQueryFetchStrategy(UserB.class);
-                MultiQueryFetchStrategyV2 strategyV2 = new MultiQueryFetchStrategyV2(UserB.class);
+                MultiQueryFetchStrategyOld strategyV1 = new MultiQueryFetchStrategyOld(UserB.class);
+                MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(UserB.class);
 
                 // Warmup iterations
                 for (int i = 0; i < WARMUP_ITERATIONS; i++) {
@@ -225,8 +225,8 @@ class MultiQueryFetchStrategyBenchmarkTest {
 
         private BenchmarkResult runBenchmark(EntityManager em, FilterRequest<BenchmarkUserProperty> request,
                 String testName) {
-            MultiQueryFetchStrategy strategyV1 = new MultiQueryFetchStrategy(UserB.class);
-            MultiQueryFetchStrategyV2 strategyV2 = new MultiQueryFetchStrategyV2(UserB.class);
+            MultiQueryFetchStrategyOld strategyV1 = new MultiQueryFetchStrategyOld(UserB.class);
+            MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(UserB.class);
 
             long[] v1Times = new long[BENCHMARK_ITERATIONS];
             long[] v2Times = new long[BENCHMARK_ITERATIONS];
@@ -311,8 +311,8 @@ class MultiQueryFetchStrategyBenchmarkTest {
                         .pagination(0, 10)
                         .build();
 
-                MultiQueryFetchStrategy strategyV1 = new MultiQueryFetchStrategy(UserB.class);
-                MultiQueryFetchStrategyV2 strategyV2 = new MultiQueryFetchStrategyV2(UserB.class);
+                MultiQueryFetchStrategyOld strategyV1 = new MultiQueryFetchStrategyOld(UserB.class);
+                MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(UserB.class);
 
                 List<Map<String, Object>> v1Results = FilterQueryFactory.of(context).execute(request, em, strategyV1);
                 List<Map<String, Object>> v2Results = FilterQueryFactory.of(context).execute(request, em, strategyV2);
@@ -343,8 +343,8 @@ class MultiQueryFetchStrategyBenchmarkTest {
                         .pagination(0, 10)
                         .build();
 
-                MultiQueryFetchStrategy strategyV1 = new MultiQueryFetchStrategy(UserB.class);
-                MultiQueryFetchStrategyV2 strategyV2 = new MultiQueryFetchStrategyV2(UserB.class);
+                MultiQueryFetchStrategyOld strategyV1 = new MultiQueryFetchStrategyOld(UserB.class);
+                MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(UserB.class);
 
                 List<Map<String, Object>> v1Results = FilterQueryFactory.of(context).execute(request, em, strategyV1);
                 List<Map<String, Object>> v2Results = FilterQueryFactory.of(context).execute(request, em, strategyV2);
