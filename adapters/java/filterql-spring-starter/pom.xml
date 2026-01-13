@@ -8,7 +8,6 @@
     <groupId>io.github.cyfko</groupId>
     <artifactId>filterql-spring-starter</artifactId>
     <version>1.0.0</version>
-    <packaging>pom</packaging>
 
     <name>FilterQL Spring Starter</name>
     <description>

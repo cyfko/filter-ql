@@ -25,20 +25,29 @@ import java.util.*;
 import java.util.logging.Logger;
 
 /**
- * Multi-query JPA projection strategy implementing a DTO-centric, batch-driven fetch logic.
+ * Multi-query JPA projection strategy implementing a DTO-centric, batch-driven
+ * fetch logic.
  * <p>
- * This strategy performs batch queries to efficiently resolve both scalar and collection data for DTO projections, using DTO field names
- * directly in the result aliases and output, thereby obviating the need for post-processing DTO mapping. Entity field names are used
- * only for query and path resolution. This approach provides high performance and clean separation between DTOs and entities in query results.
+ * This strategy performs batch queries to efficiently resolve both scalar and
+ * collection data for DTO projections, using DTO field names
+ * directly in the result aliases and output, thereby obviating the need for
+ * post-processing DTO mapping. Entity field names are used
+ * only for query and path resolution. This approach provides high performance
+ * and clean separation between DTOs and entities in query results.
  * <br>
  * <b>Key innovations:</b>
  * <ul>
- *   <li>projection fields names are used as query aliases and output keys, not entity field names.</li>
- *   <li>Supports nested projections and batched queries for multi-level collections.</li>
- *   <li>Provides direct mapping between entity fields and DTO properties using projection metadata.</li>
- *   <li>Composite keys and multi-level collection joins are handled transparently.</li>
- *   <li>Automatically project all scalar fields (discarding collections and linked entities)  when no explicit
- *   projection found.</li>
+ * <li>projection fields names are used as query aliases and output keys, not
+ * entity field names.</li>
+ * <li>Supports nested projections and batched queries for multi-level
+ * collections.</li>
+ * <li>Provides direct mapping between entity fields and DTO properties using
+ * projection metadata.</li>
+ * <li>Composite keys and multi-level collection joins are handled
+ * transparently.</li>
+ * <li>Automatically project all scalar fields (discarding collections and
+ * linked entities) when no explicit
+ * projection found.</li>
  * </ul>
  * </p>
  *
@@ -46,7 +55,8 @@ import java.util.logging.Logger;
  * @since 2.0.0
  *
  * @example
- * <pre>
+ * 
+ *          <pre>
  * {@code
  * // Batch-fetch users with nested addresses:
  * MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserDTO.class);
@@ -60,7 +70,7 @@ import java.util.logging.Logger;
  * }
  * </pre>
  */
-public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<String,Object>>> {
+public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<String, Object>>> {
 
     private static final Logger logger = Logger.getLogger(MultiQueryFetchStrategy.class.getName());
     private static final int BATCH_SIZE = 1000;
@@ -70,44 +80,58 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
     private final InstanceResolver instanceResolver;
 
     /**
-     * Initializes the strategy, validating that the DTO maps to the entity and that projection metadata exists.
+     * Initializes the strategy, validating that the DTO maps to the entity and that
+     * projection metadata exists.
      * <p>
-     * Note: The {@code projectionClass} may also be an entity class (annotated with {@link jakarta.persistence.Entity})
+     * Note: The {@code projectionClass} may also be an entity class (annotated with
+     * {@link jakarta.persistence.Entity})
      * for auto projection mappings.
      * </p>
      *
-     * @param projectionClass class annotated with {@link io.github.cyfko.projection.Projection}
+     * @param projectionClass class annotated with
+     *                        {@link io.github.cyfko.projection.Projection}
      *                        and describing the projection structure.
-     * @throws IllegalStateException    if no projection metadata is available for the DTO class
-     * @throws IllegalArgumentException if the DTO maps to a different entity than configured
+     * @throws IllegalStateException    if no projection metadata is available for
+     *                                  the DTO class
+     * @throws IllegalArgumentException if the DTO maps to a different entity than
+     *                                  configured
      */
     public MultiQueryFetchStrategy(Class<?> projectionClass) {
-        this(projectionClass,null);
+        this(projectionClass, null);
     }
 
     /**
-     * Initializes the strategy, validating that the DTO maps to the entity and that projection metadata exists.
+     * Initializes the strategy, validating that the DTO maps to the entity and that
+     * projection metadata exists.
      * <p>
-     * Note: The {@code projectionClass} may also be an entity class (annotated with {@link jakarta.persistence.Entity})
+     * Note: The {@code projectionClass} may also be an entity class (annotated with
+     * {@link jakarta.persistence.Entity})
      * for auto projection mappings.
      * </p>
      *
-     * @param projectionClass class annotated with {@link io.github.cyfko.projection.Projection}
-     *                        and describing the projection structure.
-     * @param instanceResolver the resolver for computed field providers, or {@code null} if none are needed
-     * @throws IllegalStateException    if no projection metadata is available for the DTO class
-     * @throws IllegalArgumentException if the DTO maps to a different entity than configured
+     * @param projectionClass  class annotated with
+     *                         {@link io.github.cyfko.projection.Projection}
+     *                         and describing the projection structure.
+     * @param instanceResolver the resolver for computed field providers, or
+     *                         {@code null} if none are needed
+     * @throws IllegalStateException    if no projection metadata is available for
+     *                                  the DTO class
+     * @throws IllegalArgumentException if the DTO maps to a different entity than
+     *                                  configured
      */
     public MultiQueryFetchStrategy(Class<?> projectionClass, InstanceResolver instanceResolver) {
-        Objects.requireNonNull(projectionClass, "DTO class is required. Usage of entity class itself as the dto class is perfectly fine.");
+        Objects.requireNonNull(projectionClass,
+                "DTO class is required. Usage of entity class itself as the dto class is perfectly fine.");
         ProjectionMetadata metadata = ProjectionRegistry.getMetadataFor(projectionClass);
 
         if (metadata == null) {
-            throw new IllegalStateException("Provided class is neither a projection nor an entity: " + projectionClass.getName());
+            throw new IllegalStateException(
+                    "Provided class is neither a projection nor an entity: " + projectionClass.getName());
         }
 
         if (metadata.computedFields().length > 0 && instanceResolver == null) {
-            throw new IllegalStateException("Projection <" + projectionClass.getSimpleName()  + "> has computed fields. " +
+            throw new IllegalStateException("Projection <" + projectionClass.getSimpleName() + "> has computed fields. "
+                    +
                     "Please consider using constructor with non-null arguments: AbstractMultiQueryFetchStrategy(Class<?>, ComputerResolver)");
         }
 
@@ -122,22 +146,30 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
      * The steps performed are:
      * </p>
      * <ol>
-     *   <li>Transforms the requested DTO projection to corresponding entity projection fields.</li>
-     *   <li>Builds and executes the root entity query with DTO field aliases.</li>
-     *   <li>Initializes nested empty collections as required by the DTO structure.</li>
-     *   <li>Performs level-by-level batch sub-queries for each collection field, attaching results by parent keys.</li>
-     *   <li>Returns results directly as a list of DTO-mapped result maps (no post-processing).</li>
+     * <li>Transforms the requested DTO projection to corresponding entity
+     * projection fields.</li>
+     * <li>Builds and executes the root entity query with DTO field aliases.</li>
+     * <li>Initializes nested empty collections as required by the DTO
+     * structure.</li>
+     * <li>Performs level-by-level batch sub-queries for each collection field,
+     * attaching results by parent keys.</li>
+     * <li>Returns results directly as a list of DTO-mapped result maps (no
+     * post-processing).</li>
      * </ol>
      *
      * @param em     the JPA EntityManager for database query execution
      * @param pr     a predicate resolver for filtering logic
-     * @param params query execution parameters, including projection selection, sorting, and pagination
-     * @return a list of result maps, each keyed by DTO field names and containing hydrated values per output DTO
+     * @param params query execution parameters, including projection selection,
+     *               sorting, and pagination
+     * @return a list of result maps, each keyed by DTO field names and containing
+     *         hydrated values per output DTO
      *
-     * @throws ProjectionDefinitionException if any requested projection field cannot be resolved
+     * @throws ProjectionDefinitionException if any requested projection field
+     *                                       cannot be resolved
      *
      * @example
-     * <pre>
+     * 
+     *          <pre>
      * {@code
      * // Fetch users with nested addresses and paginated friends
      * Set<String> projection = Set.of("id", "name", "address.city", "friends[limit=5].name");
@@ -150,7 +182,8 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
      * </pre>
      */
     @Override
-    public <Context> List<Map<String, Object>> execute(Context ctx, PredicateResolver<?> pr, QueryExecutionParams params) {
+    public <Context> List<Map<String, Object>> execute(Context ctx, PredicateResolver<?> pr,
+            QueryExecutionParams params) {
         EntityManager em = (EntityManager) ctx;
         long startTime = System.nanoTime();
 
@@ -159,7 +192,7 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
         {
             // 0. Transform DTO projection to entity projection and build mapping
             boolean ignoreCase = params.projectionPolicy().fieldCase() == ProjectionPolicy.FieldCase.CASE_INSENSITIVE;
-            final var transformation = transformProjection(params.projection(),ignoreCase);
+            final var transformation = transformProjection(params.projection(), ignoreCase);
 
             CriteriaBuilder cb = em.getCriteriaBuilder();
             CriteriaQuery<Tuple> rootQuery = cb.createTupleQuery();
@@ -168,13 +201,15 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
             queryCtx = new QueryContext(em, cb, root, rootQuery, pr, transformation);
         }
 
-        MultiQueryExecutionPlan plan = MultiQueryExecutionPlan.build(queryCtx.root, queryCtx.projectionSpec);
+        MultiQueryExecutionPlan plan = MultiQueryExecutionPlan.build(queryCtx.root,
+                queryCtx.projectionSpec);
 
         logger.fine(() -> String.format("Execution plan: %d root fields, %d collection levels",
                 plan.getRootScalarFields().size(), plan.getCollectionLevels().size()));
 
         // 2. Execute root query (with DTO aliases)
-        Map<Object, Map<String, Object>> rootResults = executeRootQuery(queryCtx, plan, params);
+        Map<Object, Map<String, Object>> rootResults = executeRootQuery(queryCtx,
+                plan, params);
 
         if (rootResults.isEmpty()) {
             logger.fine("Root query returned no results");
@@ -200,9 +235,11 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
 
             for (CollectionNode node : level.collections()) {
                 // executeCollectionQuery now returns both results and index
-                BatchQueryResult queryResult = executeCollectionQuery(queryCtx, node, currentLevelParentIds);
+                BatchQueryResult queryResult = executeCollectionQuery(queryCtx, node,
+                        currentLevelParentIds);
 
-                attachToParentsWithIndex(parentIndexByPath, queryResult.childrenByParent(), node);
+                attachToParentsWithIndex(parentIndexByPath, queryResult.childrenByParent(),
+                        node);
 
                 // Use pre-built child index instead of rebuilding it
                 parentIndexByPath.put(node.collectionPath(), queryResult.childLookupIndex());
@@ -221,22 +258,27 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
         List<Map<String, Object>> results = new ArrayList<>(handleComputedFields(rootResults.values(), queryCtx));
 
         long durationMs = (System.nanoTime() - startTime) / 1_000_000;
-        logger.info(() -> String.format("Multi-query completed in %dms: %d roots", durationMs, results.size()));
+        logger.info(() -> String.format("Multi-query completed in %dms: %d roots",
+                durationMs, results.size()));
 
         return results;
     }
 
     /**
-     * Transforms a set of DTO projection field names into corresponding entity field paths, building the mapping and options.
+     * Transforms a set of DTO projection field names into corresponding entity
+     * field paths, building the mapping and options.
      * <p>
-     * This method also parses any collection-level options (e.g. pagination) from the DTO projection syntax.
+     * This method also parses any collection-level options (e.g. pagination) from
+     * the DTO projection syntax.
      * </p>
      *
      * @param dtoProjection the set of DTO field names requested for projection
      * @param ignoreCase    whether DTO field matching is case-insensitive
-     * @return the transformation object containing: entity projection field names, collection options, and the entity→DTO map
+     * @return the transformation object containing: entity projection field names,
+     *         collection options, and the entity→DTO map
      *
-     * @throws ProjectionDefinitionException if any DTO path does not resolve to a valid entity field path
+     * @throws ProjectionDefinitionException if any DTO path does not resolve to a
+     *                                       valid entity field path
      */
     private MultiQueryExecutionPlan.ProjectionSpec transformProjection(Set<String> dtoProjection, boolean ignoreCase) {
 
@@ -247,32 +289,36 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
         Map<String, Pagination> dtoCollectionOptions = ProjectionFieldParser.parseCollectionOptions(dtoProjection);
 
         if (dtoProjection == null || dtoProjection.isEmpty()) { // Project all fields
-            dtoProjection =  new HashSet<>();
+            dtoProjection = new HashSet<>();
             ProjectionMetadata meta = ProjectionRegistry.getMetadataFor(dtoClass);
-            for (var dm: meta.directMappings()){
-                if (dm.collection().isPresent() || dm.isNested() || ProjectionRegistry.getMetadataFor(dm.dtoFieldType()) != null) continue;
+            for (var dm : meta.directMappings()) {
+                if (dm.collection().isPresent() || dm.isNested()
+                        || ProjectionRegistry.getMetadataFor(dm.dtoFieldType()) != null)
+                    continue;
                 // Ne projette QUE les champs scalaires
                 dtoProjection.add(dm.dtoField());
             }
-            for (var cf: meta.computedFields()){
+            for (var cf : meta.computedFields()) {
                 dtoProjection.add(cf.dtoField());
             }
         }
 
         for (String dtoField : dtoProjection) {
-            Set<String> expandedDtoProjection = MultiQueryExecutionPlan.expandCompactNotation(dtoField.replaceAll("\\[.*?]", ""));
+            Set<String> expandedDtoProjection = MultiQueryExecutionPlan
+                    .expandCompactNotation(dtoField.replaceAll("\\[.*?]", ""));
 
             for (String baseDtoField : expandedDtoProjection) {
                 String entityPath;
                 try {
                     entityPath = ProjectionRegistry.toEntityPath(baseDtoField, dtoClass, ignoreCase);
                 } catch (IllegalArgumentException e) {
-                    throw new ProjectionDefinitionException(baseDtoField + " does not resolve to a valid projection field path.", e);
+                    throw new ProjectionDefinitionException(
+                            baseDtoField + " does not resolve to a valid projection field path.", e);
                 }
                 entityProjection.add(entityPath);
                 entityToDtoFieldMap.put(entityPath, baseDtoField);
 
-                if (ProjectionRegistry.getMetadataFor(dtoClass).isComputedField(baseDtoField,ignoreCase)){
+                if (ProjectionRegistry.getMetadataFor(dtoClass).isComputedField(baseDtoField, ignoreCase)) {
                     computedFields.add(baseDtoField);
                 }
 
@@ -286,15 +332,14 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
                 entityProjection,
                 computedFields,
                 entityCollectionOptions,
-                entityToDtoFieldMap
-        );
+                entityToDtoFieldMap);
     }
 
     /**
      * Executes root query with DTO field aliases.
      *
-     * @param ctx   the query context for execution
-     * @param plan  the execution plan for the projection
+     * @param ctx    the query context for execution
+     * @param plan   the execution plan for the projection
      * @param params query execution parameters
      * @return a map from root entity keys to their DTO-mapped result maps
      */
@@ -306,13 +351,13 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
 
         for (var mapping : plan.getRootScalarFields()) {
             Path<?> path = PathResolverUtils.resolvePath(ctx.root, mapping.entityField());
-            selections.add(path.alias( mapping.dtoField() ));
+            selections.add(path.alias(mapping.dtoField()));
         }
 
         ctx.query().multiselect(selections);
 
         // Apply filtering
-        //noinspection rawtypes,unchecked
+        // noinspection rawtypes,unchecked
         Predicate filterPredicate = ctx.predicateResolver.resolve((Root) ctx.root, ctx.query, ctx.cb);
 
         if (filterPredicate != null) {
@@ -350,9 +395,11 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
     }
 
     /**
-     * Converts a JPA Tuple to a map, filtering out internal fields at construction for optimal performance.
+     * Converts a JPA Tuple to a map, filtering out internal fields at construction
+     * for optimal performance.
      * <p>
-     * Internal fields (prefixed with PREFIX_FOR_INTERNAL_USAGE) are never inserted into the result map.
+     * Internal fields (prefixed with PREFIX_FOR_INTERNAL_USAGE) are never inserted
+     * into the result map.
      * </p>
      *
      * @param tuple the JPA Tuple to convert
@@ -361,7 +408,7 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
     private Map<String, Object> tupleToMap(Tuple tuple) {
         Map<String, Object> map = new LinkedHashMap<>();
 
-        for (var element: tuple.getElements()){
+        for (var element : tuple.getElements()) {
             String alias = element.getAlias();
 
             // Skip internal fields at construction time
@@ -383,7 +430,8 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
     }
 
     /**
-     * Inserts a value into a nested map structure, supporting nested DTO fields (e.g., "address.city").
+     * Inserts a value into a nested map structure, supporting nested DTO fields
+     * (e.g., "address.city").
      *
      * @param map   the map to update
      * @param path  the dotted path indicating where to insert the value
@@ -398,8 +446,7 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
             String segment = segments[i];
             current = (Map<String, Object>) current.computeIfAbsent(
                     segment,
-                    k -> new LinkedHashMap<>()
-            );
+                    k -> new LinkedHashMap<>());
         }
 
         String lastSegment = segments[segments.length - 1];
@@ -407,7 +454,8 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
     }
 
     /**
-     * Initializes empty collections for the root results as required by the DTO structure.
+     * Initializes empty collections for the root results as required by the DTO
+     * structure.
      *
      * @param rootResults the map of root entity results
      * @param plan        the execution plan for the projection
@@ -428,12 +476,14 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
 
     /**
      * Executes a collection query with DTO field aliases.
-     * Returns both the collection results grouped by parent and a child index for next level queries.
+     * Returns both the collection results grouped by parent and a child index for
+     * next level queries.
      *
-     * @param ctx           the query context for execution
-     * @param node          the collection node describing the sub-query
-     * @param parentIds     the set of parent IDs for which to fetch children
-     * @return a {@link BatchQueryResult} containing both results grouped by parent and a child index
+     * @param ctx       the query context for execution
+     * @param node      the collection node describing the sub-query
+     * @param parentIds the set of parent IDs for which to fetch children
+     * @return a {@link BatchQueryResult} containing both results grouped by parent
+     *         and a child index
      */
     private BatchQueryResult executeCollectionQuery(
             QueryContext ctx,
@@ -462,7 +512,8 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
 
             for (int i = 0; i < parentIdFields.size(); i++) {
                 Path<?> parentIdFieldPath = parentRefPath.get(parentIdFields.get(i));
-                selections.add(parentIdFieldPath.alias(MultiQueryExecutionPlan.PREFIX_FOR_INTERNAL_USAGE + "parent_id_" + i));
+                selections.add(
+                        parentIdFieldPath.alias(MultiQueryExecutionPlan.PREFIX_FOR_INTERNAL_USAGE + "parent_id_" + i));
             }
 
             // Collection fields with DTO aliases
@@ -529,7 +580,8 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
 
     /**
      * Attaches collection results to parent entities.
-     * No longer needs to remove internal fields as they're filtered at construction time.
+     * No longer needs to remove internal fields as they're filtered at construction
+     * time.
      */
     private void attachToParentsWithIndex(
             Map<String, Map<Object, Map<String, Object>>> parentIndexByPath,
@@ -549,7 +601,8 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
                 List<Map<String, Object>> children = entry.getValue();
 
                 int lastDotIndex = node.collectionName().lastIndexOf(".");
-                String collectionName = lastDotIndex < 0 ?  node.collectionName() : node.collectionName().substring(lastDotIndex + 1);
+                String collectionName = lastDotIndex < 0 ? node.collectionName()
+                        : node.collectionName().substring(lastDotIndex + 1);
                 parent.put(collectionName, children);
             }
         }
@@ -557,8 +610,7 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
 
     private Map<Object, Map<String, Object>> buildChildIndex(
             Map<Object, List<Map<String, Object>>> collectionResults,
-            List<String> idFields
-    ) {
+            List<String> idFields) {
         Map<Object, Map<String, Object>> index = new HashMap<>();
 
         for (List<Map<String, Object>> children : collectionResults.values()) {
@@ -579,23 +631,27 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
         return collectionPath.substring(0, lastDot);
     }
 
-    private Collection<Map<String, Object>> handleComputedFields(Collection<Map<String, Object>> result, QueryContext ctx){
-        if (dtoClass == rootEntityClass) return result;
+    private Collection<Map<String, Object>> handleComputedFields(Collection<Map<String, Object>> result,
+            QueryContext ctx) {
+        if (dtoClass == rootEntityClass)
+            return result;
         Map<String, String> entityToDtoMapping = ctx.projectionSpec.entityToDtoMapping();
 
-        for (String entityPath: entityToDtoMapping.keySet()) {
+        for (String entityPath : entityToDtoMapping.keySet()) {
             final String field = entityToDtoMapping.get(entityPath);
             if (ctx.projectionSpec.computedFields().contains(field)) {
-                for (var item: result){
+                for (var item : result) {
                     final String[] parts = entityPath.split(",");
                     final Object[] params = Arrays.stream(parts).map(item::get).toArray(Object[]::new);
                     try {
-                        final var computedValue = ProjectionUtils.computeField(instanceResolver, dtoClass, field, params);
+                        final var computedValue = ProjectionUtils.computeField(instanceResolver, dtoClass, field,
+                                params);
                         item.put(field, computedValue);
 
-                        // CLEANUP: si une dépendance d'un champ calculé n'est pas elle-même projetée par une projection
+                        // CLEANUP: si une dépendance d'un champ calculé n'est pas elle-même projetée
+                        // par une projection
                         // directe (champ non calculé) alors la retirer du résultat.
-                        for (var part: parts){
+                        for (var part : parts) {
                             boolean isDirectlyProjected = entityToDtoMapping.containsKey(part)
                                     && !ctx.projectionSpec.computedFields().contains(entityToDtoMapping.get(part));
                             if (!isDirectlyProjected) {
@@ -612,9 +668,11 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
         return result;
     }
 
-    void cleanupUnprojectedFields(){
-        // si une dépendance d'un champ calculé n'est pas elle même projété alors la retirer du résultat
-        // Est-ce que la dépendance est projétée par une projection non calculée ? Si oui garder si non retirer
+    void cleanupUnprojectedFields() {
+        // si une dépendance d'un champ calculé n'est pas elle même projété alors la
+        // retirer du résultat
+        // Est-ce que la dépendance est projétée par une projection non calculée ? Si
+        // oui garder si non retirer
 
     }
 
@@ -639,8 +697,8 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
             String idField = idFields.getFirst();
 
             // Check both public and internal versions
-            return map.containsKey(idField) ? map.get(idField) :
-                    map.get(MultiQueryExecutionPlan.PREFIX_FOR_INTERNAL_USAGE + idField);
+            return map.containsKey(idField) ? map.get(idField)
+                    : map.get(MultiQueryExecutionPlan.PREFIX_FOR_INTERNAL_USAGE + idField);
         } else {
             List<Object> values = idFields.stream().map(map::get).toList();
             return new CompositeKey(values);
@@ -664,8 +722,7 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
             CriteriaBuilder cb,
             Path<?> parentRefPath,
             List<String> parentIdFields,
-            List<Object> parentIds
-    ) {
+            List<Object> parentIds) {
         if (parentIdFields.size() == 1) {
             Path<?> parentIdPath = parentRefPath.get(parentIdFields.getFirst());
             return parentIdPath.in(parentIds);
@@ -690,7 +747,8 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
     }
 
     /**
-     * Record to represent composite (multi-part) keys for parent-child linkage in batch joins.
+     * Record to represent composite (multi-part) keys for parent-child linkage in
+     * batch joins.
      *
      * @param values list of values composing the key
      */
@@ -701,8 +759,10 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof CompositeKey(List<Object> values1))) return false;
+            if (this == o)
+                return true;
+            if (!(o instanceof CompositeKey(List<Object> values1)))
+                return false;
             return Objects.equals(values, values1);
         }
 
@@ -713,41 +773,55 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
     }
 
     /**
-     * Record encapsulating the results of a batch collection query: maps from parent keys to child lists,
-     * and an index mapping child keys to child maps for parent-child attachment at later nesting levels.
+     * Record encapsulating the results of a batch collection query: maps from
+     * parent keys to child lists,
+     * and an index mapping child keys to child maps for parent-child attachment at
+     * later nesting levels.
      *
      * @param childrenByParent map from parent keys to lists of child DTO maps
-     * @param childLookupIndex map from child keys to child DTO maps for hierarchical lookup
+     * @param childLookupIndex map from child keys to child DTO maps for
+     *                         hierarchical lookup
      */
     private record BatchQueryResult(
             Map<Object, List<Map<String, Object>>> childrenByParent,
-            Map<Object, Map<String, Object>> childLookupIndex
-    ) {}
+            Map<Object, Map<String, Object>> childLookupIndex) {
+    }
 
     /**
-     * Execution context encapsulating all state required to build and execute a dynamic CriteriaQuery
+     * Execution context encapsulating all state required to build and execute a
+     * dynamic CriteriaQuery
      * for a specific entity projection.
      * <p>
-     * This record provides a complete snapshot of the query construction environment, enabling
-     * stateless predicate resolvers, projection transformers, and recursive collection query builders
+     * This record provides a complete snapshot of the query construction
+     * environment, enabling
+     * stateless predicate resolvers, projection transformers, and recursive
+     * collection query builders
      * to operate consistently across complex query trees.
      * </p>
      *
-     * @param em                the {@link EntityManager} used for query execution and entity management
-     * @param cb                the {@link CriteriaBuilder} providing factory methods for predicates,
+     * @param em                the {@link EntityManager} used for query execution
+     *                          and entity management
+     * @param cb                the {@link CriteriaBuilder} providing factory
+     *                          methods for predicates,
      *                          expressions, and query components
-     * @param root              the {@link Root} representing the main entity in the current query scope
-     * @param query             the {@link CriteriaQuery} being constructed, typed to {@link Tuple} for
+     * @param root              the {@link Root} representing the main entity in the
+     *                          current query scope
+     * @param query             the {@link CriteriaQuery} being constructed, typed
+     *                          to {@link Tuple} for
      *                          flexible multi-select result handling
-     * @param predicateResolver the {@link PredicateResolver} responsible for translating filter expressions
+     * @param predicateResolver the {@link PredicateResolver} responsible for
+     *                          translating filter expressions
      *                          into JPA predicates against the current root entity
-     * @param projectionSpec    the {@link MultiQueryExecutionPlan.ProjectionSpec} defining how entity attributes map to
-     *                          DTO fields, including computed properties and nested projections
+     * @param projectionSpec    the {@link MultiQueryExecutionPlan.ProjectionSpec}
+     *                          defining how entity attributes map to
+     *                          DTO fields, including computed properties and nested
+     *                          projections
      */
     public record QueryContext(EntityManager em,
-                               CriteriaBuilder cb,
-                               Root<?> root,
-                               CriteriaQuery<Tuple> query,
-                               PredicateResolver<?> predicateResolver,
-                               MultiQueryExecutionPlan.ProjectionSpec projectionSpec){ }
+            CriteriaBuilder cb,
+            Root<?> root,
+            CriteriaQuery<Tuple> query,
+            PredicateResolver<?> predicateResolver,
+            MultiQueryExecutionPlan.ProjectionSpec projectionSpec) {
+    }
 }
