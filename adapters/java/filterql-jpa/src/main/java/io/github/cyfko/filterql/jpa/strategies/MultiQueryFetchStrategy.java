@@ -140,15 +140,21 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
             executeCollectionQueries(execCtx, rootResults);
         }
 
-        // 4. Convert to final Map format (single pass at the end)
+        // 4. Single pass: apply computed fields + convert to Map
+        ComputedFieldInfo[] computedFields = execCtx.plan.computedFields();
+        boolean hasComputed = computedFields.length > 0 && dtoClass != rootEntityClass;
+
+        // Compute excluded slots once (dependency fields not directly projected)
+        Set<Integer> excludedSlots = hasComputed
+                ? computeExcludedSlots(computedFields, execCtx)
+                : null;
+
         List<Map<String, Object>> results = new ArrayList<>(rootResults.size());
         for (RowBuffer row : rootResults.values()) {
-            results.add(row.toMap());
-        }
-
-        // 5. Handle computed fields on the final Maps
-        if (execCtx.plan.hasComputedFields()) {
-            handleComputedFields(results, execCtx);
+            if (hasComputed) {
+                applyComputedFieldsToRow(row, computedFields, execCtx);
+            }
+            results.add(row.toMap(excludedSlots));
         }
 
         long durationMs = (System.nanoTime() - startTime) / 1_000_000;
@@ -239,9 +245,14 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
         FieldSchema schema = ctx.plan.rootSchema();
         List<Selection<?>> selections = new ArrayList<>(schema.fieldCount());
 
-        // Build selections using schema
+        // Build selections using schema (skip computed output slots)
         for (int i = 0; i < schema.fieldCount(); i++) {
-            Path<?> path = PathResolverUtils.resolvePath(ctx.root, schema.entityField(i));
+            String entityField = schema.entityField(i);
+            // Skip computed output placeholder slots - they're not in the entity
+            if (entityField.startsWith("_computed_")) {
+                continue;
+            }
+            Path<?> path = PathResolverUtils.resolvePath(ctx.root, entityField);
             selections.add(path.alias(schema.dtoField(i)));
         }
 
@@ -480,40 +491,68 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
 
     // ==================== Computed Fields ====================
 
-    private void handleComputedFields(List<Map<String, Object>> results, ExecutionContext ctx) {
-        if (dtoClass == rootEntityClass)
-            return;
+    /**
+     * Computes the set of slots to exclude from toMap() output.
+     * These are dependency fields that are only used for computed field calculation
+     * and are not directly projected.
+     *
+     * @param computedFields array of computed field metadata
+     * @param ctx            execution context
+     * @return set of slot indices to exclude
+     */
+    private Set<Integer> computeExcludedSlots(ComputedFieldInfo[] computedFields, ExecutionContext ctx) {
+        Set<Integer> excluded = new HashSet<>();
+        Map<String, String> entityToDto = ctx.projectionSpec.entityToDtoMapping();
 
-        ComputedFieldInfo[] computedFields = ctx.plan.computedFields();
-
-        for (Map<String, Object> item : results) {
-            for (ComputedFieldInfo info : computedFields) {
-                // Gather dependencies from the Map
-                Object[] params = new Object[info.dependencyPaths().length];
-                for (int i = 0; i < params.length; i++) {
-                    params[i] = item.get(info.dependencyPaths()[i].trim());
-                }
-
-                try {
-                    Object computed = ProjectionUtils.computeField(instanceResolver, dtoClass, info.dtoFieldName(),
-                            params);
-
-                    // Store computed value directly in the Map
-                    item.put(info.dtoFieldName(), computed);
-
-                    // Cleanup: remove dependency fields not directly projected
-                    Map<String, String> entityToDto = ctx.projectionSpec.entityToDtoMapping();
-                    for (String depPath : info.dependencyPaths()) {
-                        String dtoField = entityToDto.get(depPath);
-                        boolean isDirectlyProjected = dtoField != null
-                                && !ctx.projectionSpec.computedFields().contains(dtoField);
-                        if (!isDirectlyProjected) {
-                            item.remove(depPath);
-                        }
+        for (ComputedFieldInfo info : computedFields) {
+            for (String depPath : info.dependencyPaths()) {
+                String trimmedPath = depPath.trim();
+                String dtoField = entityToDto.get(trimmedPath);
+                boolean isDirectlyProjected = dtoField != null
+                        && !ctx.projectionSpec.computedFields().contains(dtoField);
+                if (!isDirectlyProjected) {
+                    int depSlot = ctx.plan.rootSchema().indexOfEntity(trimmedPath);
+                    if (depSlot >= 0) {
+                        excluded.add(depSlot);
                     }
-                } catch (Exception e) {
-                    throw new RuntimeException("Failed to compute field: " + info.dtoFieldName(), e);
                 }
+            }
+        }
+
+        return excluded;
+    }
+
+    /**
+     * Applies computed fields to a single row using O(1) slot access.
+     * 
+     * @param row            the RowBuffer to process
+     * @param computedFields array of computed field metadata
+     * @param ctx            execution context
+     */
+    private void applyComputedFieldsToRow(RowBuffer row, ComputedFieldInfo[] computedFields, ExecutionContext ctx) {
+        for (ComputedFieldInfo info : computedFields) {
+            // Gather dependencies using O(1) slot access
+            Object[] params = new Object[info.dependencySlots().length];
+            for (int i = 0; i < params.length; i++) {
+                int slot = info.dependencySlots()[i];
+                if (slot >= 0) {
+                    params[i] = row.get(slot);
+                } else {
+                    // Fallback to name lookup if slot not found
+                    params[i] = row.getOrNull(info.dependencyPaths()[i].trim());
+                }
+            }
+
+            try {
+                Object computed = ProjectionUtils.computeField(instanceResolver, dtoClass, info.dtoFieldName(), params);
+
+                // Store computed value using O(1) slot access
+                int outputSlot = info.outputSlot();
+                if (outputSlot >= 0) {
+                    row.set(outputSlot, computed);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to compute field: " + info.dtoFieldName(), e);
             }
         }
     }

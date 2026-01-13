@@ -96,6 +96,11 @@ public final class MultiQueryExecutionPlanV2 {
             }
         }
 
+        // Add dedicated slots for computed field outputs (using DTO field name)
+        for (String computedDtoField : computedFieldNames) {
+            schemaBuilder.addField("_computed_" + computedDtoField, computedDtoField, false);
+        }
+
         // 4. Always include root ID fields
         Set<String> includedEntityFields = expandedProjection.stream()
                 .filter(f -> !metadataByPath.get(f).hasCollections())
@@ -408,11 +413,8 @@ public final class MultiQueryExecutionPlanV2 {
                     dependencySlots[i] = idx >= 0 ? idx : -1;
                 }
 
-                // Output slot is where the computed value goes
-                int outputSlot = rootSchema.indexOfDto(entityPath);
-                if (outputSlot < 0) {
-                    outputSlot = rootSchema.indexOfEntity(entityPath);
-                }
+                // Output slot is where the computed value goes (lookup by DTO field name)
+                int outputSlot = rootSchema.indexOfDto(dtoField);
 
                 infos.add(new ComputedFieldInfo(dtoField, outputSlot, dependencySlots, dependencyPaths));
             }

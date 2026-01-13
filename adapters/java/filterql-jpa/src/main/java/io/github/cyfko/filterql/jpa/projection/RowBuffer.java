@@ -187,11 +187,30 @@ public final class RowBuffer {
      * @return Map representation of this row
      */
     public Map<String, Object> toMap() {
+        return toMap(null);
+    }
+
+    /**
+     * Converts this RowBuffer to a Map for final output, excluding specified slots.
+     * <p>
+     * This method should only be called once at the end of processing,
+     * as it allocates a new Map. Internal fields and excluded slots are excluded.
+     * Nested fields are properly structured as nested Maps.
+     * </p>
+     *
+     * @param excludedSlots set of slot indices to exclude from output, or null for
+     *                      none
+     * @return Map representation of this row
+     */
+    public Map<String, Object> toMap(Set<Integer> excludedSlots) {
         Map<String, Object> result = new LinkedHashMap<>();
 
         // Add scalar fields
         for (int i = 0; i < schema.fieldCount(); i++) {
             if (schema.isInternal(i)) {
+                continue;
+            }
+            if (excludedSlots != null && excludedSlots.contains(i)) {
                 continue;
             }
 
@@ -211,7 +230,7 @@ public final class RowBuffer {
             if (children != null) {
                 List<Map<String, Object>> childMaps = new ArrayList<>(children.size());
                 for (RowBuffer child : children) {
-                    childMaps.add(child.toMap());
+                    childMaps.add(child.toMap(excludedSlots));
                 }
 
                 // Handle nested collection placement
