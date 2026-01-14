@@ -146,8 +146,19 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
         ComputedFieldInfo[] computedFields = execCtx.plan.computedFields();
         boolean hasComputed = computedFields.length > 0 && dtoClass != rootEntityClass;
 
-        Map<String, Map<Object, Number>> aggregateResults = Collections.emptyMap();
+        // Check if any computed field has aggregates (early exit optimization)
+        boolean hasAggregates = false;
         if (hasComputed) {
+            for (ComputedFieldInfo cf : computedFields) {
+                if (cf.isAggregate()) {
+                    hasAggregates = true;
+                    break;
+                }
+            }
+        }
+
+        Map<String, Map<Object, Number>> aggregateResults = Collections.emptyMap();
+        if (hasAggregates) {
             aggregateResults = prefetchAggregates(execCtx, computedFields, rootResults.keySet());
         }
 
@@ -158,14 +169,24 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
 
         // 5. Single pass: apply computed fields + convert to Map
         List<Map<String, Object>> results = new ArrayList<>(rootResults.size());
-        final Map<String, Map<Object, Number>> finalAggregateResults = aggregateResults;
-        for (Map.Entry<Object, RowBuffer> entry : rootResults.entrySet()) {
-            Object rootId = entry.getKey();
-            RowBuffer row = entry.getValue();
-            if (hasComputed) {
+
+        if (hasAggregates) {
+            // Need rootId for aggregate lookups
+            final Map<String, Map<Object, Number>> finalAggregateResults = aggregateResults;
+            for (Map.Entry<Object, RowBuffer> entry : rootResults.entrySet()) {
+                Object rootId = entry.getKey();
+                RowBuffer row = entry.getValue();
                 applyComputedFieldsToRow(row, computedFields, execCtx, rootId, finalAggregateResults);
+                results.add(row.toMap(excludedSlots));
             }
-            results.add(row.toMap(excludedSlots));
+        } else {
+            // Fast path: no aggregates, just process rows
+            for (RowBuffer row : rootResults.values()) {
+                if (hasComputed) {
+                    applyComputedFieldsToRow(row, computedFields, execCtx, null, Collections.emptyMap());
+                }
+                results.add(row.toMap(excludedSlots));
+            }
         }
 
         long durationMs = (System.nanoTime() - startTime) / 1_000_000;
