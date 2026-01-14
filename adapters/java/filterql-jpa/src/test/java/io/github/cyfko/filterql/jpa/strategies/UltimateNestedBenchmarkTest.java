@@ -61,7 +61,7 @@ class UltimateNestedBenchmarkTest {
                 for (int d = 0; d < DEPTS_PER_COMPANY; d++) {
                     Department dept = new Department(
                             "Dept-" + c + "-" + d,
-                            100000 + d * 10000);
+                            100000L + d * 10000);
                     company.addDepartment(dept);
 
                     for (int t = 0; t < TEAMS_PER_DEPT; t++) {
@@ -188,8 +188,8 @@ class UltimateNestedBenchmarkTest {
 
             // Warmup
             for (int i = 0; i < WARMUP_ITERATIONS; i++) {
-                FilterQueryFactory.of(filterContext).execute(request, em, strategyV1);
                 FilterQueryFactory.of(filterContext).execute(request, em, strategyV2);
+                FilterQueryFactory.of(filterContext).execute(request, em, strategyV1);
             }
 
             // Benchmark V1
@@ -229,13 +229,15 @@ class UltimateNestedBenchmarkTest {
                     .projection(projection)
                     .build();
 
-            MultiQueryFetchStrategyOld strategyV1 = new MultiQueryFetchStrategyOld(CompanyDto.class);
-            MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(CompanyDto.class);
+            // CompanyDto has computed fields, so we need an InstanceResolver
+            InstanceResolver resolver = InstanceResolver.noBean();
+            MultiQueryFetchStrategyOld strategyV1 = new MultiQueryFetchStrategyOld(CompanyDto.class, resolver);
+            MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
 
             // Warmup
             for (int i = 0; i < WARMUP_ITERATIONS; i++) {
-                FilterQueryFactory.of(filterContext).execute(request, em, strategyV1);
                 FilterQueryFactory.of(filterContext).execute(request, em, strategyV2);
+                FilterQueryFactory.of(filterContext).execute(request, em, strategyV1);
             }
 
             // Benchmark V1

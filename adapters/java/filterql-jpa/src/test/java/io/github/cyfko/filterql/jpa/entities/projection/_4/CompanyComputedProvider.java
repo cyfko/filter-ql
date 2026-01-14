@@ -1,39 +1,41 @@
 package io.github.cyfko.filterql.jpa.entities.projection._4;
 
-import java.util.List;
-
 /**
  * Provider class for computed fields in CompanyDto.
- * Contains methods that compute values from nested collection data.
+ * 
+ * Methods receive aggregated scalar values from SQL reducers:
+ * - COUNT returns Long
+ * - SUM returns Long (regardless of source field type)
+ * 
+ * IMPORTANT: Use boxed types (Long, Integer) instead of primitives
+ * to handle null values from aggregations.
  */
 public class CompanyComputedProvider {
 
     /**
-     * Computes total employee count across all departments, teams.
-     * This is computed from Level 3 collection data.
+     * Computes employee summary from aggregated count.
      *
-     * @param id          company id
-     * @param name        company name
-     * @param departments list of departments (contains nested teams/employees)
-     * @return summary string with total counts
+     * @param id            company id
+     * @param name          company name
+     * @param employeeCount aggregated COUNT of employees.id (may be null if no
+     *                      results)
+     * @return summary string
      */
-    public String getEmployeeSummary(Long id, String name, List<Department> departments) {
-        // In a real scenario, we'd traverse the nested structure
-        // Here we just count the top-level departments
-        int deptCount = departments != null ? departments.size() : 0;
-        return String.format("%d-%s[%d depts]", id, name, deptCount);
+    public static String getEmployeeSummary(Long id, String name, Long employeeCount) {
+        long count = employeeCount != null ? employeeCount : 0L;
+        return String.format("%d-%s[%d employees]", id, name, count);
     }
 
     /**
-     * Computes total budget across all departments.
+     * Computes total budget info from aggregated sum.
+     * SUM on integer fields returns Long in JPA/SQL.
      *
      * @param id          company id
-     * @param departments list of department data
+     * @param totalBudget aggregated SUM of departments.budget (may be null)
      * @return formatted budget string
      */
-    public String getTotalBudgetInfo(Long id, List<Department> departments) {
-        // Budget would be computed from department data
-        int deptCount = departments != null ? departments.size() : 0;
-        return String.format("Company#%d: %d departments", id, deptCount);
+    public static String getTotalBudgetInfo(Long id, Long totalBudget) {
+        long budget = totalBudget != null ? totalBudget : 0L;
+        return String.format("Company#%d: budget=%d", id, budget);
     }
 }

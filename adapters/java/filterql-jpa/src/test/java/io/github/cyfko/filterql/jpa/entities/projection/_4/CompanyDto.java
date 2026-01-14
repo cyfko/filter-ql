@@ -32,12 +32,12 @@ public class CompanyDto {
     @Projected(from = "departments")
     private List<DepartmentDto> departments;
 
-    // Computed field depending on scalar + nested collection (3rd level data)
-    @Computed(dependsOn = { "id", "name", "departments" })
+    // Computed field using COUNT reducer on nested collection
+    @Computed(dependsOn = { "id", "name", "departments.teams.employees.id" }, reducers = { Computed.Reduce.COUNT })
     private String employeeSummary;
 
-    // Another computed field
-    @Computed(dependsOn = { "id", "departments" })
+    // Another computed field using SUM reducer
+    @Computed(dependsOn = { "id", "departments.budget" }, reducers = { Computed.Reduce.SUM })
     private String totalBudgetInfo;
 
     // Getters and setters

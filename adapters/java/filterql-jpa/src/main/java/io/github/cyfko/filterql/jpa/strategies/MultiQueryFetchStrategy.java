@@ -8,6 +8,7 @@ import io.github.cyfko.filterql.core.model.SortBy;
 import io.github.cyfko.filterql.core.projection.ProjectionFieldParser;
 import io.github.cyfko.filterql.core.spi.ExecutionStrategy;
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
+import io.github.cyfko.filterql.jpa.projection.AggregateQueryExecutor;
 import io.github.cyfko.filterql.jpa.projection.FieldSchema;
 import io.github.cyfko.filterql.jpa.projection.InstanceResolver;
 import io.github.cyfko.filterql.jpa.projection.MultiQueryExecutionPlan;
@@ -15,6 +16,7 @@ import io.github.cyfko.filterql.jpa.projection.MultiQueryExecutionPlanV2;
 import io.github.cyfko.filterql.jpa.projection.MultiQueryExecutionPlanV2.CollectionPlanV2;
 import io.github.cyfko.filterql.jpa.projection.MultiQueryExecutionPlanV2.ComputedFieldInfo;
 import io.github.cyfko.filterql.jpa.projection.RowBuffer;
+import io.github.cyfko.projection.metamodel.model.projection.ComputedField.ReducerMapping;
 import io.github.cyfko.filterql.jpa.utils.PathResolverUtils;
 import io.github.cyfko.filterql.jpa.utils.ProjectionUtils;
 import io.github.cyfko.projection.metamodel.PersistenceRegistry;
@@ -140,19 +142,28 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
             executeCollectionQueries(execCtx, rootResults);
         }
 
-        // 4. Single pass: apply computed fields + convert to Map
+        // 4. Pre-fetch aggregate values for computed fields with reducers
         ComputedFieldInfo[] computedFields = execCtx.plan.computedFields();
         boolean hasComputed = computedFields.length > 0 && dtoClass != rootEntityClass;
+
+        Map<String, Map<Object, Number>> aggregateResults = Collections.emptyMap();
+        if (hasComputed) {
+            aggregateResults = prefetchAggregates(execCtx, computedFields, rootResults.keySet());
+        }
 
         // Compute excluded slots once (dependency fields not directly projected)
         Set<Integer> excludedSlots = hasComputed
                 ? computeExcludedSlots(computedFields, execCtx)
                 : null;
 
+        // 5. Single pass: apply computed fields + convert to Map
         List<Map<String, Object>> results = new ArrayList<>(rootResults.size());
-        for (RowBuffer row : rootResults.values()) {
+        final Map<String, Map<Object, Number>> finalAggregateResults = aggregateResults;
+        for (Map.Entry<Object, RowBuffer> entry : rootResults.entrySet()) {
+            Object rootId = entry.getKey();
+            RowBuffer row = entry.getValue();
             if (hasComputed) {
-                applyComputedFieldsToRow(row, computedFields, execCtx);
+                applyComputedFieldsToRow(row, computedFields, execCtx, rootId, finalAggregateResults);
             }
             results.add(row.toMap(excludedSlots));
         }
@@ -174,7 +185,7 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
         CriteriaQuery<Tuple> query = cb.createTupleQuery();
         Root<?> root = query.from(rootEntityClass);
 
-        MultiQueryExecutionPlanV2 plan = MultiQueryExecutionPlanV2.build(root, projSpec);
+        MultiQueryExecutionPlanV2 plan = MultiQueryExecutionPlanV2.build(root, projSpec, dtoClass);
 
         return new ExecutionContext(em, cb, root, query, pr, projSpec, plan);
     }
@@ -524,22 +535,55 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
 
     /**
      * Applies computed fields to a single row using O(1) slot access.
+     * For aggregate reducers, uses pre-fetched values from aggregate queries.
      * 
-     * @param row            the RowBuffer to process
-     * @param computedFields array of computed field metadata
-     * @param ctx            execution context
+     * @param row              the RowBuffer to process
+     * @param computedFields   array of computed field metadata
+     * @param ctx              execution context
+     * @param rootId           the root entity ID for looking up aggregates
+     * @param aggregateResults pre-fetched aggregate results by (path -> (rootId ->
+     *                         value))
      */
-    private void applyComputedFieldsToRow(RowBuffer row, ComputedFieldInfo[] computedFields, ExecutionContext ctx) {
+    private void applyComputedFieldsToRow(
+            RowBuffer row,
+            ComputedFieldInfo[] computedFields,
+            ExecutionContext ctx,
+            Object rootId,
+            Map<String, Map<Object, Number>> aggregateResults) {
+
         for (ComputedFieldInfo info : computedFields) {
+            ReducerMapping[] reducers = info.reducers();
+            String[] dependencyPaths = info.dependencyPaths();
+            int[] dependencySlots = info.dependencySlots();
+
             // Gather dependencies using O(1) slot access
-            Object[] params = new Object[info.dependencySlots().length];
+            Object[] params = new Object[dependencyPaths.length];
+
             for (int i = 0; i < params.length; i++) {
-                int slot = info.dependencySlots()[i];
-                if (slot >= 0) {
-                    params[i] = row.get(slot);
+                String depPath = dependencyPaths[i].trim();
+
+                // Check if this dependency has a reducer (aggregate)
+                ReducerMapping reducer = null;
+                for (ReducerMapping rm : reducers) {
+                    if (rm.dependencyIndex() == i) {
+                        reducer = rm;
+                        break;
+                    }
+                }
+
+                if (reducer != null) {
+                    // This is an aggregate dependency - use pre-fetched value
+                    Map<Object, Number> byId = aggregateResults.get(depPath);
+                    params[i] = (byId != null) ? byId.get(rootId) : null;
                 } else {
-                    // Fallback to name lookup if slot not found
-                    params[i] = row.getOrNull(info.dependencyPaths()[i].trim());
+                    // Regular scalar dependency - use slot access
+                    int slot = dependencySlots[i];
+                    if (slot >= 0) {
+                        params[i] = row.get(slot);
+                    } else {
+                        // Fallback to name lookup if slot not found
+                        params[i] = row.getOrNull(depPath);
+                    }
                 }
             }
 
@@ -555,6 +599,71 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
                 throw new RuntimeException("Failed to compute field: " + info.dtoFieldName(), e);
             }
         }
+    }
+
+    /**
+     * Pre-fetches aggregate values for all computed fields with reducers.
+     * Executes batch queries for each aggregate path.
+     * 
+     * @param exeCtx         Execution context
+     * @param computedFields computed field metadata
+     * @param rootIds        all root entity IDs
+     * @return Map of (path -> (rootId -> aggregateValue))
+     */
+    private Map<String, Map<Object, Number>> prefetchAggregates(
+            ExecutionContext exeCtx,
+            ComputedFieldInfo[] computedFields,
+            Collection<?> rootIds) {
+
+        Map<String, Map<Object, Number>> results = new HashMap<>();
+
+        if (rootIds.isEmpty()) {
+            return results;
+        }
+
+        // Get the ID field name from the plan
+        List<String> idFields = exeCtx.plan.rootIdFields();
+        if (idFields.isEmpty()) {
+            logger.warning("No root ID fields found in plan, cannot execute aggregate queries");
+            return results;
+        }
+        String rootIdField = idFields.get(0);
+
+        logger.fine(() -> "Pre-fetching aggregates for " + rootIds.size() + " root IDs using ID field: " + rootIdField);
+
+        AggregateQueryExecutor executor = new AggregateQueryExecutor(exeCtx.em, rootEntityClass, rootIdField);
+
+        for (ComputedFieldInfo info : computedFields) {
+            if (!info.isAggregate()) {
+                continue;
+            }
+
+            logger.fine(() -> "Processing aggregate computed field: " + info.dtoFieldName());
+
+            for (ReducerMapping reducer : info.reducers()) {
+                String path = info.dependencyPaths()[reducer.dependencyIndex()].trim();
+
+                logger.fine(() -> "Executing aggregate query: " + reducer.reducer() + " on path: " + path);
+
+                // Skip if already computed
+                if (results.containsKey(path)) {
+                    continue;
+                }
+
+                try {
+                    Map<Object, Number> aggregates = executor.executeAggregateQuery(path, reducer.reducer(), rootIds);
+                    results.put(path, aggregates);
+
+                    logger.fine(() -> "Aggregate query returned " + aggregates.size() + " results for path: " + path);
+                } catch (Exception e) {
+                    logger.warning("Failed to execute aggregate query for " + path + ": " + e.getMessage());
+                    e.printStackTrace();
+                    results.put(path, Collections.emptyMap());
+                }
+            }
+        }
+
+        return results;
     }
 
     // ==================== Utility Methods ====================

@@ -4,7 +4,11 @@ import io.github.cyfko.filterql.core.model.Pagination;
 import io.github.cyfko.filterql.core.model.SortBy;
 import io.github.cyfko.filterql.jpa.utils.PathResolverUtils;
 import io.github.cyfko.projection.metamodel.PersistenceRegistry;
+import io.github.cyfko.projection.metamodel.ProjectionRegistry;
 import io.github.cyfko.projection.metamodel.model.PersistenceMetadata;
+import io.github.cyfko.projection.metamodel.model.projection.ComputedField;
+import io.github.cyfko.projection.metamodel.model.projection.ComputedField.ReducerMapping;
+import io.github.cyfko.projection.metamodel.model.projection.ProjectionMetadata;
 import jakarta.persistence.criteria.Root;
 
 import java.util.*;
@@ -54,12 +58,14 @@ public final class MultiQueryExecutionPlanV2 {
     /**
      * Builds an optimized execution plan from entity projection specification.
      *
-     * @param <E>  root entity type
-     * @param root JPA root for path resolution
-     * @param ps   projection specification
+     * @param <E>      root entity type
+     * @param root     JPA root for path resolution
+     * @param ps       projection specification
+     * @param dtoClass the DTO class for accessing projection metadata
      * @return optimized execution plan
      */
-    public static <E> MultiQueryExecutionPlanV2 build(Root<E> root, MultiQueryExecutionPlan.ProjectionSpec ps) {
+    public static <E> MultiQueryExecutionPlanV2 build(Root<E> root, MultiQueryExecutionPlan.ProjectionSpec ps,
+            Class<?> dtoClass) {
         @SuppressWarnings("unchecked")
         Class<E> rootEntityClass = (Class<E>) root.getJavaType();
 
@@ -170,7 +176,7 @@ public final class MultiQueryExecutionPlanV2 {
 
         // 7. Build computed field info
         ComputedFieldInfo[] computedFieldsArray = buildComputedFieldInfo(
-                rootSchema, ps.entityToDtoMapping(), computedFieldNames);
+                rootSchema, ps.entityToDtoMapping(), computedFieldNames, dtoClass);
 
         return new MultiQueryExecutionPlanV2(
                 rootEntityClass,
@@ -395,8 +401,12 @@ public final class MultiQueryExecutionPlanV2 {
     private static ComputedFieldInfo[] buildComputedFieldInfo(
             FieldSchema rootSchema,
             Map<String, String> entityToDtoMapping,
-            Set<String> computedFieldNames) {
+            Set<String> computedFieldNames,
+            Class<?> dtoClass) {
         List<ComputedFieldInfo> infos = new ArrayList<>();
+
+        // Get projection metadata for accessing reducer info
+        ProjectionMetadata metadata = ProjectionRegistry.getMetadataFor(dtoClass);
 
         for (Map.Entry<String, String> entry : entityToDtoMapping.entrySet()) {
             String entityPath = entry.getKey();
@@ -407,16 +417,36 @@ public final class MultiQueryExecutionPlanV2 {
                 String[] dependencyPaths = entityPath.split(",");
                 int[] dependencySlots = new int[dependencyPaths.length];
 
+                // Extract reducers from metadata first to know which deps have reducers
+                ReducerMapping[] reducers = new ReducerMapping[0];
+                Set<Integer> reducerDependencyIndices = new HashSet<>();
+                if (metadata != null) {
+                    var computedField = metadata.getComputedField(dtoField, false);
+                    if (computedField.isPresent() && computedField.get().hasReducers()) {
+                        reducers = computedField.get().reducers();
+                        for (ReducerMapping rm : reducers) {
+                            reducerDependencyIndices.add(rm.dependencyIndex());
+                        }
+                    }
+                }
+
                 for (int i = 0; i < dependencyPaths.length; i++) {
                     String dep = dependencyPaths[i].trim();
-                    int idx = rootSchema.indexOfEntity(dep);
-                    dependencySlots[i] = idx >= 0 ? idx : -1;
+
+                    // Skip slot lookup for dependencies with reducers - they're resolved by
+                    // aggregate queries
+                    if (reducerDependencyIndices.contains(i)) {
+                        dependencySlots[i] = -1; // Will be resolved via aggregate query
+                    } else {
+                        int idx = rootSchema.indexOfEntity(dep);
+                        dependencySlots[i] = idx >= 0 ? idx : -1;
+                    }
                 }
 
                 // Output slot is where the computed value goes (lookup by DTO field name)
                 int outputSlot = rootSchema.indexOfDto(dtoField);
 
-                infos.add(new ComputedFieldInfo(dtoField, outputSlot, dependencySlots, dependencyPaths));
+                infos.add(new ComputedFieldInfo(dtoField, outputSlot, dependencySlots, dependencyPaths, reducers));
             }
         }
 
@@ -482,7 +512,14 @@ public final class MultiQueryExecutionPlanV2 {
             String dtoFieldName,
             int outputSlot,
             int[] dependencySlots,
-            String[] dependencyPaths // For fallback lookup
+            String[] dependencyPaths, // For fallback lookup
+            ReducerMapping[] reducers // Reducers for aggregate fields
     ) {
+        /**
+         * @return true if this computed field has aggregate reducers
+         */
+        public boolean isAggregate() {
+            return reducers != null && reducers.length > 0;
+        }
     }
 }

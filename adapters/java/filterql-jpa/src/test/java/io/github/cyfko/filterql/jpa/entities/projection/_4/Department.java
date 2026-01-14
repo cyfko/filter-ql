@@ -18,7 +18,7 @@ public class Department {
 
     private String name;
 
-    private int budget;
+    private Long budget;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id")
@@ -30,7 +30,7 @@ public class Department {
     public Department() {
     }
 
-    public Department(String name, int budget) {
+    public Department(String name, Long budget) {
         this.name = name;
         this.budget = budget;
     }
@@ -51,11 +51,11 @@ public class Department {
         this.name = name;
     }
 
-    public int getBudget() {
+    public Long getBudget() {
         return budget;
     }
 
-    public void setBudget(int budget) {
+    public void setBudget(Long budget) {
         this.budget = budget;
     }
 
