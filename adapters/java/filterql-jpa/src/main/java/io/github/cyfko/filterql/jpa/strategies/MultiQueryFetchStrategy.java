@@ -183,7 +183,7 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
             // Fast path: no aggregates, just process rows
             for (RowBuffer row : rootResults.values()) {
                 if (hasComputed) {
-                    applyComputedFieldsToRow(row, computedFields, execCtx, null, Collections.emptyMap());
+                    applyComputedFieldsToRowSimple(row, computedFields);
                 }
                 results.add(row.toMap(excludedSlots));
             }
@@ -612,6 +612,42 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
                 Object computed = ProjectionUtils.computeField(instanceResolver, dtoClass, info.dtoFieldName(), params);
 
                 // Store computed value using O(1) slot access
+                int outputSlot = info.outputSlot();
+                if (outputSlot >= 0) {
+                    row.set(outputSlot, computed);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to compute field: " + info.dtoFieldName(), e);
+            }
+        }
+    }
+
+    /**
+     * Fast-path version for computed fields WITHOUT aggregates.
+     * Uses simple slot access without reducer checks.
+     * 
+     * @param row            the RowBuffer to process
+     * @param computedFields array of computed field metadata
+     */
+    private void applyComputedFieldsToRowSimple(RowBuffer row, ComputedFieldInfo[] computedFields) {
+        for (ComputedFieldInfo info : computedFields) {
+            int[] dependencySlots = info.dependencySlots();
+            String[] dependencyPaths = info.dependencyPaths();
+
+            // Gather dependencies using O(1) slot access
+            Object[] params = new Object[dependencySlots.length];
+            for (int i = 0; i < params.length; i++) {
+                int slot = dependencySlots[i];
+                if (slot >= 0) {
+                    params[i] = row.get(slot);
+                } else {
+                    // Fallback to name lookup
+                    params[i] = row.getOrNull(dependencyPaths[i].trim());
+                }
+            }
+
+            try {
+                Object computed = ProjectionUtils.computeField(instanceResolver, dtoClass, info.dtoFieldName(), params);
                 int outputSlot = info.outputSlot();
                 if (outputSlot >= 0) {
                     row.set(outputSlot, computed);
