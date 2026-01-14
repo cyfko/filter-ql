@@ -4,6 +4,10 @@
         <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
         <class>io.github.cyfko.filterql.jpa.JpaEnumMatchModeTest$Task</class>
         <class>io.github.cyfko.filterql.jpa.JpaCustomOperatorTest$Document</class>
+        <class>io.github.cyfko.filterql.jpa.entities.projection._4.Company</class>
+        <class>io.github.cyfko.filterql.jpa.entities.projection._4.Department</class>
+        <class>io.github.cyfko.filterql.jpa.entities.projection._4.Team</class>
+        <class>io.github.cyfko.filterql.jpa.entities.projection._4.Employee</class>
 
         <properties>
             <!-- H2 in-memory -->
