@@ -182,7 +182,7 @@ class LargeScaleBenchmarkTest {
     @Test
     @Order(5)
     @DisplayName("Large Scale: With Computed Fields")
-    @Disabled("Computed fields test needs fix for dtoField null issue")
+    // @Disabled("Computed fields test needs fix for dtoField null issue")
     void benchmarkWithComputed() {
         System.out.println("\n┌──────────────────────────────────────────────────────────────┐");
         System.out.println("│  LARGE SCALE: WITH COMPUTED FIELDS                           │");
@@ -238,34 +238,27 @@ class LargeScaleBenchmarkTest {
         }
     }
 
+    /**
+     * Benchmark with computed fields - V2 only (V1 doesn't support reducers on deep
+     * paths).
+     */
     private void runBenchmarkWithComputed(Set<String> projection, String testName) {
         try (EntityManager em = emf.createEntityManager()) {
             FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
-                    .filter("f", CompanyProperty.NAME, "LIKE", "Company%")
+                    .filter("f", CompanyProperty.NAME, "MATCHES", "Company%")
                     .combineWith("f")
                     .projection(projection)
                     .build();
 
             InstanceResolver resolver = InstanceResolver.noBean();
-            MultiQueryFetchStrategyOld strategyV1 = new MultiQueryFetchStrategyOld(CompanyDto.class, resolver);
             MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
 
             // Warmup
             for (int i = 0; i < WARMUP_ITERATIONS; i++) {
                 FilterQueryFactory.of(filterContext).execute(request, em, strategyV2);
-                FilterQueryFactory.of(filterContext).execute(request, em, strategyV1);
             }
 
-            // Benchmark V1
-            long[] v1Times = new long[BENCHMARK_ITERATIONS];
-            List<Map<String, Object>> v1Result = null;
-            for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
-                long start = System.nanoTime();
-                v1Result = FilterQueryFactory.of(filterContext).execute(request, em, strategyV1);
-                v1Times[i] = System.nanoTime() - start;
-            }
-
-            // Benchmark V2
+            // Benchmark V2 only (reducers are a V2-only feature)
             long[] v2Times = new long[BENCHMARK_ITERATIONS];
             List<Map<String, Object>> v2Result = null;
             for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
@@ -274,13 +267,23 @@ class LargeScaleBenchmarkTest {
                 v2Times[i] = System.nanoTime() - start;
             }
 
-            printResults(testName, v1Times, v2Times, v1Result.size(), v2Result.size());
+            // Print V2 results
+            double v2Avg = Arrays.stream(v2Times).average().orElse(0) / 1_000_000.0;
+            double v2Min = Arrays.stream(v2Times).min().orElse(0) / 1_000_000.0;
+            double v2Max = Arrays.stream(v2Times).max().orElse(0) / 1_000_000.0;
 
-            // Verify computed fields
-            if (!v2Result.isEmpty()) {
-                assertTrue(v2Result.getFirst().containsKey("employeeSummary"),
-                        "Should have employeeSummary computed field");
-            }
+            System.out.printf("   V2 with aggregates: avg=%8.2fms, min=%8.2fms, max=%8.2fms%n", v2Avg, v2Min, v2Max);
+            System.out.printf("   Results: %d companies with computed fields%n", v2Result.size());
+
+            // Verify computed fields are present and contain values
+            assertFalse(v2Result.isEmpty(), "Should have results");
+            Map<String, Object> first = v2Result.getFirst();
+            assertTrue(first.containsKey("employeeSummary"), "Should have employeeSummary computed field");
+            assertTrue(first.containsKey("totalBudgetInfo"), "Should have totalBudgetInfo computed field");
+
+            // Print sample computed values
+            System.out.printf("   Sample: employeeSummary=%s, totalBudgetInfo=%s%n",
+                    first.get("employeeSummary"), first.get("totalBudgetInfo"));
         }
     }
 

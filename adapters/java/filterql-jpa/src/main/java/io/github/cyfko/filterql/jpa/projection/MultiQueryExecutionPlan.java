@@ -21,11 +21,12 @@ import java.util.stream.Collectors;
  *
  * <h2>Key Features</h2>
  * <ul>
- *   <li>DTO field names in CollectionNode.collectionName and ScalarFieldMapping</li>
- *   <li>Entity field names preserved only for query path resolution</li>
- *   <li>Compact notation support with automatic expansion</li>
- *   <li>Composite key support via PersistenceRegistry</li>
- *   <li>Hierarchical collection navigation</li>
+ * <li>DTO field names in CollectionNode.collectionName and
+ * ScalarFieldMapping</li>
+ * <li>Entity field names preserved only for query path resolution</li>
+ * <li>Compact notation support with automatic expansion</li>
+ * <li>Composite key support via PersistenceRegistry</li>
+ * <li>Hierarchical collection navigation</li>
  * </ul>
  *
  * @author Frank KOSSI
@@ -45,8 +46,7 @@ public class MultiQueryExecutionPlan {
             List<ScalarFieldMapping> rootScalarFields,
             List<String> rootIdFields,
             List<CollectionLevelPlan> collectionLevels,
-            Map<String, PathResolverUtils.PathResolutionMetadata> metadataByPath
-    ) {
+            Map<String, PathResolverUtils.PathResolutionMetadata> metadataByPath) {
         this.rootEntityClass = rootEntityClass;
         this.rootScalarFields = Collections.unmodifiableList(rootScalarFields);
         this.rootIdFields = rootIdFields;
@@ -57,13 +57,13 @@ public class MultiQueryExecutionPlan {
     /**
      * Builds an execution plan from entity projection with DTO field mapping.
      *
-     * @param <E> root entity type
+     * @param <E>  root entity type
      * @param root JPA root for path resolution
-     * @param ps projection specification
+     * @param ps   projection specification
      * @return execution plan
      */
     public static <E> MultiQueryExecutionPlan build(Root<E> root, ProjectionSpec ps) {
-        //noinspection unchecked
+        // noinspection unchecked
         Class<E> rootEntityClass = (Class<E>) root.getJavaType();
 
         // 0. Expand compact notation
@@ -90,14 +90,15 @@ public class MultiQueryExecutionPlan {
             if (!meta.hasCollections()) {
                 // Scalar field - map to DTO name
                 String dtoField = ps.entityToDtoMapping.getOrDefault(entityField, entityField);
-                rootScalarFields.add(new ScalarFieldMapping(entityField, ps.computedFields.contains(dtoField) ? entityField : dtoField));
+                rootScalarFields.add(new ScalarFieldMapping(entityField,
+                        ps.computedFields.contains(dtoField) ? entityField : dtoField));
             } else {
                 // Collection path
                 int depth = meta.collectionSegments().size();
                 pathsByDepth.computeIfAbsent(depth, k -> new LinkedHashSet<>()).add(entityField);
 
                 // Also insert mapping for collection names (without fields)
-                String dtoField = ps.entityToDtoMapping.get(entityField);
+                String dtoField = ps.entityToDtoMapping.getOrDefault(entityField, entityField);
                 int dotIndex = dtoField.lastIndexOf('.');
                 dtoField = dotIndex == -1 ? dtoField : dtoField.substring(0, dotIndex);
 
@@ -110,9 +111,11 @@ public class MultiQueryExecutionPlan {
         }
 
         // 4. Always include root ID (but don't expose in DTO if not requested)
-        Set<String> includedFields = rootScalarFields.stream().map(ScalarFieldMapping::entityField).collect(Collectors.toSet());
+        Set<String> includedFields = rootScalarFields.stream().map(ScalarFieldMapping::entityField)
+                .collect(Collectors.toSet());
         for (String idField : rootIdFields) {
-            if (includedFields.contains(idField)) continue;
+            if (includedFields.contains(idField))
+                continue;
             rootScalarFields.add(ScalarFieldMapping.internal(idField));
         }
 
@@ -122,16 +125,14 @@ public class MultiQueryExecutionPlan {
                 pathsByDepth,
                 metadataByPath,
                 ps.collectionPagination,
-                ps.entityToDtoMapping
-        );
+                ps.entityToDtoMapping);
 
         return new MultiQueryExecutionPlan(
                 rootEntityClass,
                 rootScalarFields,
                 rootIdFields,
                 collectionLevels,
-                metadataByPath
-        );
+                metadataByPath);
     }
 
     /**
@@ -139,9 +140,10 @@ public class MultiQueryExecutionPlan {
      * <p>
      * Examples:
      * <ul>
-     *   <li>"address.city,street" → ["address.city", "address.street"]</li>
-     *   <li>"firstName,lastName" → ["firstName", "lastName"]</li>
-     *   <li>"orders.items.productName,quantity" → ["orders.items.productName", "orders.items.quantity"]</li>
+     * <li>"address.city,street" → ["address.city", "address.street"]</li>
+     * <li>"firstName,lastName" → ["firstName", "lastName"]</li>
+     * <li>"orders.items.productName,quantity" → ["orders.items.productName",
+     * "orders.items.quantity"]</li>
      * </ul>
      * </p>
      *
@@ -157,9 +159,10 @@ public class MultiQueryExecutionPlan {
      * <p>
      * Examples:
      * <ul>
-     *   <li>"address.city,street" → ["address.city", "address.street"]</li>
-     *   <li>"firstName,lastName" → ["firstName", "lastName"]</li>
-     *   <li>"orders.items.productName,quantity" → ["orders.items.productName", "orders.items.quantity"]</li>
+     * <li>"address.city,street" → ["address.city", "address.street"]</li>
+     * <li>"firstName,lastName" → ["firstName", "lastName"]</li>
+     * <li>"orders.items.productName,quantity" → ["orders.items.productName",
+     * "orders.items.quantity"]</li>
      * </ul>
      * </p>
      *
@@ -205,8 +208,7 @@ public class MultiQueryExecutionPlan {
             Map<Integer, Set<String>> pathsByDepth,
             Map<String, PathResolverUtils.PathResolutionMetadata> metadataByPath,
             Map<String, Pagination> optionsByCollection,
-            Map<String, String> entityToDtoFieldMap
-    ) {
+            Map<String, String> entityToDtoFieldMap) {
         List<CollectionLevelPlan> levels = new ArrayList<>();
 
         for (Map.Entry<Integer, Set<String>> entry : pathsByDepth.entrySet()) {
@@ -216,8 +218,7 @@ public class MultiQueryExecutionPlan {
             Map<String, List<String>> pathsByCollection = groupPathsByCollectionAtDepth(
                     pathsAtDepth,
                     metadataByPath,
-                    depth
-            );
+                    depth);
 
             Set<CollectionNode> nodes = new LinkedHashSet<>();
 
@@ -232,8 +233,7 @@ public class MultiQueryExecutionPlan {
                         depth,
                         metadataByPath,
                         optionsByCollection,
-                        entityToDtoFieldMap
-                );
+                        entityToDtoFieldMap);
 
                 nodes.add(node);
             }
@@ -247,8 +247,7 @@ public class MultiQueryExecutionPlan {
     private static Map<String, List<String>> groupPathsByCollectionAtDepth(
             Set<String> paths,
             Map<String, PathResolverUtils.PathResolutionMetadata> metadataByPath,
-            int targetDepth
-    ) {
+            int targetDepth) {
         Map<String, List<String>> grouped = new LinkedHashMap<>();
 
         for (String path : paths) {
@@ -289,8 +288,7 @@ public class MultiQueryExecutionPlan {
             int depth,
             Map<String, PathResolverUtils.PathResolutionMetadata> metadataByPath,
             Map<String, Pagination> optionsByCollection,
-            Map<String, String> entityToDtoFieldMap
-    ) {
+            Map<String, String> entityToDtoFieldMap) {
         String samplePath = pathsInCollection.get(0);
         PathResolverUtils.PathResolutionMetadata sampleMeta = metadataByPath.get(samplePath);
 
@@ -299,8 +297,7 @@ public class MultiQueryExecutionPlan {
         CollectionInfo collectionInfo = sampleMeta.getCollectionInfo(entityCollectionFieldName);
         if (collectionInfo == null) {
             throw new IllegalStateException(
-                    "No collection info found for: " + entityCollectionFieldName + " in path: " + collectionPath
-            );
+                    "No collection info found for: " + entityCollectionFieldName + " in path: " + collectionPath);
         }
 
         Class<?> parentEntityClass = determineParentEntityClass(rootEntityClass, collectionPath, metadataByPath);
@@ -314,8 +311,7 @@ public class MultiQueryExecutionPlan {
         if (collectionFieldMetadata == null || !collectionFieldMetadata.isCollection()) {
             throw new IllegalStateException(
                     String.format("Field '%s' is not a collection in %s",
-                            entityCollectionFieldName, parentEntityClass.getSimpleName())
-            );
+                            entityCollectionFieldName, parentEntityClass.getSimpleName()));
         }
 
         Class<?> elementClass = collectionFieldMetadata.relatedType();
@@ -324,21 +320,21 @@ public class MultiQueryExecutionPlan {
         String parentReferenceField = determineParentReferenceField(
                 collectionFieldMetadata,
                 parentEntityClass,
-                elementClass
-        );
+                elementClass);
 
         // Extract fields to select with DTO mapping
         List<ScalarFieldMapping> fieldsToSelect = extractFieldsToSelect(
                 collectionPath,
                 pathsInCollection,
                 metadataByPath,
-                entityToDtoFieldMap
-        );
+                entityToDtoFieldMap);
 
         // Always include element IDs (internal, not exposed in DTO)
-        Set<String> includedFields = fieldsToSelect.stream().map(ScalarFieldMapping::entityField).collect(Collectors.toSet());
+        Set<String> includedFields = fieldsToSelect.stream().map(ScalarFieldMapping::entityField)
+                .collect(Collectors.toSet());
         for (String idField : elementIdFields) {
-            if (includedFields.contains(idField)) continue;
+            if (includedFields.contains(idField))
+                continue;
             fieldsToSelect.add(ScalarFieldMapping.internal(idField));
         }
 
@@ -357,15 +353,13 @@ public class MultiQueryExecutionPlan {
                 options != null ? options.size() : null,
                 options != null ? options.offset() : null,
                 options != null ? options.sort() : List.of(),
-                false
-        );
+                false);
     }
 
     private static String determineParentReferenceField(
             PersistenceMetadata collectionMetadata,
             Class<?> parentEntityClass,
-            Class<?> elementClass
-    ) {
+            Class<?> elementClass) {
         Optional<String> mappedBy = collectionMetadata.getMappedBy();
         if (mappedBy.isPresent()) {
             return mappedBy.get();
@@ -392,8 +386,7 @@ public class MultiQueryExecutionPlan {
     private static Class<?> determineParentEntityClass(
             Class<?> rootEntityClass,
             String collectionPath,
-            Map<String, PathResolverUtils.PathResolutionMetadata> metadataByPath
-    ) {
+            Map<String, PathResolverUtils.PathResolutionMetadata> metadataByPath) {
         String[] segments = collectionPath.split("\\.");
 
         if (segments.length == 1) {
@@ -409,7 +402,8 @@ public class MultiQueryExecutionPlan {
                     String parentCollectionField = segments[segments.length - 2];
                     CollectionInfo parentInfo = meta.getCollectionInfo(parentCollectionField);
                     if (parentInfo != null && parentInfo.isEntityCollection()) {
-                        Class<?> grandParent = determineParentEntityClass(rootEntityClass, parentCollectionPath, metadataByPath);
+                        Class<?> grandParent = determineParentEntityClass(rootEntityClass, parentCollectionPath,
+                                metadataByPath);
                         return PersistenceRegistry.getMetadataFor(grandParent).get(parentCollectionField).relatedType();
                     }
                 }
@@ -423,8 +417,7 @@ public class MultiQueryExecutionPlan {
             String collectionPath,
             List<String> pathsInCollection,
             Map<String, PathResolverUtils.PathResolutionMetadata> metadataByPath,
-            Map<String, String> entityToDtoFieldMap
-    ) {
+            Map<String, String> entityToDtoFieldMap) {
         List<ScalarFieldMapping> fields = new ArrayList<>();
         int collectionDepth = collectionPath.split("\\.").length;
 
@@ -471,8 +464,10 @@ public class MultiQueryExecutionPlan {
     }
 
     /**
-     * Mapping between entity field name (for queries) and DTO field name (for results).
-     * If dtoField is null, the field is internal (e.g., ID) and should not appear in DTO.
+     * Mapping between entity field name (for queries) and DTO field name (for
+     * results).
+     * If dtoField is null, the field is internal (e.g., ID) and should not appear
+     * in DTO.
      */
     public record ScalarFieldMapping(String entityField, String dtoField) {
         public ScalarFieldMapping {
@@ -494,15 +489,15 @@ public class MultiQueryExecutionPlan {
      */
     public record CollectionLevelPlan(
             int depth,
-            Set<CollectionNode> collections
-    ) {}
+            Set<CollectionNode> collections) {
+    }
 
     /**
      * Node representing a single collection with DTO field names for result tree.
      */
     public record CollectionNode(
             String collectionPath,
-            String collectionName,  // DTO name for insertion in result tree
+            String collectionName, // DTO name for insertion in result tree
             String parentReferenceField,
             List<String> idFields,
             Class<?> elementClass,
@@ -510,26 +505,28 @@ public class MultiQueryExecutionPlan {
             Integer limitPerParent,
             Integer offsetPerParent,
             List<SortBy> sortFields,
-            boolean isLeaf
-    ) {}
+            boolean isLeaf) {
+    }
 
     /**
      * Record representing the result of a projection transformation:
      * <ul>
-     *   <li>{@code entityFields} - set of entity field paths selected for query</li>
-     *   <li>{@code computedFields} - set of computed DTO field paths</li>
-     *   <li>{@code collectionPagination} - mapping of collection paths to their pagination options</li>
-     *   <li>{@code entityToDtoMapping} - map from each entity path to the corresponding DTO field name</li>
+     * <li>{@code entityFields} - set of entity field paths selected for query</li>
+     * <li>{@code computedFields} - set of computed DTO field paths</li>
+     * <li>{@code collectionPagination} - mapping of collection paths to their
+     * pagination options</li>
+     * <li>{@code entityToDtoMapping} - map from each entity path to the
+     * corresponding DTO field name</li>
      * </ul>
      *
-     * @param entityFields set of entity field paths for projection
+     * @param entityFields         set of entity field paths for projection
      * @param collectionPagination map of entity field path to pagination options
-     * @param entityToDtoMapping entity field path to DTO field name mapping
+     * @param entityToDtoMapping   entity field path to DTO field name mapping
      */
     public record ProjectionSpec(
             Set<String> entityFields,
             Set<String> computedFields,
             Map<String, Pagination> collectionPagination,
-            Map<String, String> entityToDtoMapping
-    ) {}
+            Map<String, String> entityToDtoMapping) {
+    }
 }
