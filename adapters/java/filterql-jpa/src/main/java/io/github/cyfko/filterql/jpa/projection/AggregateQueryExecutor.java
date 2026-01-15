@@ -20,23 +20,44 @@ import java.util.*;
  */
 public class AggregateQueryExecutor {
 
+    /**
+     * Maximum number of IDs in a single IN clause.
+     * Oracle has a limit of 1000, other databases vary.
+     * 500 is a safe default that works well with most query planners.
+     */
+    private static final int MAX_IN_CLAUSE_SIZE = 500;
+
     private final EntityManager em;
     private final Class<?> rootEntityClass;
-    private final String rootIdField;
+    private final List<String> rootIdFields;
 
+    /**
+     * Creates an executor for single-field ID entities.
+     */
     public AggregateQueryExecutor(EntityManager em, Class<?> rootEntityClass, String rootIdField) {
+        this(em, rootEntityClass, List.of(rootIdField));
+    }
+
+    /**
+     * Creates an executor for composite ID entities.
+     */
+    public AggregateQueryExecutor(EntityManager em, Class<?> rootEntityClass, List<String> rootIdFields) {
         this.em = Objects.requireNonNull(em, "EntityManager cannot be null");
         this.rootEntityClass = Objects.requireNonNull(rootEntityClass, "rootEntityClass cannot be null");
-        this.rootIdField = Objects.requireNonNull(rootIdField, "rootIdField cannot be null");
+        if (rootIdFields == null || rootIdFields.isEmpty()) {
+            throw new IllegalArgumentException("rootIdFields cannot be null or empty");
+        }
+        this.rootIdFields = List.copyOf(rootIdFields);
     }
 
     /**
      * Executes a batch aggregate query for a collection path with a reducer.
+     * Automatically batches large ID sets to avoid database limits.
      *
      * @param collectionPath the path traversing collections (e.g.,
      *                       "departments.budget")
      * @param reducer        the reducer name (SUM, AVG, COUNT, etc.)
-     * @param parentIds      the list of parent entity IDs to aggregate for
+     * @param parentIds      the collection of parent entity IDs to aggregate for
      * @return a Map from parentId to aggregated value
      */
     public Map<Object, Number> executeAggregateQuery(
@@ -46,6 +67,43 @@ public class AggregateQueryExecutor {
         if (parentIds == null || parentIds.isEmpty()) {
             return Collections.emptyMap();
         }
+
+        // For large ID sets, batch the queries
+        if (parentIds.size() > MAX_IN_CLAUSE_SIZE) {
+            return executeBatchedQuery(collectionPath, reducer, parentIds);
+        }
+
+        return executeSingleQuery(collectionPath, reducer, parentIds);
+    }
+
+    /**
+     * Executes batched queries for large ID sets.
+     */
+    private Map<Object, Number> executeBatchedQuery(
+            String collectionPath,
+            String reducer,
+            Collection<?> parentIds) {
+
+        Map<Object, Number> results = new HashMap<>();
+        List<?> idList = parentIds instanceof List<?> ? (List<?>) parentIds : new ArrayList<>(parentIds);
+
+        for (int i = 0; i < idList.size(); i += MAX_IN_CLAUSE_SIZE) {
+            int end = Math.min(i + MAX_IN_CLAUSE_SIZE, idList.size());
+            List<?> batch = idList.subList(i, end);
+            results.putAll(executeSingleQuery(collectionPath, reducer, batch));
+        }
+
+        return results;
+    }
+
+    /**
+     * Executes a single aggregate query for a batch of IDs.
+     * Optimized for the common single-ID case.
+     */
+    private Map<Object, Number> executeSingleQuery(
+            String collectionPath,
+            String reducer,
+            Collection<?> parentIds) {
 
         // Parse path: "departments.budget" or "departments.teams.employees.salary"
         String[] segments = collectionPath.split("\\.");
@@ -64,15 +122,33 @@ public class AggregateQueryExecutor {
         CriteriaQuery<Tuple> query = cb.createTupleQuery();
         Root<?> leafRoot = query.from(leafEntityClass);
 
-        // Build path back to parent using actual @ManyToOne field names
-        Path<?> parentIdPath = buildPathToParent(leafRoot, entityPath);
-
         // Build aggregate expression
         Path<Number> aggregatePath = leafRoot.get(aggregateField);
         Expression<Number> aggregateExpr = applyReducer(cb, aggregatePath, reducer);
 
-        // SELECT parent_id, AGGREGATE(field) GROUP BY parent_id WHERE parent_id IN
-        // (...)
+        // Optimize for single ID (common case) vs composite ID
+        if (rootIdFields.size() == 1) {
+            return executeSingleIdQuery(cb, query, leafRoot, entityPath, parentIds, aggregateExpr);
+        } else {
+            return executeCompositeIdQuery(cb, query, leafRoot, entityPath, parentIds, aggregateExpr);
+        }
+    }
+
+    /**
+     * Optimized path for single ID entities (most common case).
+     */
+    private Map<Object, Number> executeSingleIdQuery(
+            CriteriaBuilder cb,
+            CriteriaQuery<Tuple> query,
+            Root<?> leafRoot,
+            List<Class<?>> entityPath,
+            Collection<?> parentIds,
+            Expression<Number> aggregateExpr) {
+
+        // Build single path to parent ID
+        Path<?> parentIdPath = buildSinglePathToParent(leafRoot, entityPath);
+
+        // Simple SELECT and GROUP BY
         query.multiselect(parentIdPath.alias("parentId"), aggregateExpr.alias("aggregateValue"));
         query.where(parentIdPath.in(parentIds));
         query.groupBy(parentIdPath);
@@ -81,12 +157,73 @@ public class AggregateQueryExecutor {
         List<Tuple> results = em.createQuery(query).getResultList();
         Map<Object, Number> resultMap = new HashMap<>();
         for (Tuple tuple : results) {
-            Object parentId = tuple.get("parentId");
-            Number value = tuple.get("aggregateValue", Number.class);
-            resultMap.put(parentId, value);
+            resultMap.put(tuple.get("parentId"), tuple.get("aggregateValue", Number.class));
+        }
+        return resultMap;
+    }
+
+    /**
+     * Path for composite ID entities.
+     */
+    private Map<Object, Number> executeCompositeIdQuery(
+            CriteriaBuilder cb,
+            CriteriaQuery<Tuple> query,
+            Root<?> leafRoot,
+            List<Class<?>> entityPath,
+            Collection<?> parentIds,
+            Expression<Number> aggregateExpr) {
+
+        List<Path<?>> parentIdPaths = buildPathsToParent(leafRoot, entityPath);
+
+        // Build SELECT and GROUP BY for composite ID
+        List<Selection<?>> selections = new ArrayList<>(parentIdPaths.size() + 1);
+        List<Expression<?>> groupByExprs = new ArrayList<>(parentIdPaths.size());
+
+        for (int i = 0; i < parentIdPaths.size(); i++) {
+            Path<?> idPath = parentIdPaths.get(i);
+            selections.add(idPath.alias("parentId" + i));
+            groupByExprs.add(idPath);
+        }
+        selections.add(aggregateExpr.alias("aggregateValue"));
+
+        query.multiselect(selections);
+        query.where(parentIdPaths.get(0).in(parentIds));
+        query.groupBy(groupByExprs);
+
+        // Execute and build result map with composite keys
+        List<Tuple> results = em.createQuery(query).getResultList();
+        Map<Object, Number> resultMap = new HashMap<>();
+
+        for (Tuple tuple : results) {
+            List<Object> compositeKey = new ArrayList<>(parentIdPaths.size());
+            for (int i = 0; i < parentIdPaths.size(); i++) {
+                compositeKey.add(tuple.get("parentId" + i));
+            }
+            resultMap.put(compositeKey, tuple.get("aggregateValue", Number.class));
+        }
+        return resultMap;
+    }
+
+    /**
+     * Builds single path for simple ID (optimized, no List allocation).
+     */
+    private Path<?> buildSinglePathToParent(Root<?> leafRoot, List<Class<?>> entityPath) {
+        Path<?> currentPath = leafRoot;
+
+        for (int i = entityPath.size() - 1; i > 0; i--) {
+            Class<?> childClass = entityPath.get(i);
+            Class<?> parentClass = entityPath.get(i - 1);
+
+            String parentRefField = findManyToOneField(childClass, parentClass);
+            if (parentRefField == null) {
+                throw new IllegalStateException(
+                        "No @ManyToOne field found in " + childClass.getSimpleName() +
+                                " pointing to " + parentClass.getSimpleName());
+            }
+            currentPath = currentPath.get(parentRefField);
         }
 
-        return resultMap;
+        return currentPath.get(rootIdFields.get(0));
     }
 
     /**
@@ -122,10 +259,10 @@ public class AggregateQueryExecutor {
     }
 
     /**
-     * Builds path from leaf entity back to root parent.
-     * Uses @ManyToOne annotations to find the actual parent reference field.
+     * Builds paths from leaf entity back to root parent ID fields.
+     * Returns multiple paths for composite IDs.
      */
-    private Path<?> buildPathToParent(Root<?> leafRoot, List<Class<?>> entityPath) {
+    private List<Path<?>> buildPathsToParent(Root<?> leafRoot, List<Class<?>> entityPath) {
         Path<?> currentPath = leafRoot;
 
         // Navigate backwards through the entity path
@@ -144,8 +281,12 @@ public class AggregateQueryExecutor {
             currentPath = currentPath.get(parentRefField);
         }
 
-        // Get the ID field of the root parent
-        return currentPath.get(rootIdField);
+        // Get all ID fields of the root parent
+        List<Path<?>> idPaths = new ArrayList<>(rootIdFields.size());
+        for (String idField : rootIdFields) {
+            idPaths.add(currentPath.get(idField));
+        }
+        return idPaths;
     }
 
     /**
