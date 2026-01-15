@@ -10,6 +10,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Utility methods for working with projections and computed fields at runtime.
@@ -216,6 +217,81 @@ public abstract class ProjectionUtils {
         );
     }
 
+    public static Function<Object[], Object> resolveComputeMethod(
+            InstanceResolver instanceResolver,
+            Class<?> projectionClazz,
+            String field,
+            Object... dependencies) throws Exception {
+        Objects.requireNonNull(instanceResolver,  "providerResolver is null");
+        final ProjectionMetadata metadata = ProjectionRegistry.getMetadataFor(projectionClazz);
+
+        if (metadata == null) {
+            throw new IllegalArgumentException("The supposed projection class is not a projection nor an entity: " + projectionClazz.getSimpleName());
+        }
+
+        Optional<ComputedField> computedField = metadata.getComputedField(field, true);
+        if (computedField.isEmpty()) {
+            throw new IllegalArgumentException("No computed field found with the given name: " + field);
+        }
+
+        Method method = null;
+        Object computerInstance = null;
+
+        ComputedField.MethodReference methodReference = computedField.get().methodReference();
+        String methodName = methodReference != null && methodReference.methodName() != null ?
+                methodReference.methodName() :
+                "get" + capitalize(computedField.get().dtoField());
+
+        if (methodReference != null && methodReference.targetClass() != null) {
+            Class<?> methodRefClass = methodReference.targetClass();
+            String beanName = Arrays.stream(metadata.computers())
+                    .filter(p -> methodRefClass.equals(p.clazz()))
+                    .findFirst()
+                    .map(ComputationProvider::bean)
+                    .orElse(null);
+
+            method = ReflectionUtils.findMethod(methodRefClass, methodName, dependencies);
+            computerInstance = instanceResolver.resolve(methodRefClass, beanName);
+        } else {
+            for (var cp : metadata.computers()) {
+                method = ReflectionUtils.findMethod(cp.clazz(), methodName, dependencies);
+                if (method != null) {
+                    computerInstance = instanceResolver.resolve(cp.clazz(), cp.bean());
+                    break;
+                }
+            }
+        }
+
+        if (method == null) {
+            // No provider had a matching method
+            throw new IllegalStateException(
+                    String.format("No provider method found for computed field '%s'. " +
+                                    "Expected method: %s %s(%s) in one of the registered providers: %s",
+                            field,
+                            "Object", // Return type (unknown at runtime)
+                            methodName,
+                            formatArgumentTypes(dependencies),
+                            formatProviderList(metadata.computers()))
+            );
+        }
+
+        final Method effectiveMethod = method;
+        final Object effectiveInstance = computerInstance;
+        return (args) -> {
+            try {
+                if (effectiveInstance == null) {
+                    // Static invocation
+                    return effectiveMethod.invoke(null, args);
+                } else {
+                    // Instance invocation
+                    return effectiveMethod.invoke(effectiveInstance, args);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        };
+    }
+
     /**
      * Capitalizes the first character of the given string, leaving the remainder unchanged.
      * <p>
@@ -278,5 +354,10 @@ public abstract class ProjectionUtils {
         }
         return sb.toString();
     }
+
+    private static String pascalToCamel(String pascal) {
+        return pascal.substring(0, 1).toLowerCase() + pascal.substring(1);
+    }
+
 
 }

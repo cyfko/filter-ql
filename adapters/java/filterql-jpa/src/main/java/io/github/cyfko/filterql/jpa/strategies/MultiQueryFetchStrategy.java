@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Function;
 
 import io.github.cyfko.filterql.core.config.ProjectionPolicy;
 import io.github.cyfko.filterql.core.exception.ProjectionDefinitionException;
@@ -247,7 +248,12 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
     }
 
     @Override
-    protected void step4_ApplyComputedFields(ExecutionContext ctx, Map<Object, RowBuffer> rootResults) {
+    protected List<Map<String, Object>> step4_transform(ExecutionContext ctx, Map<Object, RowBuffer> rootResults) {
+        Set<Integer> excludedSlots = computeExcludedSlots(ctx.plan().computedFields(), ctx);
+        List<Map<String, Object>> results = new ArrayList<>(rootResults.size());
+
+        Map<String, Function<Object[], Object>> computeMethods = new HashMap<>(100);
+
         for (RowBuffer row : rootResults.values()) {
             for (ComputedFieldInfo info : ctx.plan().computedFields()) {
                 int[] dependencySlots = info.dependencySlots();
@@ -266,8 +272,11 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
                 }
 
                 try {
-                    Object computed = ProjectionUtils.computeField(instanceResolver, dtoClass, info.dtoFieldName(),
-                            params);
+                    if (!computeMethods.containsKey(info.dtoFieldName())) {
+                        var method = ProjectionUtils.resolveComputeMethod(instanceResolver, dtoClass, info.dtoFieldName(), params);
+                        computeMethods.put(info.dtoFieldName(), method);
+                    }
+                    Object computed = computeMethods.get(info.dtoFieldName()).apply(params);
                     int outputSlot = info.outputSlot();
                     if (outputSlot >= 0) {
                         row.set(outputSlot, computed);
@@ -275,19 +284,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
                 } catch (Exception e) {
                     throw new RuntimeException("Failed to compute field: " + info.dtoFieldName(), e);
                 }
-
             }
-        }
-    }
-
-    @Override
-    protected List<Map<String, Object>> step5_BuildFinalOutput(ExecutionContext ctx,
-            Map<Object, RowBuffer> rootResults) {
-        // Compute excluded slots once (dependency fields not directly projected)
-        Set<Integer> excludedSlots = computeExcludedSlots(ctx.plan().computedFields(), ctx);
-
-        List<Map<String, Object>> results = new ArrayList<>(rootResults.size());
-        for (RowBuffer row : rootResults.values()) {
             results.add(row.toMap(excludedSlots));
         }
         return results;

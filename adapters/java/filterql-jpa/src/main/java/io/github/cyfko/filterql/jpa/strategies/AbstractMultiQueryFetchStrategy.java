@@ -34,8 +34,7 @@ import java.util.stream.Collectors;
  * plan</li>
  * <li>{@link #step2_ExecuteRootQuery} - Execute the main entity query</li>
  * <li>{@link #step3_ExecuteCollectionQueries} - Load nested collections</li>
- * <li>{@link #step4_ApplyComputedFields} - Calculate @Computed fields</li>
- * <li>{@link #step5_BuildFinalOutput} - Convert to List&lt;Map&gt;</li>
+ * <li>{@link #step4_transform} - Calculate @Computed fields and convert to Convert to List&lt;Map&gt;</li>
  * </ol>
  *
  * @author Frank KOSSI
@@ -97,13 +96,8 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
 
         // Step 4: Apply computed fields
         long t4 = System.nanoTime();
-        step4_ApplyComputedFields(exeCtx, rootResults);
-        logStep("step4_ApplyComputedFields", t4);
-
-        // Step 5: Build final output
-        long t5 = System.nanoTime();
-        List<Map<String, Object>> output = step5_BuildFinalOutput(exeCtx, rootResults);
-        logStep("step5_BuildFinalOutput", t5);
+        List<Map<String, Object>> output = step4_transform(exeCtx, rootResults);
+        logStep("step4_step4_transform", t4);
 
         long durationMs = (System.nanoTime() - startTime) / 1_000_000;
         logger.info(() -> String.format("Multi-query completed in %dms: %d results", durationMs, output.size()));
@@ -130,15 +124,9 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
     protected abstract void step3_ExecuteCollectionQueries(ExecutionContext ctx, Map<Object, RowBuffer> rootResults);
 
     /**
-     * Step 4: Apply computed field calculations to rows.
+     * Step 4: Apply computed field calculations to rows and build the final output as List of Maps.
      */
-    protected abstract void step4_ApplyComputedFields(ExecutionContext ctx, Map<Object, RowBuffer> rootResults);
-
-    /**
-     * Step 5: Build the final output as List of Maps.
-     */
-    protected abstract List<Map<String, Object>> step5_BuildFinalOutput(ExecutionContext ctx,
-            Map<Object, RowBuffer> rootResults);
+    protected abstract List<Map<String, Object>> step4_transform(ExecutionContext ctx, Map<Object, RowBuffer> rootResults);
 
     // ==================== Utility Methods ====================
 
