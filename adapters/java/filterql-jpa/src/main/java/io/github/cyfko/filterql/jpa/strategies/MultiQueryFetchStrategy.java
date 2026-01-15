@@ -9,6 +9,7 @@ import io.github.cyfko.filterql.core.projection.ProjectionFieldParser;
 import io.github.cyfko.filterql.core.spi.ExecutionStrategy;
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.jpa.projection.AggregateQueryExecutor;
+import io.github.cyfko.filterql.jpa.predicate.IdPredicateBuilder;
 import io.github.cyfko.filterql.jpa.projection.FieldSchema;
 import io.github.cyfko.filterql.jpa.projection.InstanceResolver;
 import io.github.cyfko.filterql.jpa.projection.MultiQueryExecutionPlan;
@@ -741,7 +742,7 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
                 }
                 values.add(idx >= 0 ? row.get(idx) : null);
             }
-            return new CompositeKey(values);
+            return List.copyOf(values);
         }
     }
 
@@ -754,29 +755,21 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
             for (int i = 0; i < fieldCount; i++) {
                 values.add(tuple.get(prefix + "parent_id_" + i));
             }
-            return new CompositeKey(values);
+            return List.copyOf(values);
         }
     }
 
     private Predicate buildInPredicate(CriteriaBuilder cb, Path<?> parentRefPath, List<String> parentIdFields,
             List<Object> parentIds) {
-        if (parentIdFields.size() == 1) {
-            Path<?> idPath = parentRefPath.get(parentIdFields.getFirst());
-            return idPath.in(parentIds);
-        } else {
-            List<Predicate> orPredicates = new ArrayList<>();
-            for (Object parentId : parentIds) {
-                if (parentId instanceof CompositeKey key) {
-                    List<Predicate> andPredicates = new ArrayList<>();
-                    for (int i = 0; i < parentIdFields.size(); i++) {
-                        Path<?> fieldPath = parentRefPath.get(parentIdFields.get(i));
-                        andPredicates.add(cb.equal(fieldPath, key.values().get(i)));
-                    }
-                    orPredicates.add(cb.and(andPredicates.toArray(new Predicate[0])));
-                }
-            }
-            return cb.or(orPredicates.toArray(new Predicate[0]));
+        // Build paths to ID fields
+        List<Path<?>> idPaths = new ArrayList<>(parentIdFields.size());
+        for (String idField : parentIdFields) {
+            idPaths.add(parentRefPath.get(idField));
         }
+
+        // Composite keys are already List<Object>, simple IDs are scalars
+        // IdPredicateBuilder handles both cases
+        return IdPredicateBuilder.defaultBuilder().buildIdPredicate(cb, idPaths, parentIds);
     }
 
     private String getParentPath(String collectionPath) {
@@ -795,23 +788,6 @@ public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<Strin
         return -1;
     }
 
-    private record CompositeKey(List<Object> values) {
-        public CompositeKey {
-            values = List.copyOf(values);
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o)
-                return true;
-            if (!(o instanceof CompositeKey key))
-                return false;
-            return Objects.equals(values, key.values);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(values);
-        }
-    }
+    // CompositeKey removed - using List<Object> directly for composite IDs
+    // List already provides proper equals/hashCode based on content
 }
