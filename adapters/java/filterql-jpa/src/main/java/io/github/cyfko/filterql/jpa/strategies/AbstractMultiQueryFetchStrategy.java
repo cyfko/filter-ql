@@ -44,6 +44,9 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
 
     protected static final Logger logger = Logger.getLogger(AbstractMultiQueryFetchStrategy.class.getName());
 
+    protected static final String PREFIX_FOR_INTERNAL_USAGE = "_i_";
+    protected static final String PREFIX_FOR_COMPUTED = "_c_";
+
     protected final Class<?> dtoClass;
     protected final Class<?> rootEntityClass;
     protected final InstanceResolver instanceResolver;
@@ -193,8 +196,6 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
      */
     public static final class MultiQueryExecutionPlan {
 
-        public static final String PREFIX_FOR_INTERNAL_USAGE = "_i_";
-
         private final Class<?> rootEntityClass;
         private final FieldSchema rootSchema;
         private final List<String> rootIdFields;
@@ -264,7 +265,7 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
 
             // Add dedicated slots for computed field outputs (using DTO field name)
             for (String computedDtoField : computedFieldNames) {
-                schemaBuilder.addField("_computed_" + computedDtoField, computedDtoField, false);
+                schemaBuilder.addField(PREFIX_FOR_COMPUTED + computedDtoField, computedDtoField, false);
             }
 
             // 4. Always include root ID fields
@@ -362,7 +363,7 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
          * @return expanded projection set
          */
         public static Set<String> expandCompactNotation(Set<String> projection) {
-            return expandCompactNotation(projection.toArray(new String[projection.size()]));
+            return expandCompactNotation(projection.toArray(new String[0]));
         }
 
         /**
@@ -457,7 +458,7 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
                 Map<String, Pagination> optionsByCollection,
                 Map<String, String> entityToDtoFieldMap,
                 Set<String> subCollectionNames) {
-            CollectionPathInfo sampleInfo = pathsInCollection.get(0);
+            CollectionPathInfo sampleInfo = pathsInCollection.getFirst();
             String collectionFieldName = collectionPath.substring(collectionPath.lastIndexOf('.') + 1);
 
             PathResolverUtils.CollectionInfo collInfo = sampleInfo.meta.getCollectionInfo(collectionFieldName);
@@ -546,7 +547,7 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
                         // Try DTO field
                         idx = childSchema.indexOfDto(sortField);
                     }
-                    sortFieldIndices[i] = idx >= 0 ? idx : 0;
+                    sortFieldIndices[i] = Math.max(idx, 0);
                     sortDescending[i] = "desc".equalsIgnoreCase(sorts.get(i).direction());
                 }
             } else {

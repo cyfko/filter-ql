@@ -40,6 +40,7 @@ import jakarta.persistence.criteria.Selection;
 
 public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
     private static final int BATCH_SIZE = 1000;
+    private static final String SUFFIX_PARENT_ID = "pid_";
 
     /**
      * Initializes the strategy with the given projection class.
@@ -130,7 +131,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
         for (int i = 0; i < schema.fieldCount(); i++) {
             String entityField = schema.entityField(i);
             // Skip computed output placeholder slots - they're not in the entity
-            if (entityField.startsWith("_computed_")) {
+            if (entityField.startsWith(PREFIX_FOR_COMPUTED)) {
                 continue;
             }
             Path<?> path = PathResolverUtils.resolvePath(ctx.root(), entityField);
@@ -317,7 +318,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
         if (idFields.size() == 1) {
             int idx = schema.indexOfEntity(idFields.getFirst());
             if (idx < 0) {
-                idx = schema.indexOfDto(MultiQueryExecutionPlan.PREFIX_FOR_INTERNAL_USAGE + idFields.getFirst());
+                idx = schema.indexOfDto(PREFIX_FOR_INTERNAL_USAGE + idFields.getFirst());
             }
             return idx >= 0 ? row.get(idx) : null;
         } else {
@@ -325,7 +326,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
             for (String idField : idFields) {
                 int idx = schema.indexOfEntity(idField);
                 if (idx < 0) {
-                    idx = schema.indexOfDto(MultiQueryExecutionPlan.PREFIX_FOR_INTERNAL_USAGE + idField);
+                    idx = schema.indexOfDto(PREFIX_FOR_INTERNAL_USAGE + idField);
                 }
                 values.add(idx >= 0 ? row.get(idx) : null);
             }
@@ -368,7 +369,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
             for (int i = 0; i < parentIdFields.size(); i++) {
                 Path<?> parentIdPath = parentRefPath.get(parentIdFields.get(i));
                 selections.add(
-                        parentIdPath.alias(MultiQueryExecutionPlan.PREFIX_FOR_INTERNAL_USAGE + "parent_id_" + i));
+                        parentIdPath.alias(PREFIX_FOR_INTERNAL_USAGE + SUFFIX_PARENT_ID + i));
             }
 
             // Child fields using schema
@@ -464,13 +465,13 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
     }
 
     private Object extractParentIdFromTuple(Tuple tuple, int fieldCount) {
-        String prefix = MultiQueryExecutionPlan.PREFIX_FOR_INTERNAL_USAGE;
+        String prefix = PREFIX_FOR_INTERNAL_USAGE;
         if (fieldCount == 1) {
-            return tuple.get(prefix + "parent_id_0");
+            return tuple.get(prefix + SUFFIX_PARENT_ID + "0");
         } else {
             List<Object> values = new ArrayList<>(fieldCount);
             for (int i = 0; i < fieldCount; i++) {
-                values.add(tuple.get(prefix + "parent_id_" + i));
+                values.add(tuple.get(prefix + SUFFIX_PARENT_ID + i));
             }
             return List.copyOf(values);
         }
