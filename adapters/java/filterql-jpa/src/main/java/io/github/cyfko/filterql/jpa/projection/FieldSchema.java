@@ -209,9 +209,9 @@ public final class FieldSchema {
         Integer idx = dtoIndexMap.get(dtoField);
         if (idx == null) {
             idx = collectionSlotMap.get(dtoField);
-            return idx != null ? new Indexer(idx,true) : Indexer.NONE;
+            return idx != null ? new Indexer(idx, true) : Indexer.NONE;
         }
-        return new Indexer(idx,false);
+        return new Indexer(idx, false);
     }
 
     /**
@@ -225,9 +225,9 @@ public final class FieldSchema {
         return idx != null ? idx : -1;
     }
 
-
     /**
      * Retrieve the set of slot indices to exclude from output, or null none
+     * 
      * @return excluded slots.
      */
     public Set<Integer> getSerialisationExcludedSlots() {
@@ -237,7 +237,8 @@ public final class FieldSchema {
     /**
      * Exclude the provided specified slots on serialization.
      *
-     * @param serialisationExcludedSlots set of slot indices to exclude from serialisation output, or null for none
+     * @param serialisationExcludedSlots set of slot indices to exclude from
+     *                                   serialisation output, or null for none
      */
     public void setSerialisationExcludedSlots(Set<Integer> serialisationExcludedSlots) {
         this.serialisationExcludedSlots = Objects.requireNonNull(serialisationExcludedSlots);
@@ -303,7 +304,8 @@ public final class FieldSchema {
     private static int countInternalFields(boolean[] internal) {
         int numFields = 0;
         for (boolean b : internal) {
-            if (b) numFields++;
+            if (b)
+                numFields++;
         }
         return numFields;
     }
@@ -322,7 +324,8 @@ public final class FieldSchema {
         private final List<String> collectionNames = new ArrayList<>();
         private final Map<String, DependencyInfo[]> computedFieldIndexMap = new HashMap<>();
 
-        private Builder() {}
+        private Builder() {
+        }
 
         /**
          * Adds a field to the schema.
@@ -334,7 +337,8 @@ public final class FieldSchema {
          */
         public Builder addField(String entityField, String dtoField, boolean isInternal) {
             // Check if already added
-            if (findEntityFieldDuplicateIndex(entityField, isInternal) > -1) return this;
+            if (findEntityFieldDuplicateIndex(entityField, isInternal) > -1)
+                return this;
 
             entityFields.add(entityField);
             dtoFields.add(dtoField);
@@ -360,10 +364,12 @@ public final class FieldSchema {
 
                 // Check reduce function
                 String reducer = null;
-                // Because reducers are always a tiny list, it is much faster to check if a dependency
+                // Because reducers are always a tiny list, it is much faster to check if a
+                // dependency
                 // have a reduce function by doing like this instead of using Set.contains()
-                for (var r: reducers) {
-                    if (r.dependencyIndex() == i) reducer = r.reducer();
+                for (var r : reducers) {
+                    if (r.dependencyIndex() == i)
+                        reducer = r.reducer();
                 }
 
                 // Check if already added
@@ -376,17 +382,21 @@ public final class FieldSchema {
                         internal.add(true);
                         entityFields.add(dependency);
                     } else {
-                        // This does not serve much! Also usage of 'PREFIX_FOR_COMPUTED' should prevent sql generation
+                        // This does not serve much! Also usage of 'PREFIX_FOR_COMPUTED' should prevent
+                        // sql generation
                         // for this dependency. See the note below.
+                        internal.add(true); // Must keep lists synchronized!
                         entityFields.add(PREFIX_FOR_COMPUTED + dependency);
                     }
 
-                    // NOTE: We also need to add this to always ensure that 'dtoFields' and 'entityFields' have the same length.
+                    // NOTE: We also need to add this to always ensure that 'dtoFields' and
+                    // 'entityFields' have the same length.
                     // Doing that allows us to simplify subsequent processing.
                     dtoFields.add(PREFIX_FOR_COMPUTED + dtoField + idx);
                 }
 
-                DependencyInfo[] dependencyInfos = computedFieldIndexMap.computeIfAbsent(dtoField, k -> new DependencyInfo[dependencies.length]);
+                DependencyInfo[] dependencyInfos = computedFieldIndexMap.computeIfAbsent(dtoField,
+                        k -> new DependencyInfo[dependencies.length]);
                 dependencyInfos[i] = new DependencyInfo(idx, reducer);
 
                 // Now add the field in Dto to have a slot for computed field outcome
@@ -403,7 +413,8 @@ public final class FieldSchema {
                 if (!isInternal && internal.get(i)) {
                     internal.set(i, false);
                 }
-                if (entityFields.get(i).equals(entityField)) return i;
+                if (entityFields.get(i).equals(entityField))
+                    return i;
             }
             return -1;
         }
@@ -432,5 +443,6 @@ public final class FieldSchema {
         }
     }
 
-    public record DependencyInfo(int index, String reducer){}
+    public record DependencyInfo(int index, String reducer) {
+    }
 }

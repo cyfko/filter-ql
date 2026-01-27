@@ -219,7 +219,6 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
         }
     }
 
-
     protected void step3_ExecuteCollectionQueries__(ExecutionContext ctx, Map<Object, RowBuffer> rootResults) {
         // // Group collection plans by depth
         // Map<Integer, List<CollectionPlan>> plansByDepth = new TreeMap<>();
@@ -297,7 +296,9 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
         AggregateQueryExecutor aggregateQueryExecutor = new AggregateQueryExecutor(ctx.em(), rootEntityClass,
                 PersistenceRegistry.getIdFields(rootEntityClass));
 
-        for (RowBuffer row : rootResults.values()) {
+        for (var entry : rootResults.entrySet()) {
+            Object rowId = entry.getKey(); // The actual ID of this row
+            RowBuffer row = entry.getValue();
             FieldSchema schema = row.getSchema();
 
             for (var e : schema.getComputedFieldIndexMap().entrySet()) {
@@ -308,17 +309,19 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
                 for (int i = 0; i < params.length; i++) {
                     FieldSchema.DependencyInfo info = infos[i];
                     if (info.reducer() != null) {
-                        String collectionPath = schema.entityField(info.index()).substring(PREFIX_FOR_COMPUTED.length());
+                        String collectionPath = schema.entityField(info.index())
+                                .substring(PREFIX_FOR_COMPUTED.length());
                         if (!reducersAggregateDone) {
                             var reduced = aggregateQueryExecutor.executeAggregateQuery(
                                     collectionPath,
                                     info.reducer(),
-                                    ctx.plan().getIdFields()
+                                    rootResults.keySet() // Pass actual ID values, not field names
                             );
                             reducedValues.put(collectionPath, reduced);
                         }
-                        params[i] = reducedValues.get(collectionPath).get(1); // TODO: a la place de 1 mettre l'ID
-                                                                              // composite ou simple
+                        // Get the reduced value for THIS ROW's ID
+                        Map<Object, Number> pathValues = reducedValues.get(collectionPath);
+                        params[i] = pathValues != null ? pathValues.get(rowId) : null;
                     } else {
                         params[i] = row.get(info.index());
                     }
