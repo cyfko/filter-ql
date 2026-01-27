@@ -308,10 +308,13 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
                 for (int i = 0; i < params.length; i++) {
                     FieldSchema.DependencyInfo info = infos[i];
                     if (info.reducer() != null) {
-                        String collectionPath = schema.dtoField(info.index()).substring(PREFIX_FOR_COMPUTED.length());
+                        String collectionPath = schema.entityField(info.index()).substring(PREFIX_FOR_COMPUTED.length());
                         if (!reducersAggregateDone) {
-                            var reduced = aggregateQueryExecutor.executeAggregateQuery(collectionPath, info.reducer(),
-                                    ctx.plan().getIdFields());
+                            var reduced = aggregateQueryExecutor.executeAggregateQuery(
+                                    collectionPath,
+                                    info.reducer(),
+                                    ctx.plan().getIdFields()
+                            );
                             reducedValues.put(collectionPath, reduced);
                         }
                         params[i] = reducedValues.get(collectionPath).get(1); // TODO: a la place de 1 mettre l'ID

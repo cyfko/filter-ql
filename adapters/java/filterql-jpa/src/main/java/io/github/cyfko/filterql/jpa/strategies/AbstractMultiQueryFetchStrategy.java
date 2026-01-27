@@ -860,12 +860,14 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
 
                 if (pf.prefix().isEmpty() || index >= segments.length) { // Add scalar fields
                     for (String field : pf.fields()) {
-                        var dtoPath = field; //pf.prefix().isEmpty() ? field : String.join(".", pf.prefix(), field);
                         pm.getComputedField(field, true).ifPresentOrElse(
-                                computedField -> schemaBuilder.addComputedField(computedField, dtoPath),
+                                computedField -> {
+                                    var dtoPath = pf.prefix().isEmpty() ? field : String.join(".", pf.prefix(), field);
+                                    schemaBuilder.addComputedField(computedField, dtoPath);
+                                },
                                 () -> {
-                                    String entityPath = ProjectionRegistry.toEntityPath(dtoPath, projectionClass, true);
-                                    schemaBuilder.addField(entityPath, dtoPath, false);
+                                    String entityPath = ProjectionRegistry.toEntityPath(field, projectionClass, true);
+                                    schemaBuilder.addField(entityPath, field, false);
                                 });
                     }
 

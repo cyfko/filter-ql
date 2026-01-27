@@ -156,6 +156,30 @@ public final class RowBuffer {
     }
 
     /**
+     * Checks if the given field or prefix exists in this RowBuffer's schema.
+     * <p>
+     * Returns true if:
+     * <ul>
+     * <li>The field is a scalar field in the schema</li>
+     * <li>The field is a collection name in the schema</li>
+     * <li>The field is a valid prefix for one or more fields</li>
+     * </ul>
+     *
+     * @param dtoField DTO field name or prefix to check
+     * @return true if field/prefix exists in schema
+     */
+    public boolean contains(String dtoField) {
+        // Check exact match (scalar or collection)
+        Indexer indexer = schema.indexOfDto(dtoField);
+        if (indexer != Indexer.NONE) {
+            return true;
+        }
+
+        // Check if it's a valid prefix
+        return hasPrefix(dtoField);
+    }
+
+    /**
      * Sets the value at the given index.
      *
      * @param index slot index
@@ -338,16 +362,5 @@ public final class RowBuffer {
      */
     public int fields() {
         return values.length - schema.getNumberOfInternalFields() - schema.getSerialisationExcludedSlots().size();
-    }
-
-    /**
-     * Checks whether this row contain the non-excluded {@code fieldName} value
-     * whether it is {@code null} or not.
-     * 
-     * @param fieldName the field name to lookup
-     * @return true
-     */
-    public boolean contains(String fieldName) {
-        return schema.indexOfDto(fieldName) != Indexer.NONE;
     }
 }

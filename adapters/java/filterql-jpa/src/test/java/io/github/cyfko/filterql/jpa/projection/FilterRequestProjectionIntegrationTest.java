@@ -21,7 +21,8 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration tests for FilterRequest with projection functionality using ExecutionStrategy.
+ * Integration tests for FilterRequest with projection functionality using
+ * ExecutionStrategy.
  */
 @DisplayName("FilterRequest with Projection Integration Tests")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -37,7 +38,7 @@ class FilterRequestProjectionIntegrationTest {
         ORDER_AMOUNT;
 
         public Class<?> getType() {
-            return switch (this){
+            return switch (this) {
                 case NAME -> String.class;
                 case EMAIL -> String.class;
                 case ORDER_NUMBER -> String.class;
@@ -46,7 +47,7 @@ class FilterRequestProjectionIntegrationTest {
         }
 
         public Set<Op> getSupportedOperators() {
-            return switch (this){
+            return switch (this) {
                 case NAME -> Set.of(Op.EQ, Op.MATCHES);
                 case EMAIL -> Set.of(Op.EQ, Op.MATCHES);
                 case ORDER_NUMBER -> Set.of(Op.EQ, Op.MATCHES);
@@ -72,8 +73,7 @@ class FilterRequestProjectionIntegrationTest {
                     case ORDER_NUMBER -> "orders.orderNumber";
                     case ORDER_AMOUNT -> "orders.amount";
                 },
-                FilterConfig.builder().build()
-        );
+                FilterConfig.builder().build());
 
         filterQuery = FilterQueryFactory.of(filterContext);
 
@@ -102,7 +102,8 @@ class FilterRequestProjectionIntegrationTest {
 
     @AfterAll
     static void teardown() {
-        if (emf != null) emf.close();
+        if (emf != null)
+            emf.close();
     }
 
     @Test
@@ -143,7 +144,9 @@ class FilterRequestProjectionIntegrationTest {
             assertEquals(1, results.size());
             RowBuffer john = results.getFirst();
             assertNotNull(john.get("id"));
-            assertNull(john.get("orders"));
+            // When no projection is specified, collections are not included in the result
+            assertFalse(john.contains("orders"),
+                    "Orders collection should not be projected when no projection is specified");
             assertEquals("John Doe", john.get("name"));
             assertEquals("john@example.com", john.get("email"));
         }
@@ -168,7 +171,8 @@ class FilterRequestProjectionIntegrationTest {
             @SuppressWarnings("unchecked")
             List<RowBuffer> orders = (List<RowBuffer>) john.get("orders");
             assertEquals(2, orders.size());
-            Set<String> orderNumbers = orders.stream().map(o -> (String) o.get("orderNumber")).collect(Collectors.toSet());
+            Set<String> orderNumbers = orders.stream().map(o -> (String) o.get("orderNumber"))
+                    .collect(Collectors.toSet());
             assertTrue(orderNumbers.contains("ORD-001"));
             assertTrue(orderNumbers.contains("ORD-002"));
         }
