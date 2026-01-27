@@ -118,12 +118,12 @@ public class ComputedFieldProjectionTest {
                     .build();
 
             MultiQueryFetchStrategy fetchStrategy = new MultiQueryFetchStrategy(DtoUserD.class, InstanceResolver.noBean());
-            List<Map<String, Object>> result = FilterQueryFactory.of(filterContext).execute(request, em, fetchStrategy);
-            Map<String, Object> first = result.getFirst();
+            List<RowBuffer> result = FilterQueryFactory.of(filterContext).execute(request, em, fetchStrategy);
+            RowBuffer first = result.getFirst();
             assertNotNull(first);
             Object keyIdentifier = first.get("keyIdentifier");
             assertEquals("1-John Doe", keyIdentifier);
-            assertEquals(1,first.size());
+            assertEquals(1, first.fields());
         }
     }
 
@@ -140,11 +140,11 @@ public class ComputedFieldProjectionTest {
                     .build();
 
             MultiQueryFetchStrategy fetchStrategy = new MultiQueryFetchStrategy(DtoUserD.class, InstanceResolver.noBean());
-            List<Map<String, Object>> result = FilterQueryFactory.of(filterContext).execute(request, em, fetchStrategy);
-            Map<String, Object> first = result.getFirst();
+            List<RowBuffer> result = FilterQueryFactory.of(filterContext).execute(request, em, fetchStrategy);
+            RowBuffer first = result.getFirst();
             assertNotNull(first);
-            assertTrue(first.containsKey("lastHistory"));
-            assertEquals(1,first.size());
+            assertTrue(first.contains("lastHistory"));
+            assertEquals(1,first.fields());
 
         }
     }

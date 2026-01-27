@@ -63,26 +63,81 @@ public final class RowBuffer {
      * Gets the value at the given index.
      *
      * @param index slot index
-     * @return value at index (may be null)
+     * @return value at index (maybe null)
      */
     public Object get(int index) {
         return values[index];
     }
 
     /**
-     * Gets the value for the given DTO field name.
-     * Delegates to schema for index lookup.
+     * Gets the value for the given DTO field name (scalar, collection, or nested
+     * prefix).
+     * <p>
+     * If the field is a scalar, returns the value directly.
+     * If the field is a collection, returns the List of child RowBuffers.
+     * If the field is a prefix (e.g., "address" when schema has
+     * "address.city.name"),
+     * returns a {@link NestedView} for zero-allocation nested access.
+     * </p>
      *
-     * @param dtoField DTO field name
-     * @return value for field (may be null)
-     * @throws IllegalArgumentException if field not found in schema
+     * @param dtoField DTO field name or prefix
+     * @return value, collection, or NestedView for nested access
+     * @throws IllegalArgumentException if field/prefix not found in schema
      */
     public Object get(String dtoField) {
-        int index = schema.indexOfDto(dtoField);
-        if (index < 0) {
-            throw new IllegalArgumentException("Unknown field: " + dtoField);
+        return getOrNested(dtoField);
+    }
+
+    /**
+     * Handles scalar, collection, and prefix access.
+     * <p>
+     * Used internally by {@link #get(String)} and by {@link NestedView}.
+     * </p>
+     *
+     * @param dtoField DTO field name or prefix
+     * @return value, collection, or NestedView
+     * @throws IllegalArgumentException if field/prefix not found
+     */
+    public Object getOrNested(String dtoField) {
+        // 1. Try exact match (scalar field)
+        Indexer indexer = schema.indexOfDto(dtoField);
+        if (indexer != Indexer.NONE) {
+            int idx = indexer.isCollection() ? schema.collectionSlot(indexer.index()) : indexer.index();
+            return values[idx];
         }
-        return values[index];
+
+        // 2. Try as prefix for nested access
+        if (hasPrefix(dtoField)) {
+            return new NestedView(this, dtoField);
+        }
+
+        throw new IllegalArgumentException("Unknown field: " + dtoField);
+    }
+
+    /**
+     * Checks if the given string is a valid prefix for any field in the schema.
+     *
+     * @param prefix the prefix to check
+     * @return true if at least one field starts with prefix + "."
+     */
+    public boolean hasPrefix(String prefix) {
+        String prefixDot = prefix + ".";
+
+        // Check scalar fields
+        for (int i = 0; i < schema.fieldCount(); i++) {
+            if (schema.dtoField(i).startsWith(prefixDot)) {
+                return true;
+            }
+        }
+
+        // Check collection names
+        for (int c = 0; c < schema.collectionCount(); c++) {
+            if (schema.collectionName(c).startsWith(prefixDot)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -92,8 +147,12 @@ public final class RowBuffer {
      * @return value for field or null
      */
     public Object getOrNull(String dtoField) {
-        int index = schema.indexOfDto(dtoField);
-        return index >= 0 ? values[index] : null;
+        Indexer indexer = schema.indexOfDto(dtoField);
+        if (indexer == Indexer.NONE) {
+            return null;
+        }
+        int idx = indexer.isCollection() ? schema.collectionSlot(indexer.index()) : indexer.index();
+        return values[idx];
     }
 
     /**
@@ -113,11 +172,11 @@ public final class RowBuffer {
      * @param value    value to set
      */
     public void set(String dtoField, Object value) {
-        int index = schema.indexOfDto(dtoField);
-        if (index < 0) {
+        Indexer indexer = schema.indexOfDto(dtoField);
+        if (indexer == Indexer.NONE || indexer.isCollection()) {
             throw new IllegalArgumentException("Unknown field: " + dtoField);
         }
-        values[index] = value;
+        values[indexer.index()] = value;
     }
 
     // ==================== Collection Access ====================
@@ -177,20 +236,6 @@ public final class RowBuffer {
     // ==================== Conversion ====================
 
     /**
-     * Converts this RowBuffer to a Map for final output.
-     * <p>
-     * This method should only be called once at the end of processing,
-     * as it allocates a new Map. Internal fields are excluded.
-     * Nested fields are properly structured as nested Maps.
-     * </p>
-     *
-     * @return Map representation of this row
-     */
-    public Map<String, Object> toMap() {
-        return toMap(null);
-    }
-
-    /**
      * Converts this RowBuffer to a Map for final output, excluding specified slots.
      * <p>
      * This method should only be called once at the end of processing,
@@ -198,11 +243,10 @@ public final class RowBuffer {
      * Nested fields are properly structured as nested Maps.
      * </p>
      *
-     * @param excludedSlots set of slot indices to exclude from output, or null for
-     *                      none
      * @return Map representation of this row
      */
-    public Map<String, Object> toMap(Set<Integer> excludedSlots) {
+    public Map<String, Object> toMap() {
+        final Set<Integer> excludedSlots = schema.getSerialisationExcludedSlots();
         Map<String, Object> result = new LinkedHashMap<>();
 
         // Add scalar fields
@@ -210,6 +254,7 @@ public final class RowBuffer {
             if (schema.isInternal(i)) {
                 continue;
             }
+
             if (excludedSlots != null && excludedSlots.contains(i)) {
                 continue;
             }
@@ -230,21 +275,19 @@ public final class RowBuffer {
             if (children != null) {
                 List<Map<String, Object>> childMaps = new ArrayList<>(children.size());
                 for (RowBuffer child : children) {
-                    childMaps.add(child.toMap(excludedSlots));
+                    childMaps.add(child.toMap());
                 }
 
                 // Handle nested collection placement
                 if (collName.contains(".")) {
-                    String[] path = collName.split("\\.");
-                    insertNested(result, path, childMaps);
+                    insertNested(result, schema.collectionPaths(c), childMaps);
                 } else {
                     result.put(collName, childMaps);
                 }
             } else {
                 // Empty collection
                 if (collName.contains(".")) {
-                    String[] path = collName.split("\\.");
-                    insertNested(result, path, new ArrayList<>());
+                    insertNested(result, schema.collectionPaths(c), new ArrayList<>());
                 } else {
                     result.put(collName, new ArrayList<>());
                 }
@@ -283,22 +326,28 @@ public final class RowBuffer {
 
     // ==================== Accessors ====================
 
-    /**
-     * Returns the schema for this RowBuffer.
-     *
-     * @return field schema
-     */
-    public FieldSchema schema() {
+    public FieldSchema getSchema() {
         return schema;
     }
 
     /**
-     * Returns the raw values array.
-     * Use with caution - direct modification may break invariants.
-     *
-     * @return values array
+     * Retrieves the number of fields on this row ignoring serialisation excluded
+     * fields
+     * 
+     * @return the number of fields on this row
      */
-    Object[] rawValues() {
-        return values;
+    public int fields() {
+        return values.length - schema.getNumberOfInternalFields() - schema.getSerialisationExcludedSlots().size();
+    }
+
+    /**
+     * Checks whether this row contain the non-excluded {@code fieldName} value
+     * whether it is {@code null} or not.
+     * 
+     * @param fieldName the field name to lookup
+     * @return true
+     */
+    public boolean contains(String fieldName) {
+        return schema.indexOfDto(fieldName) != Indexer.NONE;
     }
 }

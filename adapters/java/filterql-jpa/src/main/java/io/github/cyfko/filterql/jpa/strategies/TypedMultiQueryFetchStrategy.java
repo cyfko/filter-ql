@@ -4,6 +4,7 @@ import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 import io.github.cyfko.filterql.core.spi.ExecutionStrategy;
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.jpa.projection.InstanceResolver;
+import io.github.cyfko.filterql.jpa.projection.RowBuffer;
 import jakarta.persistence.EntityManager;
 
 import java.util.List;
@@ -26,7 +27,7 @@ import java.util.function.Function;
  */
 public class TypedMultiQueryFetchStrategy<R> implements ExecutionStrategy<List<R>> {
     private final MultiQueryFetchStrategy multiQueryFetchStrategy;
-    private final Function<Map<String,Object>,R> resultTransformer;
+    private final Function<RowBuffer,R> resultTransformer;
 
     /**
      * Constructs a typed fetch strategy with the specified projection class and result transformer.
@@ -39,7 +40,7 @@ public class TypedMultiQueryFetchStrategy<R> implements ExecutionStrategy<List<R
      *
      * @throws NullPointerException if {@code resultTransformer} is {@code null}
      */
-    public TypedMultiQueryFetchStrategy(Class<R> projectionClass, Function<Map<String, Object>, R> resultTransformer) {
+    public TypedMultiQueryFetchStrategy(Class<R> projectionClass, Function<RowBuffer, R> resultTransformer) {
         multiQueryFetchStrategy = new MultiQueryFetchStrategy(projectionClass);
         this.resultTransformer = Objects.requireNonNull(resultTransformer, "resultTransformer cannot be null");
     }
@@ -57,7 +58,7 @@ public class TypedMultiQueryFetchStrategy<R> implements ExecutionStrategy<List<R
      *
      * @throws NullPointerException if {@code resultTransformer} is {@code null}
      */
-    public TypedMultiQueryFetchStrategy(Class<R> projectionClass, InstanceResolver instanceResolver, Function<Map<String, Object>, R> resultTransformer) {
+    public TypedMultiQueryFetchStrategy(Class<R> projectionClass, InstanceResolver instanceResolver, Function<RowBuffer, R> resultTransformer) {
         multiQueryFetchStrategy = new MultiQueryFetchStrategy(projectionClass, instanceResolver);
         this.resultTransformer = Objects.requireNonNull(resultTransformer, "resultTransformer cannot be null");
     }
@@ -69,7 +70,7 @@ public class TypedMultiQueryFetchStrategy<R> implements ExecutionStrategy<List<R
      * using the provided transformer function.
      * </p>
      *
-     * @param em     the JPA EntityManager for database query execution
+     * @param ctx    the JPA EntityManager for database query execution
      * @param pr     a predicate resolver for filtering logic
      * @param params query execution parameters, including projection selection, sorting, and pagination
      * @return a list of transformed results, each of type {@code R}

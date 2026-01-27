@@ -1,28 +1,19 @@
 package io.github.cyfko.filterql.jpa.strategies;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.function.Function;
 
 import io.github.cyfko.filterql.core.config.ProjectionPolicy;
-import io.github.cyfko.filterql.core.exception.ProjectionDefinitionException;
 import io.github.cyfko.filterql.core.model.Pagination;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 import io.github.cyfko.filterql.core.model.SortBy;
 import io.github.cyfko.filterql.core.projection.ProjectionFieldParser;
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.jpa.predicate.IdPredicateBuilder;
-import io.github.cyfko.filterql.jpa.projection.FieldSchema;
-import io.github.cyfko.filterql.jpa.projection.InstanceResolver;
+import io.github.cyfko.filterql.jpa.projection.*;
+
 import static io.github.cyfko.filterql.jpa.strategies.AbstractMultiQueryFetchStrategy.MultiQueryExecutionPlan.*;
-import io.github.cyfko.filterql.jpa.projection.RowBuffer;
+
 import io.github.cyfko.filterql.jpa.utils.PathResolverUtils;
 import io.github.cyfko.filterql.jpa.utils.ProjectionUtils;
 import io.github.cyfko.projection.metamodel.PersistenceRegistry;
@@ -30,17 +21,10 @@ import io.github.cyfko.projection.metamodel.ProjectionRegistry;
 import io.github.cyfko.projection.metamodel.model.projection.ProjectionMetadata;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Order;
-import jakarta.persistence.criteria.Path;
-import jakarta.persistence.criteria.Predicate;
-import jakarta.persistence.criteria.Root;
-import jakarta.persistence.criteria.Selection;
+import jakarta.persistence.criteria.*;
 
 public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
     private static final int BATCH_SIZE = 1000;
-    private static final String SUFFIX_PARENT_ID = "pid_";
 
     /**
      * Initializes the strategy with the given projection class.
@@ -57,19 +41,17 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
     }
 
     @Override
-    protected ExecutionContext step1_BuildExecutionContext(EntityManager em, PredicateResolver<?> pr,
-            QueryExecutionParams params) {
+    protected ExecutionContext step1_BuildExecutionContext(EntityManager em,
+            PredicateResolver<?> pr,
+            QueryExecutionParams params,
+            Class<?> dtoClass) {
         boolean ignoreCase = params.projectionPolicy().fieldCase() == ProjectionPolicy.FieldCase.CASE_INSENSITIVE;
-        ProjectionSpec projSpec = null;
+        QueryPlan.Builder planBuilder = QueryPlan.builder(dtoClass);
+        Map<String, Pagination> collectionPagination;
 
-        // Tranform projection
+        // Transform projection
         {
             Set<String> dtoProjection = params.projection();
-            Set<String> entityProjection = new HashSet<>();
-            Set<String> computedFields = new HashSet<>();
-            Map<String, Pagination> entityCollectionOptions = new HashMap<>();
-            Map<String, String> entityToDtoFieldMap = new HashMap<>();
-            Map<String, Pagination> dtoCollectionOptions = ProjectionFieldParser.parseCollectionOptions(dtoProjection);
 
             if (dtoProjection == null || dtoProjection.isEmpty()) {
                 dtoProjection = new HashSet<>();
@@ -85,46 +67,31 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
                 }
             }
 
+            // Add collection info to plan
+            collectionPagination = ProjectionFieldParser.parseCollectionOptions(dtoProjection);
+
             for (String dtoField : dtoProjection) {
-                Set<String> expanded = MultiQueryExecutionPlan
-                        .expandCompactNotation(dtoField.replaceAll("\\[.*?]", ""));
-
-                for (String baseDtoField : expanded) {
-                    String entityPath;
-                    try {
-                        entityPath = ProjectionRegistry.toEntityPath(baseDtoField, dtoClass, ignoreCase);
-                    } catch (IllegalArgumentException e) {
-                        throw new ProjectionDefinitionException(baseDtoField + " does not resolve to a valid path.", e);
-                    }
-                    entityProjection.add(entityPath);
-                    entityToDtoFieldMap.put(entityPath, baseDtoField);
-
-                    if (ProjectionRegistry.getMetadataFor(dtoClass).isComputedField(baseDtoField, ignoreCase)) {
-                        computedFields.add(baseDtoField);
-                    }
-
-                    if (dtoCollectionOptions.containsKey(baseDtoField)) {
-                        entityCollectionOptions.put(entityPath, dtoCollectionOptions.get(baseDtoField));
-                    }
-                }
+                ProjectionFieldParser.ProjectionField parsed = ProjectionFieldParser.parse(dtoField);
+                // nous devons construire le plan!
+                // Niveau 0 : champs du DTO et toutes les projections n'incluant pas les
+                // collections
+                // Cela peut tout champ scalaire simple ou imbriqué
+                // Niveau 1 : champs du DTO et toutes les projections incluant les collections
+                // dans leurs chemins
+                planBuilder.add(parsed);
             }
-
-            projSpec = new ProjectionSpec(entityProjection, computedFields,
-                    entityCollectionOptions, entityToDtoFieldMap);
         }
 
         CriteriaBuilder cb = em.getCriteriaBuilder();
         CriteriaQuery<Tuple> query = cb.createTupleQuery();
         Root<?> root = query.from(rootEntityClass);
 
-        MultiQueryExecutionPlan plan = MultiQueryExecutionPlan.build(root, projSpec, dtoClass);
-
-        return new ExecutionContext(em, cb, root, query, pr, projSpec, plan);
+        return new ExecutionContext(em, cb, root, query, pr, planBuilder.build(), collectionPagination);
     }
 
     @Override
     protected Map<Object, RowBuffer> step2_ExecuteRootQuery(ExecutionContext ctx, QueryExecutionParams params) {
-        FieldSchema schema = ctx.plan().rootSchema();
+        FieldSchema schema = ctx.plan().getSchema();
         List<Selection<?>> selections = new ArrayList<>(schema.fieldCount());
 
         // Build selections using schema (skip computed output slots)
@@ -168,7 +135,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
 
         // Convert to RowBuffer map keyed by ID
         Map<Object, RowBuffer> results = new LinkedHashMap<>();
-        List<String> idFields = ctx.plan().rootIdFields();
+        List<String> idFields = ctx.plan().getIdFields();
 
         for (Tuple tuple : tuples) {
             RowBuffer row = tupleToRowBuffer(tuple, schema);
@@ -186,109 +153,226 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
 
     @Override
     protected void step3_ExecuteCollectionQueries(ExecutionContext ctx, Map<Object, RowBuffer> rootResults) {
-        // Group collection plans by depth
-        Map<Integer, List<CollectionPlan>> plansByDepth = new TreeMap<>();
-        for (CollectionPlan cplan : ctx.plan().collectionPlans()) {
-            plansByDepth.computeIfAbsent(cplan.depth(), k -> new ArrayList<>()).add(cplan);
+        Map<String, QueryPlan>[] collectionPlans = ctx.plan().getCollectionPlans();
+        if (collectionPlans == null || collectionPlans.length == 0) {
+            return; // No collections to load
         }
 
-        // Track parent lookup by collection path
+        // Index of parents by collection path
+        // Key: parent collection path ("" for root), Value: Map<parentId, RowBuffer>
         Map<String, Map<Object, RowBuffer>> parentIndexByPath = new HashMap<>();
         parentIndexByPath.put("", rootResults);
 
-        // Track which schema applies to each collection path
-        Map<String, FieldSchema> schemaByPath = new HashMap<>();
-        schemaByPath.put("", ctx.plan().rootSchema());
+        // For each depth level
+        for (int level = 0; level < collectionPlans.length; level++) {
+            Map<String, QueryPlan> levelPlan = collectionPlans[level];
 
-        Set<Object> currentLevelParentIds = rootResults.keySet();
-
-        for (Map.Entry<Integer, List<CollectionPlan>> depthEntry : plansByDepth.entrySet()) {
-            List<CollectionPlan> plansAtDepth = depthEntry.getValue();
-
-            Set<Object> nextLevelIds = new HashSet<>();
-
-            for (CollectionPlan cplan : plansAtDepth) {
-                CollectionQueryResult result = executeCollectionQuery(ctx, cplan, currentLevelParentIds);
-
-                // Attach children to parents
-                String parentPath = getParentPath(cplan.collectionPath());
-                Map<Object, RowBuffer> parentIndex = parentIndexByPath.get(parentPath);
-                FieldSchema parentSchema = schemaByPath.get(parentPath);
-
-                if (parentIndex != null && parentSchema != null) {
-                    // Get the collection name relative to parent
-                    String collName = cplan.collectionPath().contains(".")
-                            ? cplan.collectionPath().substring(cplan.collectionPath().lastIndexOf('.') + 1)
-                            : cplan.collectionPath();
-
-                    int collectionSlotIndex = findCollectionSlotIndex(parentSchema, collName);
-
-                    // If not found by short name, try the DTO collection name
-                    if (collectionSlotIndex < 0) {
-                        collectionSlotIndex = findCollectionSlotIndex(parentSchema, cplan.dtoCollectionName());
-                    }
-
-                    for (Map.Entry<Object, List<RowBuffer>> entry : result.childrenByParent.entrySet()) {
-                        RowBuffer parent = parentIndex.get(entry.getKey());
-                        if (parent != null && collectionSlotIndex >= 0) {
-                            parent.setCollection(collectionSlotIndex, entry.getValue());
-                        }
-                    }
-                }
-
-                // Build child index for next level
-                parentIndexByPath.put(cplan.collectionPath(), result.childIndex);
-                schemaByPath.put(cplan.collectionPath(), cplan.childSchema());
-                nextLevelIds.addAll(result.childIndex.keySet());
+            if (levelPlan == null || levelPlan.isEmpty()) {
+                continue;
             }
 
-            currentLevelParentIds = nextLevelIds;
-            if (currentLevelParentIds.isEmpty())
-                break;
+            // For each collection at this level
+            for (Map.Entry<String, QueryPlan> entry : levelPlan.entrySet()) {
+                String collectionPath = entry.getKey();
+                QueryPlan collectionPlan = entry.getValue();
+
+                // Determine parent path
+                String parentPath = getParentPath(collectionPath);
+                Map<Object, RowBuffer> parentIndex = parentIndexByPath.get(parentPath);
+
+                if (parentIndex == null || parentIndex.isEmpty()) {
+                    continue; // No parents for this collection
+                }
+
+                // Collect parent IDs
+                Set<Object> parentIds = parentIndex.keySet();
+
+                // Build PredicateResolver to filter by parent IDs (IN clause)
+                PredicateResolver<?> collectionPr = buildParentIdPredicate(collectionPlan, parentIds);
+
+                // Get pagination for this collection (stable from root context)
+                Pagination collPagination = ctx.collectionPagination().get(collectionPath);
+                QueryExecutionParams collectionParams = QueryExecutionParams.builder()
+                        .pagination(collPagination)
+                        .build();
+
+                // Build execution context for this collection
+                ExecutionContext collectionCtx = buildCollectionExecutionContext(
+                        ctx.em(),
+                        collectionPr,
+                        collectionPlan,
+                        ctx.collectionPagination());
+
+                // Execute collection query
+                Map<Object, RowBuffer> collectionResults = step2_ExecuteRootQuery(collectionCtx, collectionParams);
+
+                // Link results to parent rows
+                linkCollectionResultsToParents(
+                        collectionResults,
+                        parentIndex,
+                        collectionPlan,
+                        collectionPath);
+
+                // Store child index for next level
+                parentIndexByPath.put(collectionPath, collectionResults);
+            }
         }
     }
 
-    @Override
-    protected List<Map<String, Object>> step4_transform(ExecutionContext ctx, Map<Object, RowBuffer> rootResults) {
-        Set<Integer> excludedSlots = computeExcludedSlots(ctx.plan().computedFields(), ctx);
-        List<Map<String, Object>> results = new ArrayList<>(rootResults.size());
 
-        Map<String, Function<Object[], Object>> computeMethods = new HashMap<>(100);
+    protected void step3_ExecuteCollectionQueries__(ExecutionContext ctx, Map<Object, RowBuffer> rootResults) {
+        // // Group collection plans by depth
+        // Map<Integer, List<CollectionPlan>> plansByDepth = new TreeMap<>();
+        // for (CollectionPlan cplan : ctx.plan().collectionPlans()) {
+        // plansByDepth.computeIfAbsent(cplan.depth(), k -> new
+        // ArrayList<>()).add(cplan);
+        // }
+        //
+        // // Track parent lookup by collection path
+        // Map<String, Map<Object, RowBuffer>> parentIndexByPath = new HashMap<>();
+        // parentIndexByPath.put("", rootResults);
+        //
+        // // Track which schema applies to each collection path
+        // Map<String, FieldSchema> schemaByPath = new HashMap<>();
+        // schemaByPath.put("", ctx.plan().getSchema());
+        //
+        // Set<Object> currentLevelParentIds = rootResults.keySet();
+        //
+        // for (Map.Entry<Integer, List<CollectionPlan>> depthEntry :
+        // plansByDepth.entrySet()) {
+        // List<CollectionPlan> plansAtDepth = depthEntry.getValue();
+        //
+        // Set<Object> nextLevelIds = new HashSet<>();
+        //
+        // for (CollectionPlan cplan : plansAtDepth) {
+        // CollectionQueryResult result = executeCollectionQuery(ctx, cplan,
+        // currentLevelParentIds);
+        //
+        // // Attach children to parents
+        // String parentPath = getParentPath(cplan.collectionPath());
+        // Map<Object, RowBuffer> parentIndex = parentIndexByPath.get(parentPath);
+        // FieldSchema parentSchema = schemaByPath.get(parentPath);
+        //
+        // if (parentIndex != null && parentSchema != null) {
+        // // Get the collection name relative to parent
+        // String collName = cplan.collectionPath().contains(".")
+        // ? cplan.collectionPath().substring(cplan.collectionPath().lastIndexOf('.') +
+        // 1)
+        // : cplan.collectionPath();
+        //
+        // var collectionSlotIndex = parentSchema.indexOfDto(collName);
+        //
+        // // If not found by short name, try the DTO collection name
+        // if (collectionSlotIndex == Indexer.NONE) {
+        // collectionSlotIndex = parentSchema.indexOfDto(cplan.dtoCollectionName());
+        // }
+        //
+        // for (Map.Entry<Object, List<RowBuffer>> entry :
+        // result.childrenByParent.entrySet()) {
+        // RowBuffer parent = parentIndex.get(entry.getKey());
+        // if (parent != null && collectionSlotIndex != Indexer.NONE) {
+        // parent.setCollection(collectionSlotIndex.index(), entry.getValue());
+        // }
+        // }
+        // }
+        //
+        // // Build child index for next level
+        // parentIndexByPath.put(cplan.collectionPath(), result.childIndex);
+        // schemaByPath.put(cplan.collectionPath(), cplan.childSchema());
+        // nextLevelIds.addAll(result.childIndex.keySet());
+        // }
+        //
+        // currentLevelParentIds = nextLevelIds;
+        // if (currentLevelParentIds.isEmpty())
+        // break;
+        // }
+    }
+
+    @Override
+    protected List<RowBuffer> step4_transform(ExecutionContext ctx, Map<Object, RowBuffer> rootResults) {
+        Map<String, Function<Object[], Object>> computeMethods = new HashMap<>(10);
+        Map<String, Map<Object, Number>> reducedValues = new HashMap<>();
+        boolean reducersAggregateDone = false;
+
+        AggregateQueryExecutor aggregateQueryExecutor = new AggregateQueryExecutor(ctx.em(), rootEntityClass,
+                PersistenceRegistry.getIdFields(rootEntityClass));
 
         for (RowBuffer row : rootResults.values()) {
-            for (ComputedFieldInfo info : ctx.plan().computedFields()) {
-                int[] dependencySlots = info.dependencySlots();
-                String[] dependencyPaths = info.dependencyPaths();
+            FieldSchema schema = row.getSchema();
 
-                // Gather dependencies using O(1) slot access
-                Object[] params = new Object[dependencySlots.length];
+            for (var e : schema.getComputedFieldIndexMap().entrySet()) {
+                final var dtoField = e.getKey();
+                final var infos = e.getValue();
+                Object[] params = new Object[infos.length];
+
                 for (int i = 0; i < params.length; i++) {
-                    int slot = dependencySlots[i];
-                    if (slot >= 0) {
-                        params[i] = row.get(slot);
+                    FieldSchema.DependencyInfo info = infos[i];
+                    if (info.reducer() != null) {
+                        String collectionPath = schema.dtoField(info.index()).substring(PREFIX_FOR_COMPUTED.length());
+                        if (!reducersAggregateDone) {
+                            var reduced = aggregateQueryExecutor.executeAggregateQuery(collectionPath, info.reducer(),
+                                    ctx.plan().getIdFields());
+                            reducedValues.put(collectionPath, reduced);
+                        }
+                        params[i] = reducedValues.get(collectionPath).get(1); // TODO: a la place de 1 mettre l'ID
+                                                                              // composite ou simple
                     } else {
-                        // Fallback to name lookup
-                        params[i] = row.getOrNull(dependencyPaths[i].trim());
+                        params[i] = row.get(info.index());
                     }
                 }
+                reducersAggregateDone = true;
 
                 try {
-                    if (!computeMethods.containsKey(info.dtoFieldName())) {
-                        var method = ProjectionUtils.resolveComputeMethod(instanceResolver, dtoClass, info.dtoFieldName(), params);
-                        computeMethods.put(info.dtoFieldName(), method);
+                    if (!computeMethods.containsKey(dtoField)) {
+                        var method = ProjectionUtils.resolveComputeMethod(instanceResolver, dtoClass, dtoField, params);
+                        computeMethods.put(dtoField, method);
                     }
-                    Object computed = computeMethods.get(info.dtoFieldName()).apply(params);
-                    int outputSlot = info.outputSlot();
-                    if (outputSlot >= 0) {
-                        row.set(outputSlot, computed);
-                    }
-                } catch (Exception e) {
-                    throw new RuntimeException("Failed to compute field: " + info.dtoFieldName(), e);
+                    Object computed = computeMethods.get(dtoField).apply(params);
+                    row.set(dtoField, computed);
+                } catch (Exception ex) {
+                    throw new RuntimeException("Failed to compute field: " + dtoField, ex);
                 }
             }
-            results.add(row.toMap(excludedSlots));
         }
-        return results;
+
+        // computeExcludedSlots(ctx.plan().computedFields(), ctx);
+        // Map<String, Function<Object[], Object>> computeMethods = new HashMap<>(100);
+        //
+        // for (RowBuffer row : rootResults.values()) {
+        // for (ComputedFieldInfo info : ctx.plan().computedFields()) {
+        // int[] dependencySlots = info.dependencySlots();
+        // String[] dependencyPaths = info.dependencyPaths();
+        //
+        // // Gather dependencies using O(1) slot access
+        // Object[] params = new Object[dependencySlots.length];
+        // for (int i = 0; i < params.length; i++) {
+        // int slot = dependencySlots[i];
+        // if (slot >= 0) {
+        // params[i] = row.get(slot);
+        // } else {
+        // // Fallback to name lookup
+        // params[i] = row.getOrNull(dependencyPaths[i].trim());
+        // }
+        // }
+        //
+        // try {
+        // if (!computeMethods.containsKey(info.dtoFieldName())) {
+        // var method = ProjectionUtils.resolveComputeMethod(instanceResolver, dtoClass,
+        // info.dtoFieldName(), params);
+        // computeMethods.put(info.dtoFieldName(), method);
+        // }
+        // Object computed = computeMethods.get(info.dtoFieldName()).apply(params);
+        // int outputSlot = info.outputSlot();
+        // if (outputSlot >= 0) {
+        // row.set(outputSlot, computed);
+        // }
+        // } catch (Exception e) {
+        // throw new RuntimeException("Failed to compute field: " + info.dtoFieldName(),
+        // e);
+        // }
+        // }
+        // }
+        return new ArrayList<>(rootResults.values());
     }
 
     // ==================== Utility Methods ====================
@@ -318,7 +402,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
         if (idFields.size() == 1) {
             int idx = schema.indexOfEntity(idFields.getFirst());
             if (idx < 0) {
-                idx = schema.indexOfDto(PREFIX_FOR_INTERNAL_USAGE + idFields.getFirst());
+                idx = schema.indexOfDto(PREFIX_FOR_INTERNAL_USAGE + idFields.getFirst()).index();
             }
             return idx >= 0 ? row.get(idx) : null;
         } else {
@@ -326,9 +410,140 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
             for (String idField : idFields) {
                 int idx = schema.indexOfEntity(idField);
                 if (idx < 0) {
-                    idx = schema.indexOfDto(PREFIX_FOR_INTERNAL_USAGE + idField);
+                    idx = schema.indexOfDto(PREFIX_FOR_INTERNAL_USAGE + idField).index();
                 }
                 values.add(idx >= 0 ? row.get(idx) : null);
+            }
+            return List.copyOf(values);
+        }
+    }
+
+    // ==================== Collection Query Helper Methods ====================
+
+    /**
+     * Builds a PredicateResolver that filters collection elements by parent IDs.
+     */
+    private PredicateResolver<?> buildParentIdPredicate(QueryPlan collectionPlan, Set<Object> parentIds) {
+        FieldSchema schema = collectionPlan.getSchema();
+        List<String> entityPaths = new ArrayList<>();
+
+        // Find parent ID fields in schema (prefixed by _i_pid_)
+        for (int i = 0;; i++) {
+            String alias = PREFIX_FOR_INTERNAL_USAGE + SUFFIX_PARENT_ID + i;
+            Indexer indexer = schema.indexOfDto(alias);
+            if (indexer == Indexer.NONE) {
+                break;
+            }
+            // Get the corresponding entity field path
+            entityPaths.add(schema.entityField(indexer.index()));
+        }
+
+        final List<String> finalEntityPaths = entityPaths;
+
+        return (root, query, cb) -> {
+            List<Path<?>> idPaths = new ArrayList<>(finalEntityPaths.size());
+            for (String entityPath : finalEntityPaths) {
+                idPaths.add(PathResolverUtils.resolvePath(root, entityPath));
+            }
+
+            return IdPredicateBuilder.defaultBuilder()
+                    .buildIdPredicate(cb, idPaths, parentIds);
+        };
+    }
+
+    /**
+     * Builds an ExecutionContext for executing a collection query.
+     */
+    private ExecutionContext buildCollectionExecutionContext(
+            EntityManager em,
+            PredicateResolver<?> pr,
+            QueryPlan collectionPlan,
+            Map<String, Pagination> collectionPagination) {
+
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Tuple> query = cb.createTupleQuery();
+        Root<?> root = query.from(collectionPlan.getEntityClass());
+
+        return new ExecutionContext(
+                em,
+                cb,
+                root,
+                query,
+                pr,
+                collectionPlan,
+                collectionPagination);
+    }
+
+    /**
+     * Links collection results to their parent RowBuffers.
+     */
+    private void linkCollectionResultsToParents(
+            Map<Object, RowBuffer> collectionResults,
+            Map<Object, RowBuffer> parentIndex,
+            QueryPlan collectionPlan,
+            String collectionPath) {
+
+        // Get collection name for the slot in the parent
+        String collectionName = collectionPath.contains(".")
+                ? collectionPath.substring(collectionPath.lastIndexOf('.') + 1)
+                : collectionPath;
+
+        // Group results by parent ID
+        Map<Object, List<RowBuffer>> childrenByParentId = new LinkedHashMap<>();
+
+        for (RowBuffer childRow : collectionResults.values()) {
+            Object parentId = extractParentIdFromChild(childRow);
+            childrenByParentId
+                    .computeIfAbsent(parentId, k -> new ArrayList<>())
+                    .add(childRow);
+        }
+
+        // Get parent schema (from first parent)
+        if (parentIndex.isEmpty())
+            return;
+
+        FieldSchema parentSchema = parentIndex.values().iterator().next().getSchema();
+        Indexer collIdx = parentSchema.indexOfDto(collectionName);
+
+        if (collIdx == Indexer.NONE || !collIdx.isCollection()) {
+            logger.warning(() -> "Collection slot not found for: " + collectionName);
+            return;
+        }
+
+        // Assign children to each parent
+        for (Map.Entry<Object, RowBuffer> parentEntry : parentIndex.entrySet()) {
+            Object parentId = parentEntry.getKey();
+            RowBuffer parentRow = parentEntry.getValue();
+
+            List<RowBuffer> children = childrenByParentId.getOrDefault(parentId, List.of());
+            parentRow.setCollection(collIdx.index(), children);
+        }
+    }
+
+    /**
+     * Extracts the parent ID from a child row.
+     */
+    private Object extractParentIdFromChild(RowBuffer childRow) {
+        FieldSchema schema = childRow.getSchema();
+
+        // Count number of parent ID fields
+        int count = 0;
+        while (schema.indexOfDto(PREFIX_FOR_INTERNAL_USAGE + SUFFIX_PARENT_ID + count) != Indexer.NONE) {
+            count++;
+        }
+
+        if (count == 0) {
+            return null;
+        }
+
+        if (count == 1) {
+            int idx = schema.indexOfDto(PREFIX_FOR_INTERNAL_USAGE + SUFFIX_PARENT_ID + "0").index();
+            return childRow.get(idx);
+        } else {
+            List<Object> values = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                int idx = schema.indexOfDto(PREFIX_FOR_INTERNAL_USAGE + SUFFIX_PARENT_ID + i).index();
+                values.add(childRow.get(idx));
             }
             return List.copyOf(values);
         }
@@ -343,96 +558,120 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
             ExecutionContext ctx,
             CollectionPlan cplan,
             Set<Object> parentIds) {
-        if (parentIds == null || parentIds.isEmpty()) {
-            return new CollectionQueryResult(Collections.emptyMap(), Collections.emptyMap());
-        }
+        return null;
 
-        Map<Object, List<RowBuffer>> resultsByParent = new LinkedHashMap<>();
-        Map<Object, RowBuffer> childIndex = new LinkedHashMap<>();
-        List<Object> parentIdList = new ArrayList<>(parentIds);
+        // Une query de collection est comme une query normale (ie Root query) mais pour
+        // le DTO cible.
+        // La subtilité est de relier chaque liste a la ligne du résultat parent.
+        // Donc il faudrait grouper les résultats de la requête par parent IDs pour
+        // faire la liaison subséquement
+        // select [<projection with aliases> + <parent aliases>] where (in predicate
+        // filtres... ) sort by ? limit ?
 
-        FieldSchema childSchema = cplan.childSchema();
+        // map 'niveau' -> collection plans | les résultats peuvent aussi être mappés
+        // par niveau
+        // map 'collection plan' -> parentId, collection path, field schema
 
-        for (int batchStart = 0; batchStart < parentIdList.size(); batchStart += BATCH_SIZE) {
-            int batchEnd = Math.min(batchStart + BATCH_SIZE, parentIdList.size());
-            List<Object> batchIds = parentIdList.subList(batchStart, batchEnd);
-
-            CriteriaQuery<Tuple> query = ctx.cb().createTupleQuery();
-            Root<?> collRoot = query.from(cplan.elementClass());
-
-            List<Selection<?>> selections = new ArrayList<>();
-
-            // Parent ID fields
-            Path<?> parentRefPath = collRoot.get(cplan.parentReferenceField());
-            List<String> parentIdFields = PersistenceRegistry.getIdFields(parentRefPath.getJavaType());
-
-            for (int i = 0; i < parentIdFields.size(); i++) {
-                Path<?> parentIdPath = parentRefPath.get(parentIdFields.get(i));
-                selections.add(
-                        parentIdPath.alias(PREFIX_FOR_INTERNAL_USAGE + SUFFIX_PARENT_ID + i));
-            }
-
-            // Child fields using schema
-            for (int i = 0; i < childSchema.fieldCount(); i++) {
-                Path<?> path = PathResolverUtils.resolvePath(collRoot, childSchema.entityField(i));
-                selections.add(path.alias(childSchema.dtoField(i)));
-            }
-
-            query.multiselect(selections);
-
-            // Build IN predicate
-            Predicate wherePredicate = buildInPredicate(ctx.cb(), parentRefPath, parentIdFields, batchIds);
-            query.where(wherePredicate);
-
-            // Apply sorting using pre-computed indices
-            if (cplan.sortFieldIndices().length > 0) {
-                List<Order> orders = new ArrayList<>();
-                for (int i = 0; i < cplan.sortFieldIndices().length; i++) {
-                    int fieldIdx = cplan.sortFieldIndices()[i];
-                    if (fieldIdx >= 0 && fieldIdx < childSchema.fieldCount()) {
-                        Path<?> sortPath = PathResolverUtils.resolvePath(collRoot, childSchema.entityField(fieldIdx));
-                        orders.add(cplan.sortDescending()[i] ? ctx.cb().desc(sortPath) : ctx.cb().asc(sortPath));
-                    }
-                }
-                if (!orders.isEmpty()) {
-                    query.orderBy(orders);
-                }
-            }
-
-            List<Tuple> tuples = ctx.em().createQuery(query).getResultList();
-
-            // Process results
-            Map<Object, List<RowBuffer>> batchResult = new LinkedHashMap<>();
-
-            for (Tuple tuple : tuples) {
-                Object parentId = extractParentIdFromTuple(tuple, parentIdFields.size());
-                RowBuffer childRow = tupleToRowBuffer(tuple, childSchema);
-                Object childId = extractCompositeKey(childRow, cplan.idFields(), childSchema);
-
-                batchResult.computeIfAbsent(parentId, k -> new ArrayList<>()).add(childRow);
-                childIndex.put(childId, childRow);
-            }
-
-            // Apply per-parent pagination
-            if (cplan.offsetPerParent() != null || cplan.limitPerParent() != null) {
-                for (Map.Entry<Object, List<RowBuffer>> entry : batchResult.entrySet()) {
-                    List<RowBuffer> children = entry.getValue();
-                    int offset = cplan.offsetPerParent() != null ? cplan.offsetPerParent() : 0;
-                    int limit = cplan.limitPerParent() != null ? cplan.limitPerParent() : children.size();
-                    int end = Math.min(children.size(), offset + limit);
-                    if (offset > 0 || limit < children.size()) {
-                        entry.setValue(children.subList(Math.min(offset, children.size()), end));
-                    }
-                }
-            }
-
-            // Merge batch results
-            for (Map.Entry<Object, List<RowBuffer>> entry : batchResult.entrySet()) {
-                resultsByParent.computeIfAbsent(entry.getKey(), k -> new ArrayList<>()).addAll(entry.getValue());
-            }
-        }
-
-        return new CollectionQueryResult(resultsByParent, childIndex);
+        // if (parentIds == null || parentIds.isEmpty()) {
+        // return new CollectionQueryResult(Collections.emptyMap(),
+        // Collections.emptyMap());
+        // }
+        //
+        // Map<Object, List<RowBuffer>> resultsByParent = new LinkedHashMap<>();
+        // Map<Object, RowBuffer> childIndex = new LinkedHashMap<>();
+        // List<Object> parentIdList = new ArrayList<>(parentIds);
+        //
+        // FieldSchema childSchema = cplan.childSchema();
+        //
+        // for (int batchStart = 0; batchStart < parentIdList.size(); batchStart +=
+        // BATCH_SIZE) {
+        // int batchEnd = Math.min(batchStart + BATCH_SIZE, parentIdList.size());
+        // List<Object> batchIds = parentIdList.subList(batchStart, batchEnd);
+        //
+        // CriteriaQuery<Tuple> query = ctx.cb().createTupleQuery();
+        // Root<?> collRoot = query.from(cplan.elementClass());
+        //
+        // List<Selection<?>> selections = new ArrayList<>();
+        //
+        // // Parent ID fields
+        // Path<?> parentRefPath = collRoot.get(cplan.parentReferenceField());
+        // List<String> parentIdFields =
+        // PersistenceRegistry.getIdFields(parentRefPath.getJavaType());
+        //
+        // for (int i = 0; i < parentIdFields.size(); i++) {
+        // Path<?> parentIdPath = parentRefPath.get(parentIdFields.get(i));
+        // selections.add(parentIdPath.alias(PREFIX_FOR_INTERNAL_USAGE +
+        // SUFFIX_PARENT_ID + i));
+        // }
+        //
+        // // Child fields using schema
+        // for (int i = 0; i < childSchema.fieldCount(); i++) {
+        // Path<?> path = PathResolverUtils.resolvePath(collRoot,
+        // childSchema.entityField(i));
+        // selections.add(path.alias(childSchema.dtoField(i)));
+        // }
+        //
+        // query.multiselect(selections);
+        //
+        // // Build IN predicate
+        // Predicate wherePredicate = buildInPredicate(ctx.cb(), parentRefPath,
+        // parentIdFields, batchIds);
+        // query.where(wherePredicate);
+        //
+        // // Apply sorting using pre-computed indices
+        // if (cplan.sortFieldIndices().length > 0) {
+        // List<Order> orders = new ArrayList<>();
+        // for (int i = 0; i < cplan.sortFieldIndices().length; i++) {
+        // int fieldIdx = cplan.sortFieldIndices()[i];
+        // if (fieldIdx >= 0 && fieldIdx < childSchema.fieldCount()) {
+        // Path<?> sortPath = PathResolverUtils.resolvePath(collRoot,
+        // childSchema.entityField(fieldIdx));
+        // orders.add(cplan.sortDescending()[i] ? ctx.cb().desc(sortPath) :
+        // ctx.cb().asc(sortPath));
+        // }
+        // }
+        // if (!orders.isEmpty()) {
+        // query.orderBy(orders);
+        // }
+        // }
+        //
+        // List<Tuple> tuples = ctx.em().createQuery(query).getResultList();
+        //
+        // // Process results
+        // Map<Object, List<RowBuffer>> batchResult = new LinkedHashMap<>();
+        //
+        // for (Tuple tuple : tuples) {
+        // Object parentId = extractParentIdFromTuple(tuple, parentIdFields.size());
+        // RowBuffer childRow = tupleToRowBuffer(tuple, childSchema);
+        // Object childId = extractCompositeKey(childRow, cplan.idFields(),
+        // childSchema);
+        //
+        // batchResult.computeIfAbsent(parentId, k -> new ArrayList<>()).add(childRow);
+        // childIndex.put(childId, childRow);
+        // }
+        //
+        // // Apply per-parent pagination
+        // if (cplan.offsetPerParent() != null || cplan.limitPerParent() != null) {
+        // for (Map.Entry<Object, List<RowBuffer>> entry : batchResult.entrySet()) {
+        // List<RowBuffer> children = entry.getValue();
+        // int offset = cplan.offsetPerParent() != null ? cplan.offsetPerParent() : 0;
+        // int limit = cplan.limitPerParent() != null ? cplan.limitPerParent() :
+        // children.size();
+        // int end = Math.min(children.size(), offset + limit);
+        // if (offset > 0 || limit < children.size()) {
+        // entry.setValue(children.subList(Math.min(offset, children.size()), end));
+        // }
+        // }
+        // }
+        //
+        // // Merge batch results
+        // for (Map.Entry<Object, List<RowBuffer>> entry : batchResult.entrySet()) {
+        // resultsByParent.computeIfAbsent(entry.getKey(), k -> new
+        // ArrayList<>()).addAll(entry.getValue());
+        // }
+        // }
+        //
+        // return new CollectionQueryResult(resultsByParent, childIndex);
     }
 
     private String getParentPath(String collectionPath) {
@@ -440,15 +679,6 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
             return "";
         }
         return collectionPath.substring(0, collectionPath.lastIndexOf('.'));
-    }
-
-    private int findCollectionSlotIndex(FieldSchema schema, String collectionName) {
-        for (int c = 0; c < schema.collectionCount(); c++) {
-            if (schema.collectionName(c).equals(collectionName)) {
-                return c;
-            }
-        }
-        return -1;
     }
 
     private Predicate buildInPredicate(CriteriaBuilder cb, Path<?> parentRefPath, List<String> parentIdFields,
@@ -488,23 +718,24 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
      */
     private Set<Integer> computeExcludedSlots(ComputedFieldInfo[] computedFields, ExecutionContext ctx) {
         Set<Integer> excluded = new HashSet<>();
-        Map<String, String> entityToDto = ctx.projectionSpec().entityToDtoMapping();
-
-        for (ComputedFieldInfo info : computedFields) {
-            for (String depPath : info.dependencyPaths()) {
-                String trimmedPath = depPath.trim();
-                String dtoField = entityToDto.get(trimmedPath);
-                boolean isDirectlyProjected = dtoField != null
-                        && !ctx.projectionSpec().computedFields().contains(dtoField);
-                if (!isDirectlyProjected) {
-                    int depSlot = ctx.plan().rootSchema().indexOfEntity(trimmedPath);
-                    if (depSlot >= 0) {
-                        excluded.add(depSlot);
-                    }
-                }
-            }
-        }
-
+        // Map<String, String> entityToDto = ctx.projectionSpec().entityToDtoMapping();
+        //
+        // for (ComputedFieldInfo info : computedFields) {
+        // for (String depPath : info.dependencyPaths()) {
+        // String trimmedPath = depPath.trim();
+        // String dtoField = entityToDto.get(trimmedPath);
+        // boolean isDirectlyProjected = dtoField != null
+        // && !ctx.projectionSpec().computedFields().contains(dtoField);
+        // if (!isDirectlyProjected) {
+        // int depSlot = ctx.plan().rootSchema().indexOfEntity(trimmedPath);
+        // if (depSlot >= 0) {
+        // excluded.add(depSlot);
+        // }
+        // }
+        // }
+        // }
+        //
+        // ctx.plan().rootSchema().setSerialisationExcludedSlots(excluded);
         return excluded;
     }
 }

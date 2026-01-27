@@ -170,19 +170,19 @@ class JpaProjectionIntegrationTest {
 
                 // Then: Should execute successfully
                 MultiQueryFetchStrategy fetchStrategy = new MultiQueryFetchStrategy(UserB.class);
-                List<Map<String, Object>> result = FilterQueryFactory.of(context).execute(request, em, fetchStrategy);
+                List<RowBuffer> result = FilterQueryFactory.of(context).execute(request, em, fetchStrategy);
 
                 // Verify tuple has expected fields
                 assertEquals(2, result.size());
 
-                Map<String, Object> firstResult = result.getFirst();
-                Map<String, Object> secondResult = result.get(1);
+                RowBuffer firstResult = result.getFirst();
+                RowBuffer secondResult = result.get(1);
                 assertEquals("John Doe", firstResult.get("name"));
                 assertEquals("john@example.com", firstResult.get("email"));
                 assertEquals("Jane Smith", secondResult.get("name"));
                 assertEquals("jane@example.com", secondResult.get("email"));
-                assertEquals(2, firstResult.size());
-                assertEquals(2, secondResult.size());
+                assertEquals(2, firstResult.fields());
+                assertEquals(2, secondResult.fields());
             }
         }
 
@@ -199,15 +199,15 @@ class JpaProjectionIntegrationTest {
 
                 // Then: Should execute successfully
                 MultiQueryFetchStrategy fetchStrategy = new MultiQueryFetchStrategy(UserB.class);
-                List<Map<String, Object>> result = FilterQueryFactory.of(context).execute(request, em, fetchStrategy);
+                List<RowBuffer> result = FilterQueryFactory.of(context).execute(request, em, fetchStrategy);
 
                 // Verify tuple has expected fields
                 assertEquals(1, result.size());
 
-                Map<String, Object> firstResult = result.getFirst();
+                RowBuffer firstResult = result.getFirst();
                 assertEquals("Bob Johnson", firstResult.get("name"));
                 assertEquals("bob@example.com", firstResult.get("email"));
-                assertEquals(2, firstResult.size());
+                assertEquals(2, firstResult.fields());
             }
         }
 

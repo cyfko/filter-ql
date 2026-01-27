@@ -487,9 +487,7 @@ public class MultiQueryExecutionPlan {
     /**
      * Plan for a single collection depth level.
      */
-    public record CollectionLevelPlan(
-            int depth,
-            Set<CollectionNode> collections) {
+    public record CollectionLevelPlan(int depth, Set<CollectionNode> collections) {
     }
 
     /**

@@ -10,6 +10,7 @@ import io.github.cyfko.filterql.jpa.JpaFilterContext;
 import io.github.cyfko.filterql.jpa.entities.projection._1.AddressB;
 import io.github.cyfko.filterql.jpa.entities.projection._1.City;
 import io.github.cyfko.filterql.jpa.entities.projection._1.UserB;
+import io.github.cyfko.filterql.jpa.projection.RowBuffer;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Persistence;
@@ -201,8 +202,7 @@ class MultiQueryFetchStrategyBenchmarkTest {
                 BenchmarkResult result = runBenchmark(em, request, "Nested path projection");
 
                 // Assertions
-                assertTrue(result.v2SpeedupFactor >= 0.5,
-                        "V2 should not be significantly slower");
+                assertTrue(result.v2SpeedupFactor >= 0.5, "V2 should not be significantly slower");
                 assertEquals(result.v1Results.size(), result.v2Results.size());
             }
         }
@@ -232,7 +232,7 @@ class MultiQueryFetchStrategyBenchmarkTest {
             long[] v2Times = new long[BENCHMARK_ITERATIONS];
 
             List<Map<String, Object>> v1Results = null;
-            List<Map<String, Object>> v2Results = null;
+            List<RowBuffer> v2Results = null;
 
             // Run benchmark iterations
             for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
@@ -288,7 +288,7 @@ class MultiQueryFetchStrategyBenchmarkTest {
 
         private record BenchmarkResult(
                 List<Map<String, Object>> v1Results,
-                List<Map<String, Object>> v2Results,
+                List<RowBuffer> v2Results,
                 long v1AvgNanos,
                 long v2AvgNanos,
                 double v2SpeedupFactor) {
@@ -315,7 +315,7 @@ class MultiQueryFetchStrategyBenchmarkTest {
                 MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(UserB.class);
 
                 List<Map<String, Object>> v1Results = FilterQueryFactory.of(context).execute(request, em, strategyV1);
-                List<Map<String, Object>> v2Results = FilterQueryFactory.of(context).execute(request, em, strategyV2);
+                List<RowBuffer> v2Results = FilterQueryFactory.of(context).execute(request, em, strategyV2);
 
                 // Size check
                 assertEquals(v1Results.size(), v2Results.size(), "Result count should match");
@@ -323,7 +323,7 @@ class MultiQueryFetchStrategyBenchmarkTest {
                 // Content check
                 for (int i = 0; i < v1Results.size(); i++) {
                     Map<String, Object> v1Row = v1Results.get(i);
-                    Map<String, Object> v2Row = v2Results.get(i);
+                    RowBuffer v2Row = v2Results.get(i);
 
                     assertEquals(v1Row.get("name"), v2Row.get("name"), "Name should match at index " + i);
                     assertEquals(v1Row.get("email"), v2Row.get("email"), "Email should match at index " + i);
@@ -347,13 +347,13 @@ class MultiQueryFetchStrategyBenchmarkTest {
                 MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(UserB.class);
 
                 List<Map<String, Object>> v1Results = FilterQueryFactory.of(context).execute(request, em, strategyV1);
-                List<Map<String, Object>> v2Results = FilterQueryFactory.of(context).execute(request, em, strategyV2);
+                List<RowBuffer> v2Results = FilterQueryFactory.of(context).execute(request, em, strategyV2);
 
                 assertEquals(v1Results.size(), v2Results.size());
 
                 for (int i = 0; i < v1Results.size(); i++) {
                     Map<String, Object> v1Row = v1Results.get(i);
-                    Map<String, Object> v2Row = v2Results.get(i);
+                    RowBuffer v2Row = v2Results.get(i);
 
                     assertEquals(v1Row.get("name"), v2Row.get("name"));
 
@@ -361,15 +361,14 @@ class MultiQueryFetchStrategyBenchmarkTest {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> v1Address = (Map<String, Object>) v1Row.get("address");
                     @SuppressWarnings("unchecked")
-                    Map<String, Object> v2Address = (Map<String, Object>) v2Row.get("address");
+                    RowBuffer v2Address = (RowBuffer) v2Row.get("address");
 
                     assertNotNull(v1Address, "V1 should have address");
                     assertNotNull(v2Address, "V2 should have address");
 
                     @SuppressWarnings("unchecked")
                     Map<String, Object> v1City = (Map<String, Object>) v1Address.get("city");
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> v2City = (Map<String, Object>) v2Address.get("city");
+                    RowBuffer v2City = (RowBuffer) v2Address.get("city");
 
                     assertEquals(v1City.get("name"), v2City.get("name"), "City name should match");
                 }

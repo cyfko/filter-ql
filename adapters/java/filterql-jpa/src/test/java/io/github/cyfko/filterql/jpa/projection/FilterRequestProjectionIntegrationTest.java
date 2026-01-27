@@ -117,10 +117,10 @@ class FilterRequestProjectionIntegrationTest {
                     .build();
 
             var strategy = new MultiQueryFetchStrategy(UserC.class);
-            List<Map<String, Object>> results = filterQuery.execute(request, em, strategy);
+            List<RowBuffer> results = filterQuery.execute(request, em, strategy);
 
             assertEquals(1, results.size());
-            Map<String, Object> john = results.getFirst();
+            RowBuffer john = results.getFirst();
             assertEquals("John Doe", john.get("name"));
             assertNotNull(john.get("id"));
             assertEquals("john@example.com", john.get("email"));
@@ -138,10 +138,10 @@ class FilterRequestProjectionIntegrationTest {
                     .build();
 
             var strategy = new MultiQueryFetchStrategy(UserC.class);
-            List<Map<String, Object>> results = filterQuery.execute(request, em, strategy);
+            List<RowBuffer> results = filterQuery.execute(request, em, strategy);
 
             assertEquals(1, results.size());
-            Map<String, Object> john = results.getFirst();
+            RowBuffer john = results.getFirst();
             assertNotNull(john.get("id"));
             assertNull(john.get("orders"));
             assertEquals("John Doe", john.get("name"));
@@ -161,12 +161,12 @@ class FilterRequestProjectionIntegrationTest {
                     .build();
 
             var strategy = new MultiQueryFetchStrategy(UserC.class);
-            List<Map<String, Object>> results = filterQuery.execute(request, em, strategy);
+            List<RowBuffer> results = filterQuery.execute(request, em, strategy);
 
             assertEquals(1, results.size());
-            Map<String, Object> john = results.getFirst();
+            RowBuffer john = results.getFirst();
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> orders = (List<Map<String, Object>>) john.get("orders");
+            List<RowBuffer> orders = (List<RowBuffer>) john.get("orders");
             assertEquals(2, orders.size());
             Set<String> orderNumbers = orders.stream().map(o -> (String) o.get("orderNumber")).collect(Collectors.toSet());
             assertTrue(orderNumbers.contains("ORD-001"));
@@ -186,8 +186,8 @@ class FilterRequestProjectionIntegrationTest {
                     .projection(Set.of("id", "name", "email"))
                     .build();
 
-            ExecutionStrategy<List<Map<String,Object>>> strategy = new MultiQueryFetchStrategy(UserC.class);
-            List<Map<String, Object>> results = filterQuery.execute(request, em, strategy);
+            ExecutionStrategy<List<RowBuffer>> strategy = new MultiQueryFetchStrategy(UserC.class);
+            List<RowBuffer> results = filterQuery.execute(request, em, strategy);
 
             assertEquals(2, results.size());
             Set<String> names = results.stream().map(r -> (String) r.get("name")).collect(Collectors.toSet());
@@ -208,12 +208,12 @@ class FilterRequestProjectionIntegrationTest {
                     .build();
 
             var strategy = new MultiQueryFetchStrategy(UserC.class);
-            List<Map<String, Object>> results = filterQuery.execute(request, em, strategy);
+            List<RowBuffer> results = filterQuery.execute(request, em, strategy);
 
             assertFalse(results.isEmpty());
-            Map<String, Object> john = results.getFirst();
+            RowBuffer john = results.getFirst();
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> orders = (List<Map<String, Object>>) john.get("orders");
+            List<RowBuffer> orders = (List<RowBuffer>) john.get("orders");
             assertEquals(2, orders.size());
             assertEquals(100.0, (Double) orders.get(0).get("amount"));
             assertEquals(200.0, (Double) orders.get(1).get("amount"));
