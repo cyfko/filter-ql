@@ -398,12 +398,14 @@ public final class FieldSchema {
                 DependencyInfo[] dependencyInfos = computedFieldIndexMap.computeIfAbsent(dtoField,
                         k -> new DependencyInfo[dependencies.length]);
                 dependencyInfos[i] = new DependencyInfo(idx, reducer);
-
-                // Now add the field in Dto to have a slot for computed field outcome
-                entityFields.add(PREFIX_FOR_COMPUTED);
-                dtoFields.add(dtoField);
-                internal.add(true);
             }
+
+            // Now add the field in Dto to have a slot for computed field outcome
+            // (added ONCE per computed field, after processing all dependencies)
+            // This slot is NOT internal - it's the visible output for the user
+            entityFields.add(PREFIX_FOR_COMPUTED);
+            dtoFields.add(dtoField);
+            internal.add(false); // computed output is visible to user
 
             return this;
         }
