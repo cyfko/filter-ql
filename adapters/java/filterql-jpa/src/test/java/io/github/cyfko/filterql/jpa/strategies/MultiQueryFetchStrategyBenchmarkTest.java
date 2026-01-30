@@ -11,6 +11,7 @@ import io.github.cyfko.filterql.jpa.entities.projection._1.AddressB;
 import io.github.cyfko.filterql.jpa.entities.projection._1.City;
 import io.github.cyfko.filterql.jpa.entities.projection._1.UserB;
 import io.github.cyfko.filterql.jpa.projection.RowBuffer;
+import io.github.cyfko.filterql.jpa.projection.NestedView;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Persistence;
@@ -360,15 +361,14 @@ class MultiQueryFetchStrategyBenchmarkTest {
                     // Check nested structure
                     @SuppressWarnings("unchecked")
                     Map<String, Object> v1Address = (Map<String, Object>) v1Row.get("address");
-                    @SuppressWarnings("unchecked")
-                    RowBuffer v2Address = (RowBuffer) v2Row.get("address");
+                    NestedView v2Address = (NestedView) v2Row.get("address");
 
                     assertNotNull(v1Address, "V1 should have address");
                     assertNotNull(v2Address, "V2 should have address");
 
                     @SuppressWarnings("unchecked")
                     Map<String, Object> v1City = (Map<String, Object>) v1Address.get("city");
-                    RowBuffer v2City = (RowBuffer) v2Address.get("city");
+                    NestedView v2City = (NestedView) v2Address.get("city");
 
                     assertEquals(v1City.get("name"), v2City.get("name"), "City name should match");
                 }

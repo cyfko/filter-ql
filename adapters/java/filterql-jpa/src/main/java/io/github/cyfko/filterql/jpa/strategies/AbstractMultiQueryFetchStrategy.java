@@ -163,7 +163,7 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
         private final Class<?> entityClass;
         private final FieldSchema schema;
         private final List<String> idFields;
-        private Map<String, QueryPlan>[] collectionPlans;
+        private final Map<String, QueryPlan>[] collectionPlans;
 
         private QueryPlan(Class<?> entityClass, FieldSchema schema, Map<String, QueryPlan>[] collectionPlans) {
             this.entityClass = entityClass;
@@ -195,7 +195,7 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
         public static class Builder {
             private final Class<?> projectionClass;
             private final FieldSchema.Builder schemaBuilder;
-            private Map<Integer, Map<String, QueryPlan.Builder>> collectionPlans = new TreeMap<>();
+            private final Map<Integer, Map<String, QueryPlan.Builder>> collectionPlans = new TreeMap<>();
 
             // Parent context for collection plans
             private final Class<?> parentEntityClass;
@@ -256,19 +256,24 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
                 return this;
             }
 
-            private void add(Class<?> dtoClass, ProjectionFieldParser.ProjectionField pf, String[] segments, int index) {
+            private void add(Class<?> dtoClass,
+                             ProjectionFieldParser.ProjectionField pf,
+                             String[] segments,
+                             int index) {
                 ProjectionMetadata pm = ProjectionRegistry.getMetadataFor(dtoClass);
 
                 if (pf.prefix().isEmpty() || index >= segments.length) { // Add scalar fields
                     for (String field : pf.fields()) {
+                        String dtoPath = pf.prefix().isEmpty() ? field : pf.prefix() + "." + field;
                         pm.getComputedField(field, true).ifPresentOrElse(
                                 computedField -> {
-                                    var dtoPath = pf.prefix().isEmpty() ? field : String.join(".", pf.prefix(), field);
                                     schemaBuilder.addComputedField(computedField, dtoPath);
                                 },
                                 () -> {
-                                    String entityPath = ProjectionRegistry.toEntityPath(field, projectionClass, true);
-                                    schemaBuilder.addField(entityPath, field, false);
+                                    // Use full path for this builder's schema (works for both root and collections)
+                                    String entityPath = ProjectionRegistry.toEntityPath(dtoPath, this.projectionClass,
+                                            true);
+                                    schemaBuilder.addField(entityPath, dtoPath, false);
                                 });
                     }
 
@@ -307,9 +312,14 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
                     }
 
                     // Insert this builder as a new collection level plan
-                    builder.add(dm.dtoFieldType(), pf, segments, index + 1); // TODO: on peut également projeter toute
-                                                                             // une collection sans forcement avoir un
-                                                                             // champ imbriqué
+                    // Create relative segments for the collection (segments after the collection
+                    // element)
+                    String[] relativeSegments = java.util.Arrays.copyOfRange(segments, index + 1, segments.length);
+                    // Create a new pf with relative prefix for the collection builder
+                    String relativePrefix = String.join(".", relativeSegments);
+                    var relativePf = new ProjectionFieldParser.ProjectionField(relativePrefix, pf.fields());
+                    builder.add(dm.dtoFieldType(), relativePf, relativeSegments, 0);
+
                     collectionPlans.computeIfAbsent(index, k -> new HashMap<>())
                             .put(collectionPath, builder);
 
