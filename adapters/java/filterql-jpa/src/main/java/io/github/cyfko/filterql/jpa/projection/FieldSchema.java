@@ -337,8 +337,22 @@ public final class FieldSchema {
          */
         public Builder addField(String entityField, String dtoField, boolean isInternal) {
             // Check if already added
-            if (findEntityFieldDuplicateIndex(entityField, isInternal) > -1)
+            int existingIdx = findEntityFieldDuplicateIndex(entityField);
+            if (existingIdx > -1) {
+                // If the existing field was internal and we're adding it as visible,
+                // we need to update dtoField to make it accessible
+                if (!isInternal && internal.get(existingIdx)) {
+                    internal.set(existingIdx, false);
+                    dtoFields.set(existingIdx, dtoField);
+                    // Also update nested paths
+                    if (dtoField.contains(".")) {
+                        nestedPaths.set(existingIdx, dtoField.split("\\."));
+                    } else {
+                        nestedPaths.set(existingIdx, null);
+                    }
+                }
                 return this;
+            }
 
             entityFields.add(entityField);
             dtoFields.add(dtoField);
@@ -373,7 +387,7 @@ public final class FieldSchema {
                 }
 
                 // Check if already added
-                int idx = findEntityFieldDuplicateIndex(dependency, true);
+                int idx = findEntityFieldDuplicateIndex(dependency);
 
                 // Define slot
                 if (idx == -1) {
@@ -393,6 +407,8 @@ public final class FieldSchema {
                     // 'entityFields' have the same length.
                     // Doing that allows us to simplify subsequent processing.
                     dtoFields.add(PREFIX_FOR_COMPUTED + dtoField + idx);
+                    // Keep nestedPaths synchronized with other lists
+                    nestedPaths.add(null);
                 }
 
                 DependencyInfo[] dependencyInfos = computedFieldIndexMap.computeIfAbsent(dtoField,
@@ -406,15 +422,13 @@ public final class FieldSchema {
             entityFields.add(PREFIX_FOR_COMPUTED);
             dtoFields.add(dtoField);
             internal.add(false); // computed output is visible to user
+            nestedPaths.add(null); // Keep nestedPaths synchronized
 
             return this;
         }
 
-        private int findEntityFieldDuplicateIndex(String entityField, boolean isInternal) {
+        private int findEntityFieldDuplicateIndex(String entityField) {
             for (int i = 0; i < entityFields.size(); i++) {
-                if (!isInternal && internal.get(i)) {
-                    internal.set(i, false);
-                }
                 if (entityFields.get(i).equals(entityField))
                     return i;
             }

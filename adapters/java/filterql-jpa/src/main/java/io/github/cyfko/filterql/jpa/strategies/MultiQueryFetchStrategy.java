@@ -221,7 +221,6 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
     protected List<RowBuffer> step4_transform(ExecutionContext ctx, Map<Object, RowBuffer> rootResults) {
         Map<String, Function<Object[], Object>> computeMethods = new HashMap<>(10);
         Map<String, Map<Object, Number>> reducedValues = new HashMap<>();
-        boolean reducersAggregateDone = false;
 
         AggregateQueryExecutor aggregateQueryExecutor = new AggregateQueryExecutor(ctx.em(), rootEntityClass,
                 PersistenceRegistry.getIdFields(rootEntityClass));
@@ -241,7 +240,8 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
                     if (info.reducer() != null) {
                         String collectionPath = schema.entityField(info.index())
                                 .substring(PREFIX_FOR_COMPUTED.length());
-                        if (!reducersAggregateDone) {
+                        // Execute aggregate query only once per collection path (for all rows)
+                        if (!reducedValues.containsKey(collectionPath)) {
                             var reduced = aggregateQueryExecutor.executeAggregateQuery(
                                     collectionPath,
                                     info.reducer(),
@@ -256,7 +256,6 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
                         params[i] = row.get(info.index());
                     }
                 }
-                reducersAggregateDone = true;
 
                 try {
                     if (!computeMethods.containsKey(dtoField)) {
