@@ -18,8 +18,23 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Large-scale benchmark test to stress test performance with 1000+ entities.
- * Compares V1 (original) vs V2 (optimized) strategies.
+ * Large-scale benchmark test to stress test MultiQueryFetchStrategy V2 performance with 1000+ entities.
+ * Tests include:
+ * - Performance benchmarks on large datasets
+ * - Multi-level nested collections (3 levels deep)
+ * - Data correctness verification
+ * - Computed fields with aggregations
+ *
+ * <h2>Data Structure</h2>
+ * <pre>
+ * 100 Companies
+ *   └── 3 Departments each (300 total)
+ *         └── 4 Teams each (1200 total)
+ *               └── 5 Employees each (6000 total)
+ * </pre>
+ *
+ * @author Frank KOSSI
+ * @since 2.0.0
  */
 @DisplayName("Large Scale Performance Benchmark (1000+ entities)")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -119,178 +134,560 @@ class LargeScaleBenchmarkTest {
         }
     }
 
-    @Test
-    @Order(1)
-    @DisplayName("Large Scale: Scalars Only (100 companies)")
-    void benchmarkScalarsOnly() {
-        System.out.println("\n┌──────────────────────────────────────────────────────────────┐");
-        System.out.println("│  LARGE SCALE: SCALARS ONLY (100 companies)                   │");
-        System.out.println("└──────────────────────────────────────────────────────────────┘");
+    // ==================== Performance Benchmarks ====================
 
-        Set<String> projection = Set.of("id", "name", "country", "foundedYear");
+    @Nested
+    @DisplayName("Performance Benchmarks")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class PerformanceBenchmarks {
 
-        runBenchmark(projection, "Scalars Only (100 companies)");
+        @Test
+        @Order(1)
+        @DisplayName("Large Scale: Scalars Only (100 companies)")
+        void benchmarkScalarsOnly() {
+            System.out.println("\n┌──────────────────────────────────────────────────────────────┐");
+            System.out.println("│  LARGE SCALE: SCALARS ONLY (100 companies)                   │");
+            System.out.println("└──────────────────────────────────────────────────────────────┘");
+
+            Set<String> projection = Set.of("id", "name", "country", "foundedYear");
+
+            BenchmarkResult result = runBenchmark(projection, "Scalars Only (100 companies)");
+
+            assertEquals(NUM_COMPANIES, result.results.size(),
+                    "Should return exactly " + NUM_COMPANIES + " companies");
+        }
+
+        @Test
+        @Order(2)
+        @DisplayName("Large Scale: 1-Level Collection (300 departments)")
+        void benchmark1LevelCollection() {
+            System.out.println("\n┌──────────────────────────────────────────────────────────────┐");
+            System.out.println("│  LARGE SCALE: 1-LEVEL COLLECTION (300 departments)           │");
+            System.out.println("└──────────────────────────────────────────────────────────────┘");
+
+            Set<String> projection = Set.of(
+                    "id", "name",
+                    "departments.id", "departments.name", "departments.budget");
+
+            BenchmarkResult result = runBenchmark(projection, "1-Level Collection");
+
+            assertEquals(NUM_COMPANIES, result.results.size(),
+                    "Should return exactly " + NUM_COMPANIES + " companies");
+        }
+
+        @Test
+        @Order(3)
+        @DisplayName("Large Scale: 2-Level Collections (1200 teams)")
+        void benchmark2LevelCollections() {
+            System.out.println("\n┌──────────────────────────────────────────────────────────────┐");
+            System.out.println("│  LARGE SCALE: 2-LEVEL COLLECTIONS (1200 teams)               │");
+            System.out.println("└──────────────────────────────────────────────────────────────┘");
+
+            Set<String> projection = Set.of(
+                    "id", "name",
+                    "departments.id", "departments.name",
+                    "departments.teams.id", "departments.teams.name");
+
+            BenchmarkResult result = runBenchmark(projection, "2-Level Collections");
+
+            assertEquals(NUM_COMPANIES, result.results.size(),
+                    "Should return exactly " + NUM_COMPANIES + " companies");
+        }
+
+        @Test
+        @Order(4)
+        @DisplayName("Large Scale: Full 3-Level (6000 employees)")
+        void benchmark3LevelCollections() {
+            System.out.println("\n┌──────────────────────────────────────────────────────────────┐");
+            System.out.println("│  LARGE SCALE: FULL 3-LEVEL (6000 employees)                  │");
+            System.out.println("└──────────────────────────────────────────────────────────────┘");
+
+            Set<String> projection = Set.of(
+                    "id", "name",
+                    "departments.id", "departments.name",
+                    "departments.teams.id", "departments.teams.name",
+                    "departments.teams.employees.id", "departments.teams.employees.name");
+
+            BenchmarkResult result = runBenchmark(projection, "Full 3-Level");
+
+            assertEquals(NUM_COMPANIES, result.results.size(),
+                    "Should return exactly " + NUM_COMPANIES + " companies");
+        }
+
+        @Test
+        @Order(5)
+        @DisplayName("Large Scale: With Computed Fields")
+        void benchmarkWithComputed() {
+            System.out.println("\n┌──────────────────────────────────────────────────────────────┐");
+            System.out.println("│  LARGE SCALE: WITH COMPUTED FIELDS                           │");
+            System.out.println("└──────────────────────────────────────────────────────────────┘");
+
+            Set<String> projection = Set.of(
+                    "id", "name",
+                    "departments.id", "departments.name",
+                    "employeeSummary", "totalBudgetInfo");
+
+            runBenchmarkWithComputed(projection, "With Computed Fields");
+        }
     }
 
-    @Test
-    @Order(2)
-    @DisplayName("Large Scale: 1-Level Collection (300 departments)")
-    void benchmark1LevelCollection() {
-        System.out.println("\n┌──────────────────────────────────────────────────────────────┐");
-        System.out.println("│  LARGE SCALE: 1-LEVEL COLLECTION (300 departments)           │");
-        System.out.println("└──────────────────────────────────────────────────────────────┘");
+    // ==================== Data Correctness Tests ====================
 
-        Set<String> projection = Set.of(
-                "id", "name",
-                "departments.id", "departments.name", "departments.budget");
+    @Nested
+    @DisplayName("Data Correctness Tests")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class CorrectnessTests {
 
-        runBenchmark(projection, "1-Level Collection");
+        @Test
+        @Order(10)
+        @DisplayName("Should return exact scalar field values")
+        void shouldReturnExactScalarValues() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
+                        .filter("f", CompanyProperty.NAME, "LIKE", "Company%")
+                        .combineWith("f")
+                        .projection(Set.of("id", "name", "country", "foundedYear"))
+                        .pagination(0, 10)
+                        .build();
+
+                InstanceResolver resolver = InstanceResolver.noBean();
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
+
+                List<RowBuffer> results = FilterQueryFactory.of(filterContext).execute(request, em, strategy);
+
+                assertEquals(10, results.size(), "Should return 10 companies");
+
+                for (RowBuffer row : results) {
+                    String name = row.get("name").toString();
+                    int companyIndex = Integer.parseInt(name.substring(8)); // "Company-X"
+
+                    // Verify exact values match insertion logic
+                    assertEquals("Company-" + companyIndex, name, "Name should match");
+                    assertEquals(companyIndex % 2 == 0 ? "USA" : "France", row.get("country").toString(),
+                            "Country should match for company " + companyIndex);
+                    assertEquals(2000 + (companyIndex % 25), row.get("foundedYear"),
+                            "Founded year should match for company " + companyIndex);
+                }
+            }
+        }
+
+        @Test
+        @Order(11)
+        @DisplayName("Should return correct number of departments per company")
+        void shouldReturnCorrectDepartmentsPerCompany() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
+                        .filter("f", CompanyProperty.NAME, "LIKE", "Company%")
+                        .combineWith("f")
+                        .projection(Set.of("name", "departments.id", "departments.name"))
+                        .pagination(0, 20)
+                        .build();
+
+                InstanceResolver resolver = InstanceResolver.noBean();
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
+
+                List<RowBuffer> results = FilterQueryFactory.of(filterContext).execute(request, em, strategy);
+
+                assertEquals(20, results.size(), "Should return 20 companies");
+
+                for (RowBuffer row : results) {
+                    String name = row.get("name").toString();
+
+                    @SuppressWarnings("unchecked")
+                    List<RowBuffer> departments = (List<RowBuffer>) row.get("departments");
+
+                    assertNotNull(departments, "Departments should not be null for company: " + name);
+                    assertEquals(DEPTS_PER_COMPANY, departments.size(),
+                            "Company should have exactly " + DEPTS_PER_COMPANY + " departments: " + name);
+                }
+            }
+        }
+
+        @Test
+        @Order(12)
+        @DisplayName("Should return exact department values")
+        void shouldReturnExactDepartmentValues() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
+                        .filter("f", CompanyProperty.NAME, "LIKE", "Company%")
+                        .combineWith("f")
+                        .projection(Set.of("name", "departments.name", "departments.budget"))
+                        .pagination(0, 5)
+                        .build();
+
+                InstanceResolver resolver = InstanceResolver.noBean();
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
+
+                List<RowBuffer> results = FilterQueryFactory.of(filterContext).execute(request, em, strategy);
+
+                assertEquals(5, results.size(), "Should return 5 companies");
+
+                for (RowBuffer row : results) {
+                    String companyName = row.get("name").toString();
+                    int companyIndex = Integer.parseInt(companyName.substring(8));
+
+                    @SuppressWarnings("unchecked")
+                    List<RowBuffer> departments = (List<RowBuffer>) row.get("departments");
+
+                    for (int d = 0; d < departments.size(); d++) {
+                        RowBuffer dept = departments.get(d);
+                        String deptName = dept.get("name").toString();
+                        Long budget = (Long) dept.get("budget");
+
+                        // Verify exact values
+                        String expectedDeptName = "Dept-" + companyIndex + "-" + d;
+                        long expectedBudget = 100000L + d * 10000;
+
+                        assertEquals(expectedDeptName, deptName,
+                                "Department name should match for company " + companyIndex);
+                        assertEquals(expectedBudget, budget,
+                                "Budget should match for " + expectedDeptName);
+                    }
+                }
+            }
+        }
+
+        @Test
+        @Order(13)
+        @DisplayName("Should return correct number of teams per department")
+        void shouldReturnCorrectTeamsPerDepartment() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
+                        .filter("f", CompanyProperty.NAME, "LIKE", "Company%")
+                        .combineWith("f")
+                        .projection(Set.of("name", "departments.name", "departments.teams.id"))
+                        .pagination(0, 10)
+                        .build();
+
+                InstanceResolver resolver = InstanceResolver.noBean();
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
+
+                List<RowBuffer> results = FilterQueryFactory.of(filterContext).execute(request, em, strategy);
+
+                assertEquals(10, results.size(), "Should return 10 companies");
+
+                for (RowBuffer row : results) {
+                    @SuppressWarnings("unchecked")
+                    List<RowBuffer> departments = (List<RowBuffer>) row.get("departments");
+
+                    for (RowBuffer dept : departments) {
+                        @SuppressWarnings("unchecked")
+                        List<RowBuffer> teams = (List<RowBuffer>) dept.get("teams");
+
+                        assertNotNull(teams, "Teams should not be null");
+                        assertEquals(TEAMS_PER_DEPT, teams.size(),
+                                "Department should have exactly " + TEAMS_PER_DEPT + " teams");
+                    }
+                }
+            }
+        }
+
+        @Test
+        @Order(14)
+        @DisplayName("Should return exact team values")
+        void shouldReturnExactTeamValues() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
+                        .filter("f", CompanyProperty.NAME, "LIKE", "Company%")
+                        .combineWith("f")
+                        .projection(Set.of("name", "departments.name", "departments.teams.name",
+                                "departments.teams.specialty"))
+                        .pagination(0, 3)
+                        .build();
+
+                InstanceResolver resolver = InstanceResolver.noBean();
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
+
+                List<RowBuffer> results = FilterQueryFactory.of(filterContext).execute(request, em, strategy);
+
+                assertEquals(3, results.size(), "Should return 3 companies");
+
+                for (RowBuffer row : results) {
+                    String companyName = row.get("name").toString();
+                    int companyIndex = Integer.parseInt(companyName.substring(8));
+
+                    @SuppressWarnings("unchecked")
+                    List<RowBuffer> departments = (List<RowBuffer>) row.get("departments");
+
+                    for (int d = 0; d < departments.size(); d++) {
+                        @SuppressWarnings("unchecked")
+                        List<RowBuffer> teams = (List<RowBuffer>) departments.get(d).get("teams");
+
+                        for (int t = 0; t < teams.size(); t++) {
+                            RowBuffer team = teams.get(t);
+                            String teamName = team.get("name").toString();
+                            String specialty = team.get("specialty").toString();
+
+                            // Verify exact values
+                            String expectedTeamName = "Team-" + companyIndex + "-" + d + "-" + t;
+                            String expectedSpecialty = t % 2 == 0 ? "Backend" : "Frontend";
+
+                            assertEquals(expectedTeamName, teamName, "Team name should match");
+                            assertEquals(expectedSpecialty, specialty,
+                                    "Specialty should match for " + expectedTeamName);
+                        }
+                    }
+                }
+            }
+        }
+
+        @Test
+        @Order(15)
+        @DisplayName("Should return correct number of employees per team")
+        void shouldReturnCorrectEmployeesPerTeam() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
+                        .filter("f", CompanyProperty.NAME, "LIKE", "Company%")
+                        .combineWith("f")
+                        .projection(Set.of("name",
+                                "departments.teams.name",
+                                "departments.teams.employees.id"))
+                        .pagination(0, 5)
+                        .build();
+
+                InstanceResolver resolver = InstanceResolver.noBean();
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
+
+                List<RowBuffer> results = FilterQueryFactory.of(filterContext).execute(request, em, strategy);
+
+                assertEquals(5, results.size(), "Should return 5 companies");
+
+                for (RowBuffer row : results) {
+                    @SuppressWarnings("unchecked")
+                    List<RowBuffer> departments = (List<RowBuffer>) row.get("departments");
+
+                    for (RowBuffer dept : departments) {
+                        @SuppressWarnings("unchecked")
+                        List<RowBuffer> teams = (List<RowBuffer>) dept.get("teams");
+
+                        for (RowBuffer team : teams) {
+                            @SuppressWarnings("unchecked")
+                            List<RowBuffer> employees = (List<RowBuffer>) team.get("employees");
+
+                            assertNotNull(employees, "Employees should not be null");
+                            assertEquals(EMPLOYEES_PER_TEAM, employees.size(),
+                                    "Team should have exactly " + EMPLOYEES_PER_TEAM + " employees");
+                        }
+                    }
+                }
+            }
+        }
+
+        @Test
+        @Order(16)
+        @DisplayName("Should return exact employee values (3-level deep)")
+        void shouldReturnExactEmployeeValues() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
+                        .filter("f", CompanyProperty.NAME, "LIKE", "Company%")
+                        .combineWith("f")
+                        .projection(Set.of("name",
+                                "departments.teams.employees.name",
+                                "departments.teams.employees.level",
+                                "departments.teams.employees.salary",
+                                "departments.teams.employees.yearsExperience"))
+                        .pagination(0, 2)
+                        .build();
+
+                InstanceResolver resolver = InstanceResolver.noBean();
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
+
+                List<RowBuffer> results = FilterQueryFactory.of(filterContext).execute(request, em, strategy);
+
+                assertEquals(2, results.size(), "Should return 2 companies");
+
+                for (RowBuffer row : results) {
+                    String companyName = row.get("name").toString();
+                    int companyIndex = Integer.parseInt(companyName.substring(8));
+
+                    @SuppressWarnings("unchecked")
+                    List<RowBuffer> departments = (List<RowBuffer>) row.get("departments");
+
+                    for (int d = 0; d < departments.size(); d++) {
+                        @SuppressWarnings("unchecked")
+                        List<RowBuffer> teams = (List<RowBuffer>) departments.get(d).get("teams");
+
+                        for (int t = 0; t < teams.size(); t++) {
+                            @SuppressWarnings("unchecked")
+                            List<RowBuffer> employees = (List<RowBuffer>) teams.get(t).get("employees");
+
+                            for (int e = 0; e < employees.size(); e++) {
+                                RowBuffer emp = employees.get(e);
+
+                                String empName = emp.get("name").toString();
+                                String level = emp.get("level").toString();
+                                BigDecimal salary = (BigDecimal) emp.get("salary");
+                                Integer yearsExp = (Integer) emp.get("yearsExperience");
+
+                                // Verify exact values
+                                String expectedName = "Employee-" + companyIndex + "-" + d + "-" + t + "-" + e;
+                                String expectedLevel = e % 3 == 0 ? "Senior" : (e % 3 == 1 ? "Mid" : "Junior");
+                                BigDecimal expectedSalary = BigDecimal.valueOf(50000 + e * 5000);
+                                int expectedYearsExp = e + 1;
+
+                                assertEquals(expectedName, empName, "Employee name should match");
+                                assertEquals(expectedLevel, level, "Level should match for " + expectedName);
+                                assertEquals(expectedSalary, salary, "Salary should match for " + expectedName);
+                                assertEquals(expectedYearsExp, yearsExp,
+                                        "Years experience should match for " + expectedName);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        @Test
+        @Order(17)
+        @DisplayName("Should maintain data integrity with pagination")
+        void shouldMaintainDataIntegrityWithPagination() {
+            try (EntityManager em = emf.createEntityManager()) {
+                // Get companies 50-54
+                FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
+                        .filter("f", CompanyProperty.NAME, "LIKE", "Company%")
+                        .combineWith("f")
+                        .projection("name", "country", "foundedYear", "departments.name")
+                        .pagination(10, 5)
+                        .build();
+
+                InstanceResolver resolver = InstanceResolver.noBean();
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
+
+                List<RowBuffer> results = FilterQueryFactory.of(filterContext).execute(request, em, strategy);
+
+                assertEquals(5, results.size(), "Should return 5 companies");
+
+                for (int i = 0; i < results.size(); i++) {
+                    RowBuffer row = results.get(i);
+                    int expectedCompanyIndex = 50 + i;
+
+                    // Verify scalar fields
+                    assertEquals("Company-" + expectedCompanyIndex, row.get("name").toString());
+                    assertEquals(expectedCompanyIndex % 2 == 0 ? "USA" : "France", row.get("country").toString());
+                    assertEquals(2000 + (expectedCompanyIndex % 25), row.get("foundedYear"));
+
+                    // Verify collection
+                    @SuppressWarnings("unchecked")
+                    List<RowBuffer> departments = (List<RowBuffer>) row.get("departments");
+                    assertEquals(DEPTS_PER_COMPANY, departments.size());
+                }
+            }
+        }
+
+        @Test
+        @Order(18)
+        @DisplayName("Should verify computed fields contain valid data")
+        void shouldVerifyComputedFieldsContainValidData() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
+                        .filter("f", CompanyProperty.NAME, "MATCHES", "Company%")
+                        .combineWith("f")
+                        .projection(Set.of("name", "employeeSummary", "totalBudgetInfo"))
+                        .pagination(0, 5)
+                        .build();
+
+                InstanceResolver resolver = InstanceResolver.noBean();
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
+
+                List<RowBuffer> results = FilterQueryFactory.of(filterContext).execute(request, em, strategy);
+
+                assertEquals(5, results.size(), "Should return 5 companies");
+
+                for (RowBuffer row : results) {
+                    String companyName = row.get("name").toString();
+
+                    // Verify computed fields are present
+                    assertTrue(row.contains("employeeSummary"),
+                            "Should have employeeSummary computed field for " + companyName);
+                    assertTrue(row.contains("totalBudgetInfo"),
+                            "Should have totalBudgetInfo computed field for " + companyName);
+
+                    // Verify computed fields are not null
+                    assertNotNull(row.get("employeeSummary"),
+                            "employeeSummary should not be null for " + companyName);
+                    assertNotNull(row.get("totalBudgetInfo"),
+                            "totalBudgetInfo should not be null for " + companyName);
+
+                    System.out.printf("   %s: employeeSummary=%s, totalBudgetInfo=%s%n",
+                            companyName, row.get("employeeSummary"), row.get("totalBudgetInfo"));
+                }
+            }
+        }
     }
 
-    @Test
-    @Order(3)
-    @DisplayName("Large Scale: 2-Level Collections (1200 teams)")
-    void benchmark2LevelCollections() {
-        System.out.println("\n┌──────────────────────────────────────────────────────────────┐");
-        System.out.println("│  LARGE SCALE: 2-LEVEL COLLECTIONS (1200 teams)               │");
-        System.out.println("└──────────────────────────────────────────────────────────────┘");
+    // ==================== Benchmark Utilities ====================
 
-        Set<String> projection = Set.of(
-                "id", "name",
-                "departments.id", "departments.name",
-                "departments.teams.id", "departments.teams.name");
-
-        runBenchmark(projection, "2-Level Collections");
-    }
-
-    @Test
-    @Order(4)
-    @DisplayName("Large Scale: Full 3-Level (6000 employees)")
-    void benchmark3LevelCollections() {
-        System.out.println("\n┌──────────────────────────────────────────────────────────────┐");
-        System.out.println("│  LARGE SCALE: FULL 3-LEVEL (6000 employees)                  │");
-        System.out.println("└──────────────────────────────────────────────────────────────┘");
-
-        Set<String> projection = Set.of(
-                "id", "name",
-                "departments.id", "departments.name",
-                "departments.teams.id", "departments.teams.name",
-                "departments.teams.employees.id", "departments.teams.employees.name");
-
-        runBenchmark(projection, "Full 3-Level");
-    }
-
-    @Test
-    @Order(5)
-    @DisplayName("Large Scale: With Computed Fields")
-    // @Disabled("Computed fields test needs fix for dtoField null issue")
-    void benchmarkWithComputed() {
-        System.out.println("\n┌──────────────────────────────────────────────────────────────┐");
-        System.out.println("│  LARGE SCALE: WITH COMPUTED FIELDS                           │");
-        System.out.println("└──────────────────────────────────────────────────────────────┘");
-
-        Set<String> projection = Set.of(
-                "id", "name",
-                "departments.id", "departments.name",
-                "employeeSummary", "totalBudgetInfo");
-
-        runBenchmarkWithComputed(projection, "With Computed Fields");
-    }
-
-    private void runBenchmark(Set<String> projection, String testName) {
+    private BenchmarkResult runBenchmark(Set<String> projection, String testName) {
         try (EntityManager em = emf.createEntityManager()) {
             FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
                     .filter("f", CompanyProperty.NAME, "LIKE", "Company%")
                     .combineWith("f")
                     .projection(projection)
-                    .pagination(0, NUM_COMPANIES) // Explicit pagination to get all companies
+                    .pagination(0, NUM_COMPANIES)
                     .build();
 
-            // Need InstanceResolver for CompanyDto with computed fields
             InstanceResolver resolver = InstanceResolver.noBean();
-            MultiQueryFetchStrategyOld strategyV1 = new MultiQueryFetchStrategyOld(CompanyDto.class, resolver);
-            MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
+            MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
 
             // Warmup
             for (int i = 0; i < WARMUP_ITERATIONS; i++) {
-                FilterQueryFactory.of(filterContext).execute(request, em, strategyV2);
-                FilterQueryFactory.of(filterContext).execute(request, em, strategyV1);
+                FilterQueryFactory.of(filterContext).execute(request, em, strategy);
             }
 
-            // Benchmark V1
-            long[] v1Times = new long[BENCHMARK_ITERATIONS];
-            List<Map<String, Object>> v1Result = null;
+            // Benchmark
+            long[] times = new long[BENCHMARK_ITERATIONS];
+            List<RowBuffer> results = null;
+
             for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
                 long start = System.nanoTime();
-                v1Result = FilterQueryFactory.of(filterContext).execute(request, em, strategyV1);
-                v1Times[i] = System.nanoTime() - start;
+                results = FilterQueryFactory.of(filterContext).execute(request, em, strategy);
+                times[i] = System.nanoTime() - start;
             }
 
-            // Benchmark V2
-            long[] v2Times = new long[BENCHMARK_ITERATIONS];
-            List<RowBuffer> v2Result = null;
-            for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
-                long start = System.nanoTime();
-                v2Result = FilterQueryFactory.of(filterContext).execute(request, em, strategyV2);
-                v2Times[i] = System.nanoTime() - start;
-            }
+            printResults(testName, times, results.size());
 
-            printResults(testName, v1Times, v2Times, v1Result.size(), v2Result.size());
-
-            // V2 should return exactly NUM_COMPANIES (100) since all companies match
-            // "Company%"
-            assertEquals(NUM_COMPANIES, v2Result.size(),
-                    "V2 should return exactly " + NUM_COMPANIES + " companies");
-
-            // Note: V1 may have a bug with collection projections causing fewer results
-            if (v1Result.size() != v2Result.size()) {
-                System.out.println("⚠️ WARNING: V1 returned " + v1Result.size() +
-                        " results, V2 returned " + v2Result.size() +
-                        " (V1 may have a collection projection bug)");
-            }
+            return new BenchmarkResult(results, Arrays.stream(times).average().orElse(0));
         }
     }
 
-    /**
-     * Benchmark with computed fields - V2 only (V1 doesn't support reducers on deep
-     * paths).
-     */
     private void runBenchmarkWithComputed(Set<String> projection, String testName) {
         try (EntityManager em = emf.createEntityManager()) {
             FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
                     .filter("f", CompanyProperty.NAME, "MATCHES", "Company%")
                     .combineWith("f")
                     .projection(projection)
+                    .pagination(0, NUM_COMPANIES)
                     .build();
 
             InstanceResolver resolver = InstanceResolver.noBean();
-            MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
+            MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
 
             // Warmup
             for (int i = 0; i < WARMUP_ITERATIONS; i++) {
-                FilterQueryFactory.of(filterContext).execute(request, em, strategyV2);
+                FilterQueryFactory.of(filterContext).execute(request, em, strategy);
             }
 
-            // Benchmark V2 only (reducers are a V2-only feature)
-            long[] v2Times = new long[BENCHMARK_ITERATIONS];
-            List<RowBuffer> v2Result = null;
+            // Benchmark
+            long[] times = new long[BENCHMARK_ITERATIONS];
+            List<RowBuffer> results = null;
+
             for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
                 long start = System.nanoTime();
-                v2Result = FilterQueryFactory.of(filterContext).execute(request, em, strategyV2);
-                v2Times[i] = System.nanoTime() - start;
+                results = FilterQueryFactory.of(filterContext).execute(request, em, strategy);
+                times[i] = System.nanoTime() - start;
             }
 
-            // Print V2 results
-            double v2Avg = Arrays.stream(v2Times).average().orElse(0) / 1_000_000.0;
-            double v2Min = Arrays.stream(v2Times).min().orElse(0) / 1_000_000.0;
-            double v2Max = Arrays.stream(v2Times).max().orElse(0) / 1_000_000.0;
+            // Print results
+            double avg = Arrays.stream(times).average().orElse(0) / 1_000_000.0;
+            double min = Arrays.stream(times).min().orElse(0) / 1_000_000.0;
+            double max = Arrays.stream(times).max().orElse(0) / 1_000_000.0;
 
-            System.out.printf("   V2 with aggregates: avg=%8.2fms, min=%8.2fms, max=%8.2fms%n", v2Avg, v2Min, v2Max);
-            System.out.printf("   Results: %d companies with computed fields%n", v2Result.size());
+            System.out.printf("   Results with aggregates: avg=%8.2fms, min=%8.2fms, max=%8.2fms%n", avg, min, max);
+            System.out.printf("   Results: %d companies with computed fields%n", results.size());
 
             // Verify computed fields are present and contain values
-            assertFalse(v2Result.isEmpty(), "Should have results");
-            RowBuffer first = v2Result.getFirst();
+            assertFalse(results.isEmpty(), "Should have results");
+            RowBuffer first = results.getFirst();
             assertTrue(first.contains("employeeSummary"), "Should have employeeSummary computed field");
             assertTrue(first.contains("totalBudgetInfo"), "Should have totalBudgetInfo computed field");
 
@@ -300,23 +697,17 @@ class LargeScaleBenchmarkTest {
         }
     }
 
-    private void printResults(String testName, long[] v1Times, long[] v2Times, int v1Count, int v2Count) {
-        double v1Avg = Arrays.stream(v1Times).average().orElse(0) / 1_000_000.0;
-        double v2Avg = Arrays.stream(v2Times).average().orElse(0) / 1_000_000.0;
-        double v1Min = Arrays.stream(v1Times).min().orElse(0) / 1_000_000.0;
-        double v2Min = Arrays.stream(v2Times).min().orElse(0) / 1_000_000.0;
-        double v1Max = Arrays.stream(v1Times).max().orElse(0) / 1_000_000.0;
-        double v2Max = Arrays.stream(v2Times).max().orElse(0) / 1_000_000.0;
+    private void printResults(String testName, long[] times, int resultCount) {
+        double avg = Arrays.stream(times).average().orElse(0) / 1_000_000.0;
+        double min = Arrays.stream(times).min().orElse(0) / 1_000_000.0;
+        double max = Arrays.stream(times).max().orElse(0) / 1_000_000.0;
 
-        double speedup = v1Avg / v2Avg;
-        String status = speedup >= 1.0 ? "✓ FASTER" : "✗ SLOWER";
+        System.out.printf("   Results stats: avg=%8.2fms, min=%8.2fms, max=%8.2fms%n", avg, min, max);
+        System.out.printf("   Results: %d rows%n", resultCount);
+    }
 
-        System.out.printf("   V1 (original):  avg=%8.2fms, min=%8.2fms, max=%8.2fms%n", v1Avg, v1Min, v1Max);
-        System.out.printf("   V2 (optimized): avg=%8.2fms, min=%8.2fms, max=%8.2fms%n", v2Avg, v2Min, v2Max);
-        System.out.printf("   Speedup: %.2fx %s%n", speedup, status);
-        System.out.printf("   Results: V1=%d rows, V2=%d rows%n", v1Count, v2Count);
-        System.out.printf("   Time saved per query: %.2fms%n", v1Avg - v2Avg);
-
-        assertTrue(speedup >= 0.9, "V2 should not be significantly slower than V1");
+    private record BenchmarkResult(
+            List<RowBuffer> results,
+            double avgNanos) {
     }
 }

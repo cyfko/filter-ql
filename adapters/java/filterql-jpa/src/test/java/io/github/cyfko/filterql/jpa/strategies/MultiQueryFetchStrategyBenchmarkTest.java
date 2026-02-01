@@ -18,29 +18,28 @@ import jakarta.persistence.Persistence;
 import org.junit.jupiter.api.*;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Benchmark test comparing MultiQueryFetchStrategy V1 vs V2 performance.
+ * Benchmark test MultiQueryFetchStrategy performance.
  * <p>
- * This test measures execution time and verifies result correctness between
- * the original implementation and the optimized V2 implementation.
+ * This test measures execution time and verifies result correctness of
+ * the optimized V2 implementation.
  * </p>
- * 
+ *
  * <h2>Metrics Measured</h2>
  * <ul>
  * <li>Execution time (ms)</li>
- * <li>Result correctness (identical outputs)</li>
+ * <li>Result correctness</li>
  * <li>Warmup iterations to eliminate JIT effects</li>
  * </ul>
  *
  * @author Frank KOSSI
  * @since 2.0.0
  */
-@DisplayName("MultiQueryFetchStrategy V1 vs V2 Benchmark")
+@DisplayName("MultiQueryFetchStrategy Benchmark")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class MultiQueryFetchStrategyBenchmarkTest {
 
@@ -145,7 +144,7 @@ class MultiQueryFetchStrategyBenchmarkTest {
 
         @Test
         @Order(1)
-        @DisplayName("Warmup: Execute both strategies to trigger JIT compilation")
+        @DisplayName("Warmup: Execute strategy to trigger JIT compilation")
         void warmup() {
             try (EntityManager em = emf.createEntityManager()) {
                 FilterRequest<BenchmarkUserProperty> request = FilterRequest.<BenchmarkUserProperty>builder()
@@ -155,16 +154,14 @@ class MultiQueryFetchStrategyBenchmarkTest {
                         .pagination(0, 50)
                         .build();
 
-                MultiQueryFetchStrategyOld strategyV1 = new MultiQueryFetchStrategyOld(UserB.class);
-                MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(UserB.class);
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserB.class);
 
                 // Warmup iterations
                 for (int i = 0; i < WARMUP_ITERATIONS; i++) {
-                    FilterQueryFactory.of(context).execute(request, em, strategyV1);
-                    FilterQueryFactory.of(context).execute(request, em, strategyV2);
+                    FilterQueryFactory.of(context).execute(request, em, strategy);
                 }
 
-                System.out.println("✅ Warmup complete (" + WARMUP_ITERATIONS + " iterations each)");
+                System.out.println("✅ Warmup complete (" + WARMUP_ITERATIONS + " iterations)");
             }
         }
 
@@ -183,10 +180,7 @@ class MultiQueryFetchStrategyBenchmarkTest {
                 BenchmarkResult result = runBenchmark(em, request, "Scalar projection (3 fields)");
 
                 // Assertions
-                assertTrue(result.v2SpeedupFactor >= 0.5,
-                        "V2 should not be significantly slower than V1. Speedup: " + result.v2SpeedupFactor);
-                assertEquals(result.v1Results.size(), result.v2Results.size(),
-                        "Result counts should match");
+                assertEquals(50, result.results.size(), "Should return 50 active users");
             }
         }
 
@@ -203,8 +197,7 @@ class MultiQueryFetchStrategyBenchmarkTest {
                 BenchmarkResult result = runBenchmark(em, request, "Nested path projection");
 
                 // Assertions
-                assertTrue(result.v2SpeedupFactor >= 0.5, "V2 should not be significantly slower");
-                assertEquals(result.v1Results.size(), result.v2Results.size());
+                assertEquals(50, result.results.size(), "Should return first 50 users");
             }
         }
 
@@ -220,56 +213,38 @@ class MultiQueryFetchStrategyBenchmarkTest {
 
                 BenchmarkResult result = runBenchmark(em, request, "Large result set (" + DATA_SIZE + " rows)");
 
-                assertEquals(result.v1Results.size(), result.v2Results.size());
+                assertEquals(DATA_SIZE, result.results.size(), "Should return all " + DATA_SIZE + " users");
             }
         }
 
         private BenchmarkResult runBenchmark(EntityManager em, FilterRequest<BenchmarkUserProperty> request,
-                String testName) {
-            MultiQueryFetchStrategyOld strategyV1 = new MultiQueryFetchStrategyOld(UserB.class);
-            MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(UserB.class);
+                                             String testName) {
+            MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserB.class);
 
-            long[] v1Times = new long[BENCHMARK_ITERATIONS];
-            long[] v2Times = new long[BENCHMARK_ITERATIONS];
-
-            List<Map<String, Object>> v1Results = null;
-            List<RowBuffer> v2Results = null;
+            long[] times = new long[BENCHMARK_ITERATIONS];
+            List<RowBuffer> results = null;
 
             // Run benchmark iterations
             for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
-                // V1
-                long startV1 = System.nanoTime();
-                v1Results = FilterQueryFactory.of(context).execute(request, em, strategyV1);
-                v1Times[i] = System.nanoTime() - startV1;
-
-                // V2
-                long startV2 = System.nanoTime();
-                v2Results = FilterQueryFactory.of(context).execute(request, em, strategyV2);
-                v2Times[i] = System.nanoTime() - startV2;
+                long start = System.nanoTime();
+                results = FilterQueryFactory.of(context).execute(request, em, strategy);
+                times[i] = System.nanoTime() - start;
             }
 
             // Calculate statistics
-            long v1Avg = average(v1Times);
-            long v2Avg = average(v2Times);
-            long v1Min = min(v1Times);
-            long v2Min = min(v2Times);
-            double speedup = (double) v1Avg / v2Avg;
+            long avgTime = average(times);
+            long minTime = min(times);
 
             // Print results
             System.out.println();
             System.out.println("═══════════════════════════════════════════════════════════════");
             System.out.println("📊 BENCHMARK: " + testName);
             System.out.println("───────────────────────────────────────────────────────────────");
-            System.out.printf("   V1 (original):  avg=%6.2fms, min=%6.2fms%n", v1Avg / 1_000_000.0,
-                    v1Min / 1_000_000.0);
-            System.out.printf("   V2 (optimized): avg=%6.2fms, min=%6.2fms%n", v2Avg / 1_000_000.0,
-                    v2Min / 1_000_000.0);
-            System.out.printf("   Speedup: %.2fx %s%n", speedup,
-                    speedup > 1 ? "✅ FASTER" : (speedup < 0.9 ? "⚠️ SLOWER" : "≈ SAME"));
-            System.out.printf("   Results: V1=%d rows, V2=%d rows%n", v1Results.size(), v2Results.size());
+            System.out.printf("   Speed: avg=%6.2fms, min=%6.2fms%n", avgTime / 1_000_000.0, minTime / 1_000_000.0);
+            System.out.printf("   Results: %d rows%n", results.size());
             System.out.println("═══════════════════════════════════════════════════════════════");
 
-            return new BenchmarkResult(v1Results, v2Results, v1Avg, v2Avg, speedup);
+            return new BenchmarkResult(results, avgTime);
         }
 
         private long average(long[] times) {
@@ -288,11 +263,8 @@ class MultiQueryFetchStrategyBenchmarkTest {
         }
 
         private record BenchmarkResult(
-                List<Map<String, Object>> v1Results,
-                List<RowBuffer> v2Results,
-                long v1AvgNanos,
-                long v2AvgNanos,
-                double v2SpeedupFactor) {
+                List<RowBuffer> results,
+                long avgNanos) {
         }
     }
 
@@ -302,8 +274,8 @@ class MultiQueryFetchStrategyBenchmarkTest {
 
         @Test
         @Order(10)
-        @DisplayName("V1 and V2 should return identical scalar results")
-        void shouldReturnIdenticalScalarResults() {
+        @DisplayName("Should return valid scalar results")
+        void shouldReturnValidScalarResults() {
             try (EntityManager em = emf.createEntityManager()) {
                 FilterRequest<BenchmarkUserProperty> request = FilterRequest.<BenchmarkUserProperty>builder()
                         .filter("activeArg", BenchmarkUserProperty.ACTIVE, "EQ", true)
@@ -312,68 +284,221 @@ class MultiQueryFetchStrategyBenchmarkTest {
                         .pagination(0, 10)
                         .build();
 
-                MultiQueryFetchStrategyOld strategyV1 = new MultiQueryFetchStrategyOld(UserB.class);
-                MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(UserB.class);
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserB.class);
 
-                List<Map<String, Object>> v1Results = FilterQueryFactory.of(context).execute(request, em, strategyV1);
-                List<RowBuffer> v2Results = FilterQueryFactory.of(context).execute(request, em, strategyV2);
+                List<RowBuffer> results = FilterQueryFactory.of(context).execute(request, em, strategy);
 
-                // Size check
-                assertEquals(v1Results.size(), v2Results.size(), "Result count should match");
+                // Verify results
+                assertEquals(10, results.size(), "Should return 10 results");
 
-                // Content check
-                for (int i = 0; i < v1Results.size(); i++) {
-                    Map<String, Object> v1Row = v1Results.get(i);
-                    RowBuffer v2Row = v2Results.get(i);
+                for (int i = 0; i < results.size(); i++) {
+                    RowBuffer row = results.get(i);
 
-                    assertEquals(v1Row.get("name"), v2Row.get("name"), "Name should match at index " + i);
-                    assertEquals(v1Row.get("email"), v2Row.get("email"), "Email should match at index " + i);
+                    assertNotNull(row.get("name"), "Name should not be null at index " + i);
+                    assertNotNull(row.get("email"), "Email should not be null at index " + i);
+                    assertTrue(row.get("email").toString().contains("@example.com"),
+                            "Email should have correct format at index " + i);
                 }
-
-                System.out.println("✅ Correctness verified: " + v1Results.size() + " rows match");
             }
         }
 
         @Test
         @Order(11)
-        @DisplayName("V1 and V2 should return identical nested path results")
-        void shouldReturnIdenticalNestedResults() {
+        @DisplayName("Should return valid nested path results")
+        void shouldReturnValidNestedResults() {
             try (EntityManager em = emf.createEntityManager()) {
                 FilterRequest<BenchmarkUserProperty> request = FilterRequest.<BenchmarkUserProperty>builder()
                         .projection("name", "address.city.name")
                         .pagination(0, 10)
                         .build();
 
-                MultiQueryFetchStrategyOld strategyV1 = new MultiQueryFetchStrategyOld(UserB.class);
-                MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(UserB.class);
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserB.class);
 
-                List<Map<String, Object>> v1Results = FilterQueryFactory.of(context).execute(request, em, strategyV1);
-                List<RowBuffer> v2Results = FilterQueryFactory.of(context).execute(request, em, strategyV2);
+                List<RowBuffer> results = FilterQueryFactory.of(context).execute(request, em, strategy);
 
-                assertEquals(v1Results.size(), v2Results.size());
+                assertEquals(10, results.size(), "Should return 10 results");
 
-                for (int i = 0; i < v1Results.size(); i++) {
-                    Map<String, Object> v1Row = v1Results.get(i);
-                    RowBuffer v2Row = v2Results.get(i);
+                for (int i = 0; i < results.size(); i++) {
+                    RowBuffer row = results.get(i);
 
-                    assertEquals(v1Row.get("name"), v2Row.get("name"));
+                    assertNotNull(row.get("name"), "Name should not be null at index " + i);
 
                     // Check nested structure
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> v1Address = (Map<String, Object>) v1Row.get("address");
-                    NestedView v2Address = (NestedView) v2Row.get("address");
+                    NestedView address = (NestedView) row.get("address");
+                    assertNotNull(address, "Address should not be null at index " + i);
 
-                    assertNotNull(v1Address, "V1 should have address");
-                    assertNotNull(v2Address, "V2 should have address");
-
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> v1City = (Map<String, Object>) v1Address.get("city");
-                    NestedView v2City = (NestedView) v2Address.get("city");
-
-                    assertEquals(v1City.get("name"), v2City.get("name"), "City name should match");
+                    NestedView city = (NestedView) address.get("city");
+                    assertNotNull(city, "City should not be null at index " + i);
+                    assertNotNull(city.get("name"), "City name should not be null at index " + i);
                 }
+            }
+        }
 
-                System.out.println("✅ Nested structure correctness verified: " + v1Results.size() + " rows match");
+        @Test
+        @Order(12)
+        @DisplayName("Should return exact field values matching inserted data")
+        void shouldReturnExactFieldValues() {
+            try (EntityManager em = emf.createEntityManager()) {
+                // Test specific users with known IDs
+                FilterRequest<BenchmarkUserProperty> request = FilterRequest.<BenchmarkUserProperty>builder()
+                        .projection("name", "email", "phone", "active")
+                        .pagination(0, 5)
+                        .build();
+
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserB.class);
+
+                List<RowBuffer> results = FilterQueryFactory.of(context).execute(request, em, strategy);
+
+                assertEquals(5, results.size(), "Should return 5 results");
+
+                for (int i = 0; i < results.size(); i++) {
+                    RowBuffer row = results.get(i);
+
+                    String name = row.get("name").toString();
+                    String email = row.get("email").toString();
+                    String phone = row.get("phone").toString();
+                    Boolean active = (Boolean) row.get("active");
+
+                    // Extract user index from name (format: "User X")
+                    int userIndex = Integer.parseInt(name.substring(5));
+
+                    // Verify exact values match insertion logic
+                    assertEquals("User " + userIndex, name, "Name should match");
+                    assertEquals("user" + userIndex + "@example.com", email, "Email should match");
+                    assertEquals("+1-555-" + String.format("%04d", userIndex), phone, "Phone should match");
+                    assertEquals(userIndex % 2 == 0, active, "Active status should match");
+                }
+            }
+        }
+
+        @Test
+        @Order(13)
+        @DisplayName("Should return exact nested values matching inserted data")
+        void shouldReturnExactNestedValues() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<BenchmarkUserProperty> request = FilterRequest.<BenchmarkUserProperty>builder()
+                        .projection("name", "address.city.name", "address.city.zipCode")
+                        .pagination(0, 20)
+                        .build();
+
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserB.class);
+
+                List<RowBuffer> results = FilterQueryFactory.of(context).execute(request, em, strategy);
+
+                assertEquals(20, results.size(), "Should return 20 results");
+
+                // Expected cities in order (cyclic pattern)
+                String[][] expectedCities = {
+                        {"Paris", "75001"},
+                        {"Lyon", "69001"},
+                        {"Marseille", "13001"},
+                        {"Bordeaux", "33000"},
+                        {"Lille", "59000"}
+                };
+
+                for (int i = 0; i < results.size(); i++) {
+                    RowBuffer row = results.get(i);
+
+                    String name = row.get("name").toString();
+                    int userIndex = Integer.parseInt(name.substring(5));
+
+                    // Get nested city data
+                    NestedView address = (NestedView) row.get("address");
+                    assertNotNull(address, "Address should exist for user " + userIndex);
+
+                    NestedView city = (NestedView) address.get("city");
+                    assertNotNull(city, "City should exist for user " + userIndex);
+
+                    String cityName = city.get("name").toString();
+                    String zipCode = city.get("zipCode").toString();
+
+                    // Verify city matches insertion pattern (userIndex % 5)
+                    int cityIndex = userIndex % 5;
+                    assertEquals(expectedCities[cityIndex][0], cityName,
+                            "City name should match for user " + userIndex);
+                    assertEquals(expectedCities[cityIndex][1], zipCode,
+                            "Zip code should match for user " + userIndex);
+                }
+            }
+        }
+
+        @Test
+        @Order(14)
+        @DisplayName("Should correctly filter active users and return exact values")
+        void shouldFilterActiveUsersWithExactValues() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<BenchmarkUserProperty> request = FilterRequest.<BenchmarkUserProperty>builder()
+                        .filter("activeArg", BenchmarkUserProperty.ACTIVE, "EQ", true)
+                        .combineWith("and")
+                        .projection("name", "email", "active")
+                        .pagination(0, 10)
+                        .build();
+
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserB.class);
+
+                List<RowBuffer> results = FilterQueryFactory.of(context).execute(request, em, strategy);
+
+                assertEquals(10, results.size(), "Should return 10 active users");
+
+                for (RowBuffer row : results) {
+                    String name = row.get("name").toString();
+                    int userIndex = Integer.parseInt(name.substring(5));
+
+                    // All returned users must be active
+                    Boolean active = (Boolean) row.get("active");
+                    assertTrue(active, "User " + userIndex + " should be active");
+
+                    // Verify user index is even (as per insertion logic: i % 2 == 0 -> active)
+                    assertEquals(0, userIndex % 2,
+                            "Active users should have even indices, but got " + userIndex);
+                }
+            }
+        }
+
+        @Test
+        @Order(15)
+        @DisplayName("Should return all fields with complete data integrity")
+        void shouldReturnCompleteDataIntegrity() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<BenchmarkUserProperty> request = FilterRequest.<BenchmarkUserProperty>builder()
+                        .projection("name", "email", "phone", "active", "address.city.name", "address.city.zipCode")
+                        .pagination(1, 10) // Get users 10-19
+                        .build();
+
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserB.class);
+
+                List<RowBuffer> results = FilterQueryFactory.of(context).execute(request, em, strategy);
+
+                assertEquals(10, results.size(), "Should return 10 results");
+
+                String[][] expectedCities = {
+                        {"Paris", "75001"},
+                        {"Lyon", "69001"},
+                        {"Marseille", "13001"},
+                        {"Bordeaux", "33000"},
+                        {"Lille", "59000"}
+                };
+
+                for (int i = 0; i < results.size(); i++) {
+                    RowBuffer row = results.get(i);
+                    int expectedUserIndex = 10 + i;
+
+                    // Verify all scalar fields
+                    assertEquals("User " + expectedUserIndex, row.get("name").toString());
+                    assertEquals("user" + expectedUserIndex + "@example.com", row.get("email").toString());
+                    assertEquals("+1-555-" + String.format("%04d", expectedUserIndex), row.get("phone").toString());
+                    assertEquals(expectedUserIndex % 2 == 0, row.get("active"));
+
+                    // Verify nested fields
+                    NestedView address = (NestedView) row.get("address");
+                    NestedView city = (NestedView) address.get("city");
+
+                    int cityIndex = expectedUserIndex % 5;
+                    assertEquals(expectedCities[cityIndex][0], city.get("name").toString(),
+                            "City name should match for user " + expectedUserIndex);
+                    assertEquals(expectedCities[cityIndex][1], city.get("zipCode").toString(),
+                            "Zip code should match for user " + expectedUserIndex);
+                }
             }
         }
     }

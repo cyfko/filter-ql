@@ -124,7 +124,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
 
         // Apply pagination
         int offset = params.hasPagination() ? params.pagination().offset() : 0;
-        int limit = params.hasPagination() ? params.pagination().size() : 50;
+        int limit = params.hasPagination() ? params.pagination().size() : Integer.MAX_VALUE;
 
         List<Tuple> tuples = ctx.em().createQuery(ctx.query())
                 .setFirstResult(offset)

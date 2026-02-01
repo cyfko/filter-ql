@@ -114,20 +114,6 @@ public final class FieldSchema {
         return new Builder();
     }
 
-    /**
-     * Creates a FieldSchema from scalar field mappings.
-     *
-     * @param mappings list of entity-to-DTO field mappings
-     * @return constructed FieldSchema
-     */
-    public static FieldSchema fromMappings(List<MultiQueryExecutionPlan.ScalarFieldMapping> mappings) {
-        Builder builder = builder();
-        for (MultiQueryExecutionPlan.ScalarFieldMapping mapping : mappings) {
-            builder.addField(mapping.entityField(), mapping.dtoField(), mapping.isInternal());
-        }
-        return builder.build();
-    }
-
     // ==================== Field Access ====================
 
     /**

@@ -184,22 +184,11 @@ class UltimateNestedBenchmarkTest {
                     .build();
 
             InstanceResolver resolver = InstanceResolver.noBean();
-            MultiQueryFetchStrategyOld strategyV1 = new MultiQueryFetchStrategyOld(CompanyDto.class, resolver);
             MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
 
             // Warmup
             for (int i = 0; i < WARMUP_ITERATIONS; i++) {
                 FilterQueryFactory.of(filterContext).execute(request, em, strategyV2);
-                FilterQueryFactory.of(filterContext).execute(request, em, strategyV1);
-            }
-
-            // Benchmark V1
-            long[] v1Times = new long[BENCHMARK_ITERATIONS];
-            List<Map<String, Object>> v1Result = null;
-            for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
-                long start = System.nanoTime();
-                v1Result = FilterQueryFactory.of(filterContext).execute(request, em, strategyV1);
-                v1Times[i] = System.nanoTime() - start;
             }
 
             // Benchmark V2
@@ -211,7 +200,7 @@ class UltimateNestedBenchmarkTest {
                 v2Times[i] = System.nanoTime() - start;
             }
 
-            printResults(testName, v1Times, v2Times, v1Result.size(), v2Result.size());
+            printResults(testName, v2Times, v2Result.size());
 
             // Verify computed fields exist
             if (!v2Result.isEmpty()) {
@@ -233,22 +222,11 @@ class UltimateNestedBenchmarkTest {
 
             // CompanyDto has computed fields, so we need an InstanceResolver
             InstanceResolver resolver = InstanceResolver.noBean();
-            MultiQueryFetchStrategyOld strategyV1 = new MultiQueryFetchStrategyOld(CompanyDto.class, resolver);
             MultiQueryFetchStrategy strategyV2 = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
 
             // Warmup
             for (int i = 0; i < WARMUP_ITERATIONS; i++) {
                 FilterQueryFactory.of(filterContext).execute(request, em, strategyV2);
-                FilterQueryFactory.of(filterContext).execute(request, em, strategyV1);
-            }
-
-            // Benchmark V1
-            long[] v1Times = new long[BENCHMARK_ITERATIONS];
-            List<Map<String, Object>> v1Result = null;
-            for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
-                long start = System.nanoTime();
-                v1Result = FilterQueryFactory.of(filterContext).execute(request, em, strategyV1);
-                v1Times[i] = System.nanoTime() - start;
             }
 
             // Benchmark V2
@@ -260,36 +238,20 @@ class UltimateNestedBenchmarkTest {
                 v2Times[i] = System.nanoTime() - start;
             }
 
-            printResults(testName, v1Times, v2Times, v1Result.size(), v2Result.size());
+            printResults(testName, v2Times, v2Result.size());
 
             // V2 should return exactly NUM_COMPANIES (10) since all companies match
             // "Company%"
             assertEquals(NUM_COMPANIES, v2Result.size(),
                     "V2 should return exactly " + NUM_COMPANIES + " companies");
-
-            // Note: V1 may have a bug with collection projections causing fewer results
-            if (v1Result.size() != v2Result.size()) {
-                System.out.println("⚠️ WARNING: V1 returned " + v1Result.size() +
-                        " results, V2 returned " + v2Result.size() +
-                        " (V1 may have a collection projection bug)");
-            }
         }
     }
 
-    private void printResults(String testName, long[] v1Times, long[] v2Times, int v1Count, int v2Count) {
-        double v1Avg = Arrays.stream(v1Times).average().orElse(0) / 1_000_000.0;
+    private void printResults(String testName, long[] v2Times, int v2Count) {
         double v2Avg = Arrays.stream(v2Times).average().orElse(0) / 1_000_000.0;
-        double v1Min = Arrays.stream(v1Times).min().orElse(0) / 1_000_000.0;
         double v2Min = Arrays.stream(v2Times).min().orElse(0) / 1_000_000.0;
 
-        double speedup = v1Avg / v2Avg;
-        String status = speedup >= 1.0 ? "✓ FASTER" : "✗ SLOWER";
-
-        System.out.printf("   V1 (original):  avg=%6.2fms, min=%6.2fms%n", v1Avg, v1Min);
-        System.out.printf("   V2 (optimized): avg=%6.2fms, min=%6.2fms%n", v2Avg, v2Min);
-        System.out.printf("   Speedup: %.2fx %s%n", speedup, status);
-        System.out.printf("   Results: V1=%d rows, V2=%d rows%n", v1Count, v2Count);
-
-        assertTrue(speedup >= 0.9, "V2 should not be significantly slower than V1");
+        System.out.printf("   Speed: avg=%6.2fms, min=%6.2fms%n", v2Avg, v2Min);
+        System.out.printf("   Results: V2=%d rows%n", v2Count);
     }
 }

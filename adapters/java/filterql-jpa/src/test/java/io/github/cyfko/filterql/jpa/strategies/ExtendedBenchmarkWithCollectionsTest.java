@@ -17,19 +17,19 @@ import jakarta.persistence.Persistence;
 import org.junit.jupiter.api.*;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Extended benchmark test comparing V1 vs V2 with:
+ * Extended benchmark test for MultiQueryFetchStrategy V2:
  * - Large data volumes (500+ users, 2500+ orders, 5000+ items)
  * - Collection projections (User → Orders → Items)
  * - Nested collection traversal
- * 
+ * - Data correctness verification
+ *
  * <h2>Test Data Structure</h2>
- * 
+ *
  * <pre>
  * 500 Users
  *   └── 5 Orders each (2500 total)
@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Frank KOSSI
  * @since 2.0.0
  */
-@DisplayName("Extended V1 vs V2 Benchmark (Collections + Large Volume)")
+@DisplayName("Extended Benchmark (Collections + Large Volume)")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ExtendedBenchmarkWithCollectionsTest {
 
@@ -156,12 +156,10 @@ class ExtendedBenchmarkWithCollectionsTest {
                     .pagination(0, 10)
                     .build();
 
-            MultiQueryFetchStrategyOld v1 = new MultiQueryFetchStrategyOld(UserD.class);
-            MultiQueryFetchStrategy v2 = new MultiQueryFetchStrategy(UserD.class);
+            MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserD.class);
 
             for (int i = 0; i < WARMUP_ITERATIONS; i++) {
-                FilterQueryFactory.of(context).execute(request, em, v1);
-                FilterQueryFactory.of(context).execute(request, em, v2);
+                FilterQueryFactory.of(context).execute(request, em, strategy);
             }
             System.out.println("✅ Warmup complete");
         }
@@ -205,8 +203,9 @@ class ExtendedBenchmarkWithCollectionsTest {
                 BenchmarkResult result = executeBenchmark(em, request, UserD.class,
                         "Scalar: " + label);
 
-                assertEquals(result.v1Results.size(), result.v2Results.size());
-                assertTrue(result.v1Results.size() <= limit);
+                int expectedCount = Math.min(limit, USER_COUNT);
+                assertEquals(expectedCount, result.results.size(),
+                        "Should return " + expectedCount + " users");
             }
         }
     }
@@ -239,9 +238,6 @@ class ExtendedBenchmarkWithCollectionsTest {
             runCollectionBenchmark(100, false, "100 users + orders");
         }
 
-        /**
-         * V2 supports multi-level nested collections (orders.items).
-         */
         @Test
         @Order(23)
         @DisplayName("50 users with nested orders.items")
@@ -263,88 +259,267 @@ class ExtendedBenchmarkWithCollectionsTest {
 
                 FilterRequest<UserProperty> request = builder.build();
 
-                // Use UserD entity class (not DtoUserD which has computed fields requiring
-                // resolver)
                 BenchmarkResult result = executeBenchmark(em, request, UserD.class,
                         "Collection: " + label);
 
-                // V2 should return exactly 'limit' users (the expected count based on
-                // pagination)
                 int expectedCount = Math.min(limit, USER_COUNT);
-                assertEquals(expectedCount, result.v2Results.size(),
-                        "V2 should return exactly " + expectedCount + " users based on pagination");
+                assertEquals(expectedCount, result.results.size(),
+                        "Should return exactly " + expectedCount + " users based on pagination");
 
-                // Note: V1 may have a bug with collection projections causing fewer results
-                // We still compare V1 vs V2 for debugging purposes
-                if (result.v1Results.size() != result.v2Results.size()) {
-                    System.out.println("⚠️ WARNING: V1 returned " + result.v1Results.size() +
-                            " results, V2 returned " + result.v2Results.size() +
-                            " (V1 may have a collection projection bug)");
-                }
-
-                // Verify collection data present in V2 results
-                if (!result.v2Results.isEmpty()) {
+                // Verify collection data present in results
+                if (!result.results.isEmpty()) {
                     @SuppressWarnings("unchecked")
-                    List<RowBuffer> orders = (List<RowBuffer>) result.v2Results.getFirst().get("orders");
-                    assertNotNull(orders, "Orders collection should be present in V2");
+                    List<RowBuffer> orders = (List<RowBuffer>) result.results.getFirst().get("orders");
+                    assertNotNull(orders, "Orders collection should be present");
                 }
             }
         }
     }
 
-    // ==================== Memory Stress Test ====================
+    // ==================== Data Correctness Tests ====================
 
     @Nested
-    @DisplayName("Memory Stress Tests")
-    class MemoryStressTests {
+    @DisplayName("Data Correctness Tests")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class CorrectnessTests {
 
         @Test
-        @Order(30)
-        @DisplayName("Large result set memory comparison")
-        void memoryStressTest() {
+        @Order(40)
+        @DisplayName("Should return exact scalar field values")
+        void shouldReturnExactScalarValues() {
             try (EntityManager em = emf.createEntityManager()) {
                 FilterRequest<UserProperty> request = FilterRequest.<UserProperty>builder()
                         .projection("name", "email")
-                        .pagination(0, USER_COUNT)
+                        .pagination(0, 10)
                         .build();
 
-                MultiQueryFetchStrategyOld v1 = new MultiQueryFetchStrategyOld(UserD.class);
-                MultiQueryFetchStrategy v2 = new MultiQueryFetchStrategy(UserD.class);
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserD.class);
+                List<RowBuffer> results = FilterQueryFactory.of(context).execute(request, em, strategy);
 
-                // Force GC before measurement
-                System.gc();
-                Thread.sleep(100);
+                assertEquals(10, results.size(), "Should return 10 users");
 
-                long memBefore = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-                List<Map<String, Object>> v1Results = FilterQueryFactory.of(context).execute(request, em, v1);
-                long memAfterV1 = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+                for (int i = 0; i < results.size(); i++) {
+                    RowBuffer row = results.get(i);
+                    String name = row.get("name").toString();
+                    String email = row.get("email").toString();
 
-                v1Results = null; // Allow GC
-                System.gc();
-                Thread.sleep(100);
+                    // Extract user index from name
+                    int userIndex = Integer.parseInt(name.substring(5));
 
-                long memBeforeV2 = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-                List<RowBuffer> v2Results = FilterQueryFactory.of(context).execute(request, em, v2);
-                long memAfterV2 = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-
-                long v1MemUsed = memAfterV1 - memBefore;
-                long v2MemUsed = memAfterV2 - memBeforeV2;
-
-                System.out.println();
-                System.out.println("═══════════════════════════════════════════════════════════════");
-                System.out.println("📊 MEMORY STRESS TEST (" + USER_COUNT + " rows)");
-                System.out.println("───────────────────────────────────────────────────────────────");
-                System.out.printf("   V1 memory delta: %,d bytes%n", v1MemUsed);
-                System.out.printf("   V2 memory delta: %,d bytes%n", v2MemUsed);
-                if (v2MemUsed > 0 && v1MemUsed > 0) {
-                    System.out.printf("   Ratio: V1 uses %.1fx more memory%n", (double) v1MemUsed / v2MemUsed);
+                    // Verify exact values match insertion logic
+                    assertEquals("User " + userIndex, name, "Name should match");
+                    assertEquals("user" + userIndex + "@benchmark.com", email, "Email should match");
                 }
-                System.out.println("═══════════════════════════════════════════════════════════════");
+            }
+        }
 
-                assertNotNull(v2Results);
+        @Test
+        @Order(41)
+        @DisplayName("Should return correct number of orders per user")
+        void shouldReturnCorrectOrdersPerUser() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<UserProperty> request = FilterRequest.<UserProperty>builder()
+                        .projection("name", "orders.orderNumber")
+                        .pagination(0, 20)
+                        .build();
 
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserD.class);
+                List<RowBuffer> results = FilterQueryFactory.of(context).execute(request, em, strategy);
+
+                assertEquals(20, results.size(), "Should return 20 users");
+
+                for (int i = 0; i < results.size(); i++) {
+                    RowBuffer row = results.get(i);
+                    String name = row.get("name").toString();
+
+                    @SuppressWarnings("unchecked")
+                    List<RowBuffer> orders = (List<RowBuffer>) row.get("orders");
+
+                    assertNotNull(orders, "Orders should not be null for user: " + name);
+                    assertEquals(ORDERS_PER_USER, orders.size(),
+                            "User should have exactly " + ORDERS_PER_USER + " orders: " + name);
+                }
+            }
+        }
+
+        @Test
+        @Order(42)
+        @DisplayName("Should return exact order numbers")
+        void shouldReturnExactOrderNumbers() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<UserProperty> request = FilterRequest.<UserProperty>builder()
+                        .projection("name", "orders.orderNumber")
+                        .pagination(0, 5)
+                        .build();
+
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserD.class);
+                List<RowBuffer> results = FilterQueryFactory.of(context).execute(request, em, strategy);
+
+                assertEquals(5, results.size(), "Should return 5 users");
+
+                for (RowBuffer row : results) {
+                    String name = row.get("name").toString();
+                    int userIndex = Integer.parseInt(name.substring(5));
+
+                    @SuppressWarnings("unchecked")
+                    List<RowBuffer> orders = (List<RowBuffer>) row.get("orders");
+
+                    for (int o = 0; o < orders.size(); o++) {
+                        String orderNumber = orders.get(o).get("orderNumber").toString();
+                        String expectedOrderNumber = "ORD-" + userIndex + "-" + o;
+
+                        assertEquals(expectedOrderNumber, orderNumber,
+                                "Order number should match for user " + userIndex + ", order " + o);
+                    }
+                }
+            }
+        }
+
+        @Test
+        @Order(43)
+        @DisplayName("Should return correct number of items per order")
+        void shouldReturnCorrectItemsPerOrder() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<UserProperty> request = FilterRequest.<UserProperty>builder()
+                        .projection("name", "orders.orderNumber", "orders.items.productName")
+                        .pagination(0, 10)
+                        .build();
+
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserD.class);
+                List<RowBuffer> results = FilterQueryFactory.of(context).execute(request, em, strategy);
+
+                assertEquals(10, results.size(), "Should return 10 users");
+
+                for (RowBuffer row : results) {
+                    String name = row.get("name").toString();
+
+                    @SuppressWarnings("unchecked")
+                    List<RowBuffer> orders = (List<RowBuffer>) row.get("orders");
+
+                    assertNotNull(orders, "Orders should not be null for user: " + name);
+
+                    for (int o = 0; o < orders.size(); o++) {
+                        @SuppressWarnings("unchecked")
+                        List<RowBuffer> items = (List<RowBuffer>) orders.get(o).get("items");
+
+                        assertNotNull(items, "Items should not be null for order " + o);
+                        assertEquals(ITEMS_PER_ORDER, items.size(),
+                                "Order should have exactly " + ITEMS_PER_ORDER + " items");
+                    }
+                }
+            }
+        }
+
+        @Test
+        @Order(44)
+        @DisplayName("Should return exact nested item values")
+        void shouldReturnExactNestedItemValues() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<UserProperty> request = FilterRequest.<UserProperty>builder()
+                        .projection("name", "orders.orderNumber", "orders.items.productName", "orders.items.quantity")
+                        .pagination(0, 3)
+                        .build();
+
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserD.class);
+                List<RowBuffer> results = FilterQueryFactory.of(context).execute(request, em, strategy);
+
+                assertEquals(3, results.size(), "Should return 3 users");
+
+                for (RowBuffer row : results) {
+                    String name = row.get("name").toString();
+                    int userIndex = Integer.parseInt(name.substring(5));
+
+                    @SuppressWarnings("unchecked")
+                    List<RowBuffer> orders = (List<RowBuffer>) row.get("orders");
+
+                    for (int o = 0; o < orders.size(); o++) {
+                        @SuppressWarnings("unchecked")
+                        List<RowBuffer> items = (List<RowBuffer>) orders.get(o).get("items");
+
+                        for (int i = 0; i < items.size(); i++) {
+                            RowBuffer item = items.get(i);
+
+                            String productName = item.get("productName").toString();
+                            Integer quantity = (Integer) item.get("quantity");
+
+                            // Verify exact values match insertion logic
+                            String expectedProductName = "Product " + userIndex + "-" + o + "-" + i;
+                            int expectedQuantity = (i + 1) * 10;
+
+                            assertEquals(expectedProductName, productName,
+                                    "Product name should match for user " + userIndex + ", order " + o + ", item " + i);
+                            assertEquals(expectedQuantity, quantity,
+                                    "Quantity should match for user " + userIndex + ", order " + o + ", item " + i);
+                        }
+                    }
+                }
+            }
+        }
+
+        @Test
+        @Order(45)
+        @DisplayName("Should maintain data integrity across pagination")
+        void shouldMaintainDataIntegrityAcrossPagination() {
+            try (EntityManager em = emf.createEntityManager()) {
+                // Get users 100-104
+                FilterRequest<UserProperty> request = FilterRequest.<UserProperty>builder()
+                        .projection("name", "email", "orders.orderNumber")
+                        .pagination(99, 5)
+                        .build();
+
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserD.class);
+                List<RowBuffer> results = FilterQueryFactory.of(context).execute(request, em, strategy);
+
+                assertEquals(5, results.size(), "Should return 5 users");
+
+                for (int i = 0; i < results.size(); i++) {
+                    RowBuffer row = results.get(i);
+                    int expectedUserIndex = 495 + i;
+
+                    // Verify scalar fields
+                    assertEquals("User " + expectedUserIndex, row.get("name").toString());
+                    assertEquals("user" + expectedUserIndex + "@benchmark.com", row.get("email").toString());
+
+                    // Verify collection size
+                    @SuppressWarnings("unchecked")
+                    List<RowBuffer> orders = (List<RowBuffer>) row.get("orders");
+                    assertEquals(ORDERS_PER_USER, orders.size());
+
+                    // Verify first order number
+                    String firstOrderNumber = orders.get(0).get("orderNumber").toString();
+                    assertEquals("ORD-" + expectedUserIndex + "-0", firstOrderNumber);
+                }
+            }
+        }
+
+        @Test
+        @Order(46)
+        @DisplayName("Should handle large result sets with complete accuracy")
+        void shouldHandleLargeResultSetsAccurately() {
+            try (EntityManager em = emf.createEntityManager()) {
+                FilterRequest<UserProperty> request = FilterRequest.<UserProperty>builder()
+                        .projection("name", "email")
+                        .pagination(0, 100)
+                        .build();
+
+                MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserD.class);
+                List<RowBuffer> results = FilterQueryFactory.of(context).execute(request, em, strategy);
+
+                assertEquals(100, results.size(), "Should return 100 users");
+
+                // Verify random samples for accuracy
+                int[] samplesToCheck = {0, 25, 50, 75, 99};
+
+                for (int idx : samplesToCheck) {
+                    RowBuffer row = results.get(idx);
+                    String name = row.get("name").toString();
+                    String email = row.get("email").toString();
+
+                    int userIndex = Integer.parseInt(name.substring(5));
+
+                    assertEquals("User " + userIndex, name);
+                    assertEquals("user" + userIndex + "@benchmark.com", email);
+                }
             }
         }
     }
@@ -352,45 +527,30 @@ class ExtendedBenchmarkWithCollectionsTest {
     // ==================== Benchmark Utilities ====================
 
     private BenchmarkResult executeBenchmark(EntityManager em, FilterRequest<UserProperty> request,
-            Class<?> projectionClass, String label) {
-        MultiQueryFetchStrategyOld v1 = new MultiQueryFetchStrategyOld(projectionClass);
-        MultiQueryFetchStrategy v2 = new MultiQueryFetchStrategy(projectionClass);
+                                             Class<?> projectionClass, String label) {
+        MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(projectionClass);
 
-        long[] v1Times = new long[BENCHMARK_ITERATIONS];
-        long[] v2Times = new long[BENCHMARK_ITERATIONS];
-
-        List<Map<String, Object>> v1Results = null;
-        List<RowBuffer> v2Results = null;
+        long[] times = new long[BENCHMARK_ITERATIONS];
+        List<RowBuffer> results = null;
 
         for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
             long start = System.nanoTime();
-            v1Results = FilterQueryFactory.of(context).execute(request, em, v1);
-            v1Times[i] = System.nanoTime() - start;
-
-            start = System.nanoTime();
-            v2Results = FilterQueryFactory.of(context).execute(request, em, v2);
-            v2Times[i] = System.nanoTime() - start;
+            results = FilterQueryFactory.of(context).execute(request, em, strategy);
+            times[i] = System.nanoTime() - start;
         }
 
-        long v1Avg = average(v1Times);
-        long v2Avg = average(v2Times);
-        long v1Min = min(v1Times);
-        long v2Min = min(v2Times);
-        double speedup = (double) v1Avg / v2Avg;
-
-        String speedupIcon = speedup > 1.1 ? "✅ FASTER" : (speedup < 0.9 ? "⚠️ SLOWER" : "≈ SAME");
+        long avgTime = average(times);
+        long minTime = min(times);
 
         System.out.println();
         System.out.println("═══════════════════════════════════════════════════════════════");
         System.out.println("📊 BENCHMARK: " + label);
         System.out.println("───────────────────────────────────────────────────────────────");
-        System.out.printf("   V1 (original):  avg=%6.2fms, min=%6.2fms%n", v1Avg / 1_000_000.0, v1Min / 1_000_000.0);
-        System.out.printf("   V2 (optimized): avg=%6.2fms, min=%6.2fms%n", v2Avg / 1_000_000.0, v2Min / 1_000_000.0);
-        System.out.printf("   Speedup: %.2fx %s%n", speedup, speedupIcon);
-        System.out.printf("   Results: %d rows%n", v1Results != null ? v1Results.size() : 0);
+        System.out.printf("   Speed: avg=%6.2fms, min=%6.2fms%n", avgTime / 1_000_000.0, minTime / 1_000_000.0);
+        System.out.printf("   Results: %d rows%n", results.size());
         System.out.println("═══════════════════════════════════════════════════════════════");
 
-        return new BenchmarkResult(v1Results, v2Results, v1Avg, v2Avg, speedup);
+        return new BenchmarkResult(results, avgTime);
     }
 
     private long average(long[] times) {
@@ -409,10 +569,7 @@ class ExtendedBenchmarkWithCollectionsTest {
     }
 
     private record BenchmarkResult(
-            List<Map<String, Object>> v1Results,
-            List<RowBuffer> v2Results,
-            long v1AvgNanos,
-            long v2AvgNanos,
-            double speedup) {
+            List<RowBuffer> results,
+            long avgNanos) {
     }
 }

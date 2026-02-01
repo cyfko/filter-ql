@@ -69,6 +69,7 @@ public final class RowBuffer {
         return values[index];
     }
 
+
     /**
      * Gets the value for the given DTO field name (scalar, collection, or nested
      * prefix).
@@ -85,20 +86,6 @@ public final class RowBuffer {
      * @throws IllegalArgumentException if field/prefix not found in schema
      */
     public Object get(String dtoField) {
-        return getOrNested(dtoField);
-    }
-
-    /**
-     * Handles scalar, collection, and prefix access.
-     * <p>
-     * Used internally by {@link #get(String)} and by {@link NestedView}.
-     * </p>
-     *
-     * @param dtoField DTO field name or prefix
-     * @return value, collection, or NestedView
-     * @throws IllegalArgumentException if field/prefix not found
-     */
-    public Object getOrNested(String dtoField) {
         // 1. Try exact match (scalar field)
         Indexer indexer = schema.indexOfDto(dtoField);
         if (indexer != Indexer.NONE) {
@@ -238,23 +225,6 @@ public final class RowBuffer {
         if (values[slot] == null) {
             values[slot] = new ArrayList<RowBuffer>();
         }
-    }
-
-    /**
-     * Adds a child RowBuffer to the collection at the given index.
-     *
-     * @param collectionIndex collection index (0-based)
-     * @param child           child RowBuffer to add
-     */
-    @SuppressWarnings("unchecked")
-    public void addToCollection(int collectionIndex, RowBuffer child) {
-        int slot = schema.collectionSlot(collectionIndex);
-        List<RowBuffer> list = (List<RowBuffer>) values[slot];
-        if (list == null) {
-            list = new ArrayList<>();
-            values[slot] = list;
-        }
-        list.add(child);
     }
 
     // ==================== Conversion ====================

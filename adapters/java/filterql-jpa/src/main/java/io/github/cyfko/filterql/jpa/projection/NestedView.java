@@ -57,7 +57,7 @@ public final class NestedView {
      */
     public Object get(String field) {
         String fullPath = prefix + "." + field;
-        return source.getOrNested(fullPath);
+        return source.get(fullPath);
     }
 
     /**
