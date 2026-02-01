@@ -89,8 +89,7 @@ public final class RowBuffer {
         // 1. Try exact match (scalar field)
         Indexer indexer = schema.indexOfDto(dtoField);
         if (indexer != Indexer.NONE) {
-            int idx = indexer.isCollection() ? schema.collectionSlot(indexer.index()) : indexer.index();
-            return values[idx];
+            return values[indexer.index()];
         }
 
         // 2. Try as prefix for nested access
@@ -118,8 +117,8 @@ public final class RowBuffer {
         }
 
         // Check collection names
-        for (int c = 0; c < schema.collectionCount(); c++) {
-            if (schema.collectionName(c).startsWith(prefixDot)) {
+        for (int c : schema.collectionIndexes()) {
+            if (schema.dtoField(c).startsWith(prefixDot)) {
                 return true;
             }
         }
@@ -138,8 +137,7 @@ public final class RowBuffer {
         if (indexer == Indexer.NONE) {
             return null;
         }
-        int idx = indexer.isCollection() ? schema.collectionSlot(indexer.index()) : indexer.index();
-        return values[idx];
+        return values[indexer.index()];
     }
 
     /**
@@ -200,8 +198,7 @@ public final class RowBuffer {
      */
     @SuppressWarnings("unchecked")
     public List<RowBuffer> getCollection(int collectionIndex) {
-        int slot = schema.collectionSlot(collectionIndex);
-        return (List<RowBuffer>) values[slot];
+        return (List<RowBuffer>) values[collectionIndex];
     }
 
     /**
@@ -211,8 +208,7 @@ public final class RowBuffer {
      * @param children        list of child RowBuffers
      */
     public void setCollection(int collectionIndex, List<RowBuffer> children) {
-        int slot = schema.collectionSlot(collectionIndex);
-        values[slot] = children;
+        values[collectionIndex] = children;
     }
 
     /**
@@ -221,9 +217,8 @@ public final class RowBuffer {
      * @param collectionIndex collection index (0-based)
      */
     public void initCollection(int collectionIndex) {
-        int slot = schema.collectionSlot(collectionIndex);
-        if (values[slot] == null) {
-            values[slot] = new ArrayList<RowBuffer>();
+        if (values[collectionIndex] == null) {
+            values[collectionIndex] = new ArrayList<RowBuffer>();
         }
     }
 
@@ -240,16 +235,11 @@ public final class RowBuffer {
      * @return Map representation of this row
      */
     public Map<String, Object> toMap() {
-        final Set<Integer> excludedSlots = schema.getSerialisationExcludedSlots();
         Map<String, Object> result = new LinkedHashMap<>();
 
         // Add scalar fields
         for (int i = 0; i < schema.fieldCount(); i++) {
             if (schema.isInternal(i)) {
-                continue;
-            }
-
-            if (excludedSlots != null && excludedSlots.contains(i)) {
                 continue;
             }
 
@@ -262,8 +252,8 @@ public final class RowBuffer {
         }
 
         // Add collections
-        for (int c = 0; c < schema.collectionCount(); c++) {
-            String collName = schema.collectionName(c);
+        for (int c : schema.collectionIndexes()) {
+            String collName = schema.dtoField(c);
             List<RowBuffer> children = getCollection(c);
 
             if (children != null) {
@@ -331,6 +321,6 @@ public final class RowBuffer {
      * @return the number of fields on this row
      */
     public int fields() {
-        return values.length - schema.getNumberOfInternalFields() - schema.getSerialisationExcludedSlots().size();
+        return values.length - schema.getNumberOfInternalFields();
     }
 }

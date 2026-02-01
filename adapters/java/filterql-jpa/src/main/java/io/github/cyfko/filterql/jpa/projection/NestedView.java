@@ -115,8 +115,8 @@ public final class NestedView {
         }
 
         // Add collections with this prefix
-        for (int c = 0; c < schema.collectionCount(); c++) {
-            String collName = schema.collectionName(c);
+        for (int c : schema.collectionIndexes()) {
+            String collName = schema.dtoField(c);
             if (collName.startsWith(prefixDot)) {
                 String relativeName = collName.substring(prefixDot.length());
                 List<RowBuffer> children = source.getCollection(c);

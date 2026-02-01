@@ -96,7 +96,9 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
         for (int i = 0; i < schema.fieldCount(); i++) {
             String entityField = schema.entityField(i);
             // Skip computed output placeholder slots - they're not in the entity
-            if (entityField.startsWith(PREFIX_FOR_COMPUTED)) {
+            FieldSchema.FieldStatus fieldStatus = schema.getFieldStatus(i);
+            if (fieldStatus == FieldSchema.FieldStatus.SQL_IGNORE ||
+                fieldStatus == FieldSchema.FieldStatus.SQL_IGNORE_COLLECTION) {
                 continue;
             }
             Path<?> path = PathResolverUtils.resolvePath(ctx.root(), entityField);
@@ -141,7 +143,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
             results.put(rootId, row);
 
             // Initialize collection slots
-            for (int c = 0; c < schema.collectionCount(); c++) {
+            for (int c : schema.collectionIndexes()) {
                 row.initCollection(c);
             }
         }

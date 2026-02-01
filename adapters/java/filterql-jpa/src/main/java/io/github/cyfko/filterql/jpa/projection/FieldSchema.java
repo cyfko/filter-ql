@@ -26,8 +26,6 @@ import java.util.*;
 public final class FieldSchema {
     public static final String PREFIX_FOR_COMPUTED = "_c_";
 
-    private final String[][] paths;
-
     /** Entity field names for query construction */
     private final String[] entityFields;
 
@@ -38,30 +36,17 @@ public final class FieldSchema {
     private final String[][] nestedPaths;
 
     /** Whether each field is internal (not exposed in final result) */
-    private final boolean[] internal;
+    private final FieldStatus[] fieldStatuses;
 
     private final int numInternalFields;
+
+    private final int[] collectionSlots;
 
     /** Fast lookup: dtoField -> index */
     private final Map<String, Integer> dtoIndexMap;
 
     /** Fast lookup: entityField -> index */
     private final Map<String, Integer> entityIndexMap;
-
-    /** Indices of collection slots */
-    private final int[] collectionSlots;
-
-    /** DTO names of collections at each collection slot */
-    private final String[] collectionNames;
-
-    /** Fast lookup: collectionName -> index */
-    private final Map<String, Integer> collectionSlotMap;
-
-    /** Total number of slots (fields + collections) */
-    private final int totalSlots;
-
-    /** Set of slot indices to exclude from output, or null for none */
-    private Set<Integer> serialisationExcludedSlots = new HashSet<>();
 
     /** Fast lookup: computedField -> dependency indexes */
     private Map<String, DependencyInfo[]> computedFieldIndexMap = new HashMap<>();
@@ -72,12 +57,9 @@ public final class FieldSchema {
         this.entityFields = builder.entityFields.toArray(new String[0]);
         this.dtoFields = builder.dtoFields.toArray(new String[0]);
         this.nestedPaths = builder.nestedPaths.toArray(new String[0][]);
-        this.internal = toPrimitiveBooleanArray(builder.internal);
-        this.numInternalFields = countInternalFields(this.internal);
-        this.collectionSlots = toPrimitiveIntArray(builder.collectionSlots);
-        this.collectionNames = builder.collectionNames.toArray(new String[0]);
-        this.paths = toCollectionNamePath(builder.collectionNames);
-        this.totalSlots = entityFields.length + collectionSlots.length;
+        this.fieldStatuses = toPrimitiveBooleanArray(builder.internal);
+        this.numInternalFields = countInternalFields(this.fieldStatuses);
+        this.collectionSlots = toCollectionSlots(this.fieldStatuses);
         this.computedFieldIndexMap = builder.computedFieldIndexMap;
 
         // Build index maps
@@ -87,20 +69,10 @@ public final class FieldSchema {
             entityIndexMap.put(entityFields[i], i);
             dtoIndexMap.put(dtoFields[i], i);
         }
-
-        // Build collection index maps
-        this.collectionSlotMap = new HashMap<>(collectionSlots.length);
-        for (int i = 0; i < collectionSlots.length; i++) {
-            collectionSlotMap.put(collectionNames[i], i);
-        }
     }
 
     public Map<String, DependencyInfo[]> getComputedFieldIndexMap() {
         return computedFieldIndexMap;
-    }
-
-    private String[][] toCollectionNamePath(List<String> collectionNames) {
-        return collectionNames.stream().map(n -> n.split("\\.")).toArray(String[][]::new);
     }
 
     // ==================== Factory Methods ====================
@@ -131,7 +103,7 @@ public final class FieldSchema {
      * @return total slot count
      */
     public int totalSlots() {
-        return totalSlots;
+        return entityFields.length;
     }
 
     /**
@@ -182,7 +154,11 @@ public final class FieldSchema {
      * @return true if internal
      */
     public boolean isInternal(int index) {
-        return internal[index];
+        return fieldStatuses[index] == FieldStatus.SQL_ONLY;
+    }
+
+    public FieldStatus getFieldStatus(int index) {
+        return fieldStatuses[index];
     }
 
     /**
@@ -194,10 +170,9 @@ public final class FieldSchema {
     public Indexer indexOfDto(String dtoField) {
         Integer idx = dtoIndexMap.get(dtoField);
         if (idx == null) {
-            idx = collectionSlotMap.get(dtoField);
-            return idx != null ? new Indexer(idx, true) : Indexer.NONE;
+            return Indexer.NONE;
         }
-        return new Indexer(idx, false);
+        return new Indexer(idx,  fieldStatuses[idx] == FieldStatus.SQL_IGNORE_COLLECTION);
     }
 
     /**
@@ -211,25 +186,6 @@ public final class FieldSchema {
         return idx != null ? idx : -1;
     }
 
-    /**
-     * Retrieve the set of slot indices to exclude from output, or null none
-     * 
-     * @return excluded slots.
-     */
-    public Set<Integer> getSerialisationExcludedSlots() {
-        return serialisationExcludedSlots;
-    }
-
-    /**
-     * Exclude the provided specified slots on serialization.
-     *
-     * @param serialisationExcludedSlots set of slot indices to exclude from
-     *                                   serialisation output, or null for none
-     */
-    public void setSerialisationExcludedSlots(Set<Integer> serialisationExcludedSlots) {
-        this.serialisationExcludedSlots = Objects.requireNonNull(serialisationExcludedSlots);
-    }
-
     public int getNumberOfInternalFields() {
         return numInternalFields;
     }
@@ -237,42 +193,22 @@ public final class FieldSchema {
     // ==================== Collection Access ====================
 
     /**
-     * Returns the number of collection slots.
+     * Returns an array of collection slots.
      *
-     * @return collection count
+     * @return collection slot array
      */
-    public int collectionCount() {
-        return collectionSlots.length;
-    }
-
-    /**
-     * Returns the slot index for the i-th collection.
-     *
-     * @param collectionIndex collection index (0-based)
-     * @return slot index in RowBuffer
-     */
-    public int collectionSlot(int collectionIndex) {
-        return collectionSlots[collectionIndex];
-    }
-
-    /**
-     * Returns the DTO name for the i-th collection.
-     *
-     * @param collectionIndex collection index (0-based)
-     * @return collection DTO name
-     */
-    public String collectionName(int collectionIndex) {
-        return collectionNames[collectionIndex];
+    public int[] collectionIndexes() {
+        return collectionSlots;
     }
 
     public String[] collectionPaths(int collectionIndex) {
-        return paths[collectionIndex];
+        return nestedPaths[collectionIndex];
     }
 
     // ==================== Utility Methods ====================
 
-    private static boolean[] toPrimitiveBooleanArray(List<Boolean> list) {
-        boolean[] arr = new boolean[list.size()];
+    private static FieldStatus[] toPrimitiveBooleanArray(List<FieldStatus> list) {
+        FieldStatus[] arr = new FieldStatus[list.size()];
         for (int i = 0; i < list.size(); i++) {
             arr[i] = list.get(i);
         }
@@ -287,13 +223,22 @@ public final class FieldSchema {
         return arr;
     }
 
-    private static int countInternalFields(boolean[] internal) {
+    private static int countInternalFields(FieldStatus[] internal) {
         int numFields = 0;
-        for (boolean b : internal) {
-            if (b)
+        for (FieldStatus s : internal) {
+            if (s == FieldStatus.SQL_ONLY)
                 numFields++;
         }
         return numFields;
+    }
+
+    private static int[] toCollectionSlots(FieldStatus[] internal) {
+        List<Integer> list = new ArrayList<>();
+        for (int i = 0; i < internal.length; i++) {
+            if (internal[i] == FieldStatus.SQL_IGNORE_COLLECTION)
+                list.add(i);
+        }
+        return list.stream().mapToInt(Integer::intValue).toArray();
     }
 
     // ==================== Builder ====================
@@ -305,9 +250,7 @@ public final class FieldSchema {
         private final List<String> entityFields = new ArrayList<>();
         private final List<String> dtoFields = new ArrayList<>();
         private final List<String[]> nestedPaths = new ArrayList<>();
-        private final List<Boolean> internal = new ArrayList<>();
-        private final List<Integer> collectionSlots = new ArrayList<>();
-        private final List<String> collectionNames = new ArrayList<>();
+        private final List<FieldStatus> internal = new ArrayList<>();
         private final Map<String, DependencyInfo[]> computedFieldIndexMap = new HashMap<>();
 
         private Builder() {
@@ -319,16 +262,15 @@ public final class FieldSchema {
          * @param entityField entity field name (for queries)
          * @param dtoField    DTO field name (for results)
          * @param isInternal  true if field should not appear in final result
-         * @return this builder
          */
-        public Builder addField(String entityField, String dtoField, boolean isInternal) {
+        public void addField(String entityField, String dtoField, FieldStatus status) {
             // Check if already added
             int existingIdx = findEntityFieldDuplicateIndex(entityField);
             if (existingIdx > -1) {
                 // If the existing field was internal and we're adding it as visible,
                 // we need to update dtoField to make it accessible
-                if (!isInternal && internal.get(existingIdx)) {
-                    internal.set(existingIdx, false);
+                if (status == FieldStatus.SQL && internal.get(existingIdx) == FieldStatus.SQL_ONLY) {
+                    internal.set(existingIdx, status);
                     dtoFields.set(existingIdx, dtoField);
                     // Also update nested paths
                     if (dtoField.contains(".")) {
@@ -337,25 +279,24 @@ public final class FieldSchema {
                         nestedPaths.set(existingIdx, null);
                     }
                 }
-                return this;
+                return;
             }
 
             entityFields.add(entityField);
             dtoFields.add(dtoField);
-            internal.add(isInternal);
+            internal.add(status);
 
             // Pre-split nested paths
-            if (dtoField.contains(".") && !isInternal) {
+            if (dtoField.contains(".") && status != FieldStatus.SQL_ONLY) {
                 nestedPaths.add(dtoField.split("\\."));
             } else {
                 nestedPaths.add(null);
             }
 
-            return this;
         }
 
         // reducer == null For scalar dependency
-        public Builder addComputedField(ComputedField field, String dtoField) {
+        public void addComputedField(ComputedField field, String dtoField) {
             String[] dependencies = field.dependencies();
             ComputedField.ReducerMapping[] reducers = field.reducers();
 
@@ -379,13 +320,13 @@ public final class FieldSchema {
                 if (idx == -1) {
                     idx = internal.size();
                     if (reducer == null) {
-                        internal.add(true);
+                        internal.add(FieldStatus.SQL_ONLY);
                         entityFields.add(dependency);
                     } else {
                         // This does not serve much! Also usage of 'PREFIX_FOR_COMPUTED' should prevent
                         // sql generation
                         // for this dependency. See the note below.
-                        internal.add(true); // Must keep lists synchronized!
+                        internal.add(FieldStatus.SQL_IGNORE); // Must keep lists synchronized!
                         entityFields.add(PREFIX_FOR_COMPUTED + dependency);
                     }
 
@@ -407,10 +348,8 @@ public final class FieldSchema {
             // This slot is NOT internal - it's the visible output for the user
             entityFields.add(PREFIX_FOR_COMPUTED);
             dtoFields.add(dtoField);
-            internal.add(false); // computed output is visible to user
+            internal.add(FieldStatus.SQL_IGNORE); // computed output is visible to user
             nestedPaths.add(null); // Keep nestedPaths synchronized
-
-            return this;
         }
 
         private int findEntityFieldDuplicateIndex(String entityField) {
@@ -425,14 +364,9 @@ public final class FieldSchema {
          * Adds a collection slot to the schema.
          *
          * @param dtoCollectionName DTO name for the collection
-         * @return this builder
          */
-        public Builder addCollection(String dtoCollectionName) {
-            // Collection slots come after field slots
-            int slotIndex = entityFields.size() + collectionSlots.size();
-            collectionSlots.add(slotIndex);
-            collectionNames.add(dtoCollectionName);
-            return this;
+        public void addCollection(String dtoCollectionName) {
+            addField(dtoCollectionName, dtoCollectionName, FieldStatus.SQL_IGNORE_COLLECTION);
         }
 
         /**
@@ -446,5 +380,12 @@ public final class FieldSchema {
     }
 
     public record DependencyInfo(int index, String reducer) {
+    }
+
+    public enum FieldStatus{
+        SQL, // Generate the SQL by projecting the target field as its DTO alias
+        SQL_ONLY, // When generating the result row exclude the target field but consider it for SQL
+        SQL_IGNORE, // When generating SQL query, exclude the target field
+        SQL_IGNORE_COLLECTION, // When generating SQL query, exclude the target field because it is a collection
     }
 }

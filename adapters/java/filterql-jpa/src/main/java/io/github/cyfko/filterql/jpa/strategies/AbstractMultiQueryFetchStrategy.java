@@ -221,7 +221,7 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
                 // Add ID fields for linking
                 List<String> idFields = PersistenceRegistry.getIdFields(entityClass);
                 for (String idField : idFields) {
-                    schemaBuilder.addField(idField, idField, true);
+                    schemaBuilder.addField(idField, idField, FieldSchema.FieldStatus.SQL_ONLY);
                 }
 
                 // Add parent ID fields for collection plans (enables parent-child linking)
@@ -231,7 +231,7 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
                         schemaBuilder.addField(
                                 parentReferenceField + "." + parentIdFields.get(i),
                                 PREFIX_FOR_INTERNAL_USAGE + SUFFIX_PARENT_ID + i,
-                                true);
+                                FieldSchema.FieldStatus.SQL_ONLY);
                     }
                 }
 
@@ -273,7 +273,7 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
                                     // Use full path for this builder's schema (works for both root and collections)
                                     String entityPath = ProjectionRegistry.toEntityPath(dtoPath, this.projectionClass,
                                             true);
-                                    schemaBuilder.addField(entityPath, dtoPath, false);
+                                    schemaBuilder.addField(entityPath, dtoPath, FieldSchema.FieldStatus.SQL);
                                 });
                     }
 
