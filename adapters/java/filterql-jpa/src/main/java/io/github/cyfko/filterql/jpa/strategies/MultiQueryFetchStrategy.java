@@ -52,17 +52,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
             Set<String> dtoProjection = params.projection();
 
             if (dtoProjection == null || dtoProjection.isEmpty()) {
-                dtoProjection = new HashSet<>();
-                ProjectionMetadata meta = ProjectionRegistry.getMetadataFor(dtoClass);
-                for (var dm : meta.directMappings()) {
-                    if (dm.collection().isPresent() || dm.isNested()
-                            || ProjectionRegistry.getMetadataFor(dm.dtoFieldType()) != null)
-                        continue;
-                    dtoProjection.add(dm.dtoField());
-                }
-                for (var cf : meta.computedFields()) {
-                    dtoProjection.add(cf.dtoField());
-                }
+                dtoProjection = defaultProjection(dtoClass);
             }
 
             // Add collection info to plan
@@ -70,12 +60,6 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
 
             for (String dtoField : dtoProjection) {
                 ProjectionFieldParser.ProjectionField parsed = ProjectionFieldParser.parse(dtoField);
-                // nous devons construire le plan!
-                // Niveau 0 : champs du DTO et toutes les projections n'incluant pas les
-                // collections
-                // Cela peut tout champ scalaire simple ou imbriqué
-                // Niveau 1 : champs du DTO et toutes les projections incluant les collections
-                // dans leurs chemins
                 planBuilder.add(parsed);
             }
         }
@@ -164,9 +148,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
         parentIndexByPath.put("", rootResults);
 
         // For each depth level
-        for (int level = 0; level < collectionPlans.length; level++) {
-            Map<String, QueryPlan> levelPlan = collectionPlans[level];
-
+        for (Map<String, QueryPlan> levelPlan : collectionPlans) {
             if (levelPlan == null || levelPlan.isEmpty()) {
                 continue;
             }
@@ -215,6 +197,9 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
 
                 // Store child index for next level
                 parentIndexByPath.put(collectionPath, collectionResults);
+
+                // Resolve nested collection plans (sub-collections)
+                step3_ExecuteCollectionQueries(collectionCtx, collectionResults);
             }
         }
     }

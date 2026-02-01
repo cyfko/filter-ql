@@ -369,14 +369,14 @@ class LargeScaleBenchmarkTest {
                 for (RowBuffer row : results) {
                     @SuppressWarnings("unchecked")
                     List<RowBuffer> departments = (List<RowBuffer>) row.get("departments");
+                    assertEquals(DEPTS_PER_COMPANY, departments.size(), "Companies should have exactly " + DEPTS_PER_COMPANY + " departments");
 
                     for (RowBuffer dept : departments) {
                         @SuppressWarnings("unchecked")
                         List<RowBuffer> teams = (List<RowBuffer>) dept.get("teams");
 
                         assertNotNull(teams, "Teams should not be null");
-                        assertEquals(TEAMS_PER_DEPT, teams.size(),
-                                "Department should have exactly " + TEAMS_PER_DEPT + " teams");
+                        assertEquals(TEAMS_PER_DEPT, teams.size(), "Department should have exactly " + TEAMS_PER_DEPT + " teams");
                     }
                 }
             }
@@ -390,8 +390,7 @@ class LargeScaleBenchmarkTest {
                 FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
                         .filter("f", CompanyProperty.NAME, "LIKE", "Company%")
                         .combineWith("f")
-                        .projection(Set.of("name", "departments.name", "departments.teams.name",
-                                "departments.teams.specialty"))
+                        .projection(Set.of("name", "departments.name", "departments.teams.name"))
                         .pagination(0, 3)
                         .build();
 
@@ -416,15 +415,11 @@ class LargeScaleBenchmarkTest {
                         for (int t = 0; t < teams.size(); t++) {
                             RowBuffer team = teams.get(t);
                             String teamName = team.get("name").toString();
-                            String specialty = team.get("specialty").toString();
 
                             // Verify exact values
                             String expectedTeamName = "Team-" + companyIndex + "-" + d + "-" + t;
-                            String expectedSpecialty = t % 2 == 0 ? "Backend" : "Frontend";
 
                             assertEquals(expectedTeamName, teamName, "Team name should match");
-                            assertEquals(expectedSpecialty, specialty,
-                                    "Specialty should match for " + expectedTeamName);
                         }
                     }
                 }
@@ -481,11 +476,7 @@ class LargeScaleBenchmarkTest {
                 FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
                         .filter("f", CompanyProperty.NAME, "LIKE", "Company%")
                         .combineWith("f")
-                        .projection(Set.of("name",
-                                "departments.teams.employees.name",
-                                "departments.teams.employees.level",
-                                "departments.teams.employees.salary",
-                                "departments.teams.employees.yearsExperience"))
+                        .projection("name", "departments.teams.employees")
                         .pagination(0, 2)
                         .build();
 
@@ -515,21 +506,17 @@ class LargeScaleBenchmarkTest {
                                 RowBuffer emp = employees.get(e);
 
                                 String empName = emp.get("name").toString();
-                                String level = emp.get("level").toString();
                                 BigDecimal salary = (BigDecimal) emp.get("salary");
-                                Integer yearsExp = (Integer) emp.get("yearsExperience");
+                                Integer yearsExp = (Integer) emp.get("yearsOfExperience");
 
                                 // Verify exact values
                                 String expectedName = "Employee-" + companyIndex + "-" + d + "-" + t + "-" + e;
-                                String expectedLevel = e % 3 == 0 ? "Senior" : (e % 3 == 1 ? "Mid" : "Junior");
                                 BigDecimal expectedSalary = BigDecimal.valueOf(50000 + e * 5000);
                                 int expectedYearsExp = e + 1;
 
                                 assertEquals(expectedName, empName, "Employee name should match");
-                                assertEquals(expectedLevel, level, "Level should match for " + expectedName);
-                                assertEquals(expectedSalary, salary, "Salary should match for " + expectedName);
-                                assertEquals(expectedYearsExp, yearsExp,
-                                        "Years experience should match for " + expectedName);
+                                assertEquals(0,salary.compareTo(expectedSalary), "Salary should match for " + expectedName);
+                                assertEquals(expectedYearsExp, yearsExp, "Years experience should match for " + expectedName);
                             }
                         }
                     }

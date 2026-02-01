@@ -134,9 +134,31 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
      */
     protected abstract List<RowBuffer> step4_transform(ExecutionContext ctx, Map<Object, RowBuffer> rootResults);
 
+
     // ==================== Utility Methods ====================
 
-    protected void logStep(String stepName, long startNanos) {
+    /**
+     * Return a chosen set of fields projected as default when no specific projected fields are defined for
+     * the projection {@code dtoClass}
+     * @param dtoClass projection class.
+     * @return a {@link Set} of defaut projected fields excluding collections.
+     */
+    protected static Set<String> defaultProjection(Class<?> dtoClass) {
+        Set<String> dtoProjection = new HashSet<>();
+        ProjectionMetadata meta = ProjectionRegistry.getMetadataFor(dtoClass);
+        for (var dm : meta.directMappings()) {
+            if (dm.collection().isPresent() || dm.isNested()
+                    || ProjectionRegistry.getMetadataFor(dm.dtoFieldType()) != null)
+                continue;
+            dtoProjection.add(dm.dtoField());
+        }
+        for (var cf : meta.computedFields()) {
+            dtoProjection.add(cf.dtoField());
+        }
+        return dtoProjection;
+    }
+
+    protected static void logStep(String stepName, long startNanos) {
         if (logger.isLoggable(java.util.logging.Level.FINE)) {
             long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
             logger.fine(() -> String.format("  %s: %dms", stepName, durationMs));
@@ -265,14 +287,26 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
                 if (pf.prefix().isEmpty() || index >= segments.length) { // Add scalar fields
                     for (String field : pf.fields()) {
                         String dtoPath = pf.prefix().isEmpty() ? field : pf.prefix() + "." + field;
+
                         pm.getComputedField(field, true).ifPresentOrElse(
-                                computedField -> {
-                                    schemaBuilder.addComputedField(computedField, dtoPath);
-                                },
+                                computedField -> schemaBuilder.addComputedField(computedField, dtoPath),
                                 () -> {
-                                    // Use full path for this builder's schema (works for both root and collections)
-                                    String entityPath = ProjectionRegistry.toEntityPath(dtoPath, this.projectionClass,
-                                            true);
+
+                                    DirectMapping dm = pm.getDirectMapping(field, true)
+                                            .orElseThrow(() -> new IllegalStateException("Should never reach here"));
+
+                                    if (dm.collection().isPresent()) {
+                                        // Add all direct fields of this collection (not inner collections)
+                                        Set<String> defaultFields = defaultProjection(dm.dtoFieldType());
+                                        for (String defaultField : defaultFields) {
+                                            var parsed = new ProjectionFieldParser.ProjectionField(dtoPath, List.of(defaultField));
+                                            this.add(parsed);
+                                        }
+
+                                        return;
+                                    }
+
+                                    String entityPath = ProjectionRegistry.toEntityPath(dtoPath, this.projectionClass, true);
                                     schemaBuilder.addField(entityPath, dtoPath, FieldSchema.FieldStatus.SQL);
                                 });
                     }
