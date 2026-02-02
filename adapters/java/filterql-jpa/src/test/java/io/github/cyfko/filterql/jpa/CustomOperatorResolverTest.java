@@ -1,10 +1,9 @@
 package io.github.cyfko.filterql.jpa;
 
 import io.github.cyfko.filterql.core.api.Condition;
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.validation.Op;
 import io.github.cyfko.filterql.core.validation.PropertyReference;
-import io.github.cyfko.filterql.jpa.mappings.CustomOperatorResolver;
+import io.github.cyfko.filterql.jpa.spi.CustomOperatorResolver;
 import org.junit.jupiter.api.*;
 
 import java.util.Set;
@@ -302,7 +301,7 @@ class CustomOperatorResolverTest {
                 UserProperty.class,
                 ref -> {
                     if (ref == UserProperty.FIRST_NAME) {
-                        return (io.github.cyfko.filterql.jpa.mappings.PredicateResolverMapping<User>) (op, args) -> {
+                        return (io.github.cyfko.filterql.jpa.spi.PredicateResolverMapping<User>) (op, args) -> {
                             return (root, query, cb) -> cb.conjunction();
                         };
                     }

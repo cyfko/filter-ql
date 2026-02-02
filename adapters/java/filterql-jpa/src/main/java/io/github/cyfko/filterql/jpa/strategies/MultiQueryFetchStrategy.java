@@ -9,17 +9,18 @@ import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 import io.github.cyfko.filterql.core.model.SortBy;
 import io.github.cyfko.filterql.core.projection.ProjectionFieldParser;
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
-import io.github.cyfko.filterql.jpa.predicate.IdPredicateBuilder;
-import io.github.cyfko.filterql.jpa.projection.*;
+import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
+import io.github.cyfko.filterql.jpa.strategies.helper.IdPredicateBuilder;
 
+import io.github.cyfko.filterql.jpa.strategies.helper.*;
 import io.github.cyfko.filterql.jpa.utils.PathResolverUtils;
 import io.github.cyfko.filterql.jpa.utils.ProjectionUtils;
 import io.github.cyfko.projection.metamodel.PersistenceRegistry;
-import io.github.cyfko.projection.metamodel.ProjectionRegistry;
-import io.github.cyfko.projection.metamodel.model.projection.ProjectionMetadata;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
 import jakarta.persistence.criteria.*;
+
+import static io.github.cyfko.filterql.jpa.strategies.helper.QueryPlan.*;
 
 public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
     private static final int BATCH_SIZE = 1000;
@@ -52,7 +53,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
             Set<String> dtoProjection = params.projection();
 
             if (dtoProjection == null || dtoProjection.isEmpty()) {
-                dtoProjection = defaultProjection(dtoClass);
+                dtoProjection = QueryPlan.defaultProjection(dtoClass);
             }
 
             // Add collection info to plan
@@ -192,7 +193,6 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
                 linkCollectionResultsToParents(
                         collectionResults,
                         parentIndex,
-                        collectionPlan,
                         collectionPath);
 
                 // Store child index for next level
@@ -364,7 +364,6 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
     private void linkCollectionResultsToParents(
             Map<Object, RowBuffer> collectionResults,
             Map<Object, RowBuffer> parentIndex,
-            QueryPlan collectionPlan,
             String collectionPath) {
 
         // Get collection name for the slot in the parent

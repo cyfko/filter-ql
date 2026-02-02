@@ -1,4 +1,4 @@
-package io.github.cyfko.filterql.jpa.projection;
+package io.github.cyfko.filterql.jpa.strategies.helper;
 
 import java.util.LinkedHashMap;
 import java.util.List;

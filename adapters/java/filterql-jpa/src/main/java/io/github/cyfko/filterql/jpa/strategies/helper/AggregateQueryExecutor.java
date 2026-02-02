@@ -1,6 +1,5 @@
-package io.github.cyfko.filterql.jpa.projection;
+package io.github.cyfko.filterql.jpa.strategies.helper;
 
-import io.github.cyfko.filterql.jpa.predicate.IdPredicateBuilder;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Tuple;

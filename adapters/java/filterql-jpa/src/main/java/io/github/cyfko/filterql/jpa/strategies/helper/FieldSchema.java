@@ -1,8 +1,10 @@
-package io.github.cyfko.filterql.jpa.projection;
+package io.github.cyfko.filterql.jpa.strategies.helper;
 
 import io.github.cyfko.projection.metamodel.model.projection.ComputedField;
 
 import java.util.*;
+
+import static io.github.cyfko.filterql.jpa.strategies.helper.QueryPlan.PREFIX_FOR_COMPUTED;
 
 /**
  * Pre-computed schema for efficient field access in multi-query projections.
@@ -24,7 +26,6 @@ import java.util.*;
  * @since 2.0.0
  */
 public final class FieldSchema {
-    public static final String PREFIX_FOR_COMPUTED = "_c_";
 
     /** Entity field names for query construction */
     private final String[] entityFields;
@@ -49,9 +50,7 @@ public final class FieldSchema {
     private final Map<String, Integer> entityIndexMap;
 
     /** Fast lookup: computedField -> dependency indexes */
-    private Map<String, DependencyInfo[]> computedFieldIndexMap = new HashMap<>();
-
-    private final List<Boolean> reducers = new ArrayList<>();
+    private Map<String, DependencyInfo[]> computedFieldIndexMap;
 
     private FieldSchema(Builder builder) {
         this.entityFields = builder.entityFields.toArray(new String[0]);
@@ -215,14 +214,6 @@ public final class FieldSchema {
         return arr;
     }
 
-    private static int[] toPrimitiveIntArray(List<Integer> list) {
-        int[] arr = new int[list.size()];
-        for (int i = 0; i < list.size(); i++) {
-            arr[i] = list.get(i);
-        }
-        return arr;
-    }
-
     private static int countInternalFields(FieldStatus[] internal) {
         int numFields = 0;
         for (FieldStatus s : internal) {
@@ -261,7 +252,7 @@ public final class FieldSchema {
          *
          * @param entityField entity field name (for queries)
          * @param dtoField    DTO field name (for results)
-         * @param isInternal  true if field should not appear in final result
+         * @param status  usage status of the field
          */
         public void addField(String entityField, String dtoField, FieldStatus status) {
             // Check if already added

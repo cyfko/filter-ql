@@ -3,7 +3,6 @@ package io.github.cyfko.filterql.jpa;
 import io.github.cyfko.filterql.core.api.Condition;
 import io.github.cyfko.filterql.core.api.FilterContext;
 import io.github.cyfko.filterql.core.config.FilterConfig;
-import io.github.cyfko.filterql.core.exception.FilterDefinitionException;
 import io.github.cyfko.filterql.core.model.FilterDefinition;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
@@ -11,8 +10,8 @@ import io.github.cyfko.filterql.core.utils.TypeConversionUtils;
 import io.github.cyfko.filterql.core.utils.FilterConfigUtils;
 import io.github.cyfko.filterql.core.validation.Op;
 import io.github.cyfko.filterql.core.validation.PropertyReference;
-import io.github.cyfko.filterql.jpa.mappings.CustomOperatorResolver;
-import io.github.cyfko.filterql.jpa.mappings.PredicateResolverMapping;
+import io.github.cyfko.filterql.jpa.spi.CustomOperatorResolver;
+import io.github.cyfko.filterql.jpa.spi.PredicateResolverMapping;
 import io.github.cyfko.filterql.jpa.utils.PathResolverUtils;
 import jakarta.persistence.criteria.*;
 

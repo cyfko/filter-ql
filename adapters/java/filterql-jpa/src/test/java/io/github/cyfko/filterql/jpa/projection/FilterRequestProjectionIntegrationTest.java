@@ -12,6 +12,7 @@ import io.github.cyfko.filterql.jpa.entities.projection._2.UserC;
 import io.github.cyfko.filterql.core.spi.ExecutionStrategy;
 import io.github.cyfko.filterql.jpa.strategies.FullEntityFetchStrategy;
 import io.github.cyfko.filterql.jpa.strategies.MultiQueryFetchStrategy;
+import io.github.cyfko.filterql.jpa.strategies.helper.RowBuffer;
 import jakarta.persistence.*;
 import org.junit.jupiter.api.*;
 

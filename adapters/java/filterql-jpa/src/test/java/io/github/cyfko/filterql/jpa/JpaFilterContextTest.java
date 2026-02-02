@@ -7,7 +7,7 @@ import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.validation.Op;
 import io.github.cyfko.filterql.core.validation.PropertyReference;
-import io.github.cyfko.filterql.jpa.mappings.PredicateResolverMapping;
+import io.github.cyfko.filterql.jpa.spi.PredicateResolverMapping;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

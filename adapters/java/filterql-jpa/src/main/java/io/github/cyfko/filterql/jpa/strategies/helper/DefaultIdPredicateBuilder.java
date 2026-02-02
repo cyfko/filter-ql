@@ -1,4 +1,4 @@
-package io.github.cyfko.filterql.jpa.predicate;
+package io.github.cyfko.filterql.jpa.strategies.helper;
 
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.Path;

@@ -1,6 +1,6 @@
 package io.github.cyfko.filterql.jpa.utils;
 
-import io.github.cyfko.filterql.jpa.projection.InstanceResolver;
+import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
 import io.github.cyfko.projection.metamodel.ProjectionRegistry;
 import io.github.cyfko.projection.metamodel.model.projection.ComputationProvider;
 import io.github.cyfko.projection.metamodel.model.projection.ComputedField;

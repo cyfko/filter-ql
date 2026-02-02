@@ -3,12 +3,10 @@ package io.github.cyfko.filterql.jpa.strategies;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 import io.github.cyfko.filterql.core.spi.ExecutionStrategy;
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
-import io.github.cyfko.filterql.jpa.projection.InstanceResolver;
-import io.github.cyfko.filterql.jpa.projection.RowBuffer;
-import jakarta.persistence.EntityManager;
+import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
+import io.github.cyfko.filterql.jpa.strategies.helper.RowBuffer;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 

@@ -1,4 +1,4 @@
-package io.github.cyfko.filterql.jpa.mappings;
+package io.github.cyfko.filterql.jpa.spi;
 
 /**
  * Marker interface representing a mapping between a logical property reference

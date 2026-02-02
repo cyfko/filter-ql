@@ -14,6 +14,7 @@ import io.github.cyfko.filterql.jpa.entities.projection._1.AddressB;
 import io.github.cyfko.filterql.jpa.entities.projection._1.City;
 import io.github.cyfko.filterql.jpa.entities.projection._1.UserB;
 import io.github.cyfko.filterql.jpa.strategies.MultiQueryFetchStrategy;
+import io.github.cyfko.filterql.jpa.strategies.helper.RowBuffer;
 import jakarta.persistence.*;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;

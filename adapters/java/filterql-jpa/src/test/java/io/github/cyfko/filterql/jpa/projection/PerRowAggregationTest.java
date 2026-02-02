@@ -8,9 +8,10 @@ import io.github.cyfko.filterql.core.validation.PropertyReference;
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
 import io.github.cyfko.filterql.jpa.entities.projection._4.*;
 import io.github.cyfko.filterql.jpa.strategies.MultiQueryFetchStrategy;
+import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
+import io.github.cyfko.filterql.jpa.strategies.helper.RowBuffer;
 import jakarta.persistence.*;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.Disabled;
 
 import java.math.BigDecimal;
 import java.util.*;

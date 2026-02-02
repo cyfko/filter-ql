@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.jpa.utils;
 
 import io.github.cyfko.filterql.jpa.exception.InstanceResolutionException;
-import io.github.cyfko.filterql.jpa.projection.InstanceResolver;
+import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
 import org.junit.jupiter.api.*;
 
 import static org.junit.jupiter.api.Assertions.*;

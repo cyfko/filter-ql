@@ -5,8 +5,8 @@ import io.github.cyfko.filterql.core.api.FilterContext;
 import io.github.cyfko.filterql.core.model.FilterRequest;
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
 import io.github.cyfko.filterql.jpa.entities.projection._4.*;
-import io.github.cyfko.filterql.jpa.projection.InstanceResolver;
-import io.github.cyfko.filterql.jpa.projection.RowBuffer;
+import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
+import io.github.cyfko.filterql.jpa.strategies.helper.RowBuffer;
 import org.junit.jupiter.api.*;
 
 import jakarta.persistence.EntityManager;

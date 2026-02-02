@@ -1,4 +1,4 @@
-package io.github.cyfko.filterql.jpa.projection;
+package io.github.cyfko.filterql.jpa.spi;
 
 import io.github.cyfko.filterql.jpa.exception.InstanceResolutionException;
 

@@ -10,13 +10,14 @@ import io.github.cyfko.filterql.jpa.JpaFilterContext;
 import io.github.cyfko.filterql.jpa.entities.projection._3.DtoUserD;
 import io.github.cyfko.filterql.jpa.entities.projection._3.UserD;
 import io.github.cyfko.filterql.jpa.strategies.MultiQueryFetchStrategy;
+import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
+import io.github.cyfko.filterql.jpa.strategies.helper.RowBuffer;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Persistence;
 import org.junit.jupiter.api.*;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;

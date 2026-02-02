@@ -10,7 +10,7 @@ import io.github.cyfko.filterql.jpa.JpaFilterContext;
 import io.github.cyfko.filterql.jpa.entities.projection._3.OrderD;
 import io.github.cyfko.filterql.jpa.entities.projection._3.OrderItemD;
 import io.github.cyfko.filterql.jpa.entities.projection._3.UserD;
-import io.github.cyfko.filterql.jpa.projection.RowBuffer;
+import io.github.cyfko.filterql.jpa.strategies.helper.RowBuffer;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Persistence;

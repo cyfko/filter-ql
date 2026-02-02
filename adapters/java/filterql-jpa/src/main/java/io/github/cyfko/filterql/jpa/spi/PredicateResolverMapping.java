@@ -1,4 +1,4 @@
-package io.github.cyfko.filterql.jpa.mappings;
+package io.github.cyfko.filterql.jpa.spi;
 
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
 
