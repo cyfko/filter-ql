@@ -119,6 +119,201 @@ public class UserUtils {
 - Method must be `public static` and named `get<FieldName>`
 - Parameters correspond to fields listed in `dependsOn`
 
+### Collection Aggregations with Reducers {#reducers}
+
+When a `@Computed` field depends on a path that traverses a collection, you **must** apply a **reducer** to aggregate the multiple values into a single result.
+
+#### Available Reducers
+
+| Reducer | Constant | Description |
+|---------|----------|-------------|
+| `SUM` | `Reduce.SUM` | Sum of numeric values |
+| `AVG` | `Reduce.AVG` | Average of numeric values |
+| `COUNT` | `Reduce.COUNT` | Count of elements |
+| `COUNT_DISTINCT` | `Reduce.COUNT_DISTINCT` | Count of distinct elements |
+| `MIN` | `Reduce.MIN` | Minimum value |
+| `MAX` | `Reduce.MAX` | Maximum value |
+
+#### Positional Correspondence Rule
+
+**Critical:** Reducers correspond **only** to dependencies that traverse collections, **in order**:
+
+```java
+@Computed(
+    dependsOn = {"id", "address.city", "orders.total", "orders.quantity"},
+    //          scalar  scalar nested   collection     collection
+    reducers = {Reduce.SUM, Reduce.COUNT}
+    //          ↑ orders.total  ↑ orders.quantity
+)
+```
+
+- `id` → scalar field (no reducer needed)
+- `address.city` → scalar nested field via `@Embedded` or `@ManyToOne` (no reducer needed)
+- `orders.total` → collection traversal → **1st reducer**: `SUM`
+- `orders.quantity` → collection traversal → **2nd reducer**: `COUNT`
+
+**Constraint:** `reducers.length` must equal the number of dependencies that traverse collections.
+
+#### Path Semantics
+
+A dotted path is **not** necessarily a collection traversal:
+
+| Path | Type | Reducer needed? |
+|------|------|-----------------|
+| `address.city` | Nested scalar (`@Embedded`, `@ManyToOne`) | No |
+| `orders.total` | Collection (`@OneToMany`) | **Yes** |
+| `departments.teams.employees.salary` | Multiple collections | **Yes** |
+
+#### Collection Path Rule
+
+A path traversing a collection **must** end with a simple field:
+
+```java
+// ✅ VALID: traverses collection(s), ends with field
+"orders.total"                       // traverses orders, ends with total
+"departments.teams.employees.salary" // traverses 3 collections, ends with salary
+
+// ❌ INVALID: ends with a collection
+"orders"                             // no final field
+"departments.teams.employees"        // ends with collection
+```
+
+#### Example: Aggregating Employee Salaries
+
+Consider a Company → Departments → Employees hierarchy:
+
+```java
+@Entity
+public class Company {
+    @Id private Long id;
+    private String name;
+    
+    @OneToMany(mappedBy = "company")
+    private List<Department> departments;
+}
+
+@Entity
+public class Department {
+    @Id private Long id;
+    private String name;
+    private BigDecimal budget;
+    
+    @ManyToOne
+    private Company company;
+    
+    @OneToMany(mappedBy = "department")
+    private List<Employee> employees;
+}
+
+@Entity
+public class Employee {
+    @Id private Long id;
+    private String name;
+    private BigDecimal salary;
+    
+    @ManyToOne
+    private Department department;
+}
+```
+
+**DTO with aggregation reducers:**
+
+```java
+@Projection(from = Company.class, providers = @Provider(CompanyUtils.class))
+@Exposure(value = "companies", basePath = "/api")
+public class CompanyDTO {
+    
+    @Projected(from = "id")
+    private Long id;
+    
+    @Projected(from = "name")
+    @ExposedAs(value = "NAME", operators = {Op.EQ, Op.MATCHES})
+    private String name;
+    
+    /**
+     * Total salary across all departments and employees.
+     * Path traverses: departments (collection) → employees (collection) → salary
+     */
+    @Computed(
+        dependsOn = {"departments.employees.salary"},
+        reducers = {Reduce.SUM}
+    )
+    private BigDecimal totalSalaries;
+    
+    /**
+     * Total budget across all departments.
+     * Path traverses: departments (collection) → budget
+     */
+    @Computed(
+        dependsOn = {"departments.budget"},
+        reducers = {Reduce.SUM}
+    )
+    private BigDecimal totalBudget;
+    
+    /**
+     * Number of employees across all departments.
+     * Use COUNT on any field (here: id) from the collection.
+     */
+    @Computed(
+        dependsOn = {"departments.employees.id"},
+        reducers = {Reduce.COUNT}
+    )
+    private Long employeeCount;
+    
+    // Getters...
+}
+```
+
+**Provider class:**
+
+```java
+public class CompanyUtils {
+    
+    /**
+     * Receives the aggregated SUM of all employee salaries.
+     * The reducer has already performed the aggregation.
+     */
+    public static BigDecimal getTotalSalaries(BigDecimal salarySum) {
+        return salarySum != null ? salarySum : BigDecimal.ZERO;
+    }
+    
+    public static BigDecimal getTotalBudget(BigDecimal budgetSum) {
+        return budgetSum != null ? budgetSum : BigDecimal.ZERO;
+    }
+    
+    public static Long getEmployeeCount(Long count) {
+        return count != null ? count : 0L;
+    }
+}
+```
+
+#### Multiple Dependencies: Mixing Scalars and Collections
+
+You can mix scalar dependencies and collection dependencies. Only collection paths need reducers:
+
+```java
+@Computed(
+    dependsOn = {"name", "departments.employees.salary", "departments.budget"},
+    //          scalar   collection→SUM               collection→AVG
+    reducers = {Reduce.SUM, Reduce.AVG}
+)
+private String summary;
+
+// Provider receives: (String name, BigDecimal salarySum, BigDecimal budgetAvg)
+public static String getSummary(String name, BigDecimal salarySum, BigDecimal budgetAvg) {
+    return String.format("%s: $%.2f total salaries, $%.2f avg budget", 
+        name, salarySum, budgetAvg);
+}
+```
+
+#### Rules and Constraints
+
+1. **Reducer required for collection paths**: Any `dependsOn` path that traverses a `@OneToMany` or `@ManyToMany` must have a corresponding reducer
+2. **Path must end with a simple field**: `departments.employees.salary` ✅ vs `departments.employees` ❌
+3. **Positional correspondence**: Reducers are matched to collection dependencies **in order**, skipping scalar dependencies
+4. **Exact count**: `reducers.length` must equal the number of collection-traversing dependencies
+5. **Provider receives aggregated values**: The method receives the result of the aggregation, not the raw collection
+
 ---
 
 ## JPA Relations {#relations}

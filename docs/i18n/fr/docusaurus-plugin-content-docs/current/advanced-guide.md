@@ -119,6 +119,201 @@ public class UserUtils {
 - La méthode doit être `public static` et nommée `get<NomDuChamp>`
 - Les paramètres correspondent aux champs listés dans `dependsOn`
 
+### Agrégations sur Collections avec Reducers {#reducers}
+
+Lorsqu'un champ `@Computed` dépend d'un chemin qui traverse une collection, vous **devez** appliquer un **reducer** pour agréger les valeurs multiples en un seul résultat.
+
+#### Reducers Disponibles
+
+| Reducer | Constante | Description |
+|---------|-----------|-------------|
+| `SUM` | `Reduce.SUM` | Somme des valeurs numériques |
+| `AVG` | `Reduce.AVG` | Moyenne des valeurs numériques |
+| `COUNT` | `Reduce.COUNT` | Nombre d'éléments |
+| `COUNT_DISTINCT` | `Reduce.COUNT_DISTINCT` | Nombre d'éléments distincts |
+| `MIN` | `Reduce.MIN` | Valeur minimale |
+| `MAX` | `Reduce.MAX` | Valeur maximale |
+
+#### Règle de Correspondance Positionnelle
+
+**Critique :** Les reducers correspondent **uniquement** aux dépendances qui traversent des collections, **dans l'ordre** :
+
+```java
+@Computed(
+    dependsOn = {"id", "address.city", "orders.total", "orders.quantity"},
+    //          scalaire  scalaire imbriqué   collection     collection
+    reducers = {Reduce.SUM, Reduce.COUNT}
+    //          ↑ orders.total  ↑ orders.quantity
+)
+```
+
+- `id` → champ scalaire (pas de reducer nécessaire)
+- `address.city` → champ imbriqué scalaire via `@Embedded` ou `@ManyToOne` (pas de reducer nécessaire)
+- `orders.total` → traverse une collection → **1er reducer** : `SUM`
+- `orders.quantity` → traverse une collection → **2ème reducer** : `COUNT`
+
+**Contrainte :** `reducers.length` doit être égal au nombre de dépendances qui traversent des collections.
+
+#### Sémantique des Chemins
+
+Un chemin avec des points n'est **pas** forcément une traversée de collection :
+
+| Chemin | Type | Reducer nécessaire ? |
+|--------|------|---------------------|
+| `address.city` | Scalaire imbriqué (`@Embedded`, `@ManyToOne`) | Non |
+| `orders.total` | Collection (`@OneToMany`) | **Oui** |
+| `departments.teams.employees.salary` | Collections multiples | **Oui** |
+
+#### Règle des Chemins de Collection
+
+Un chemin qui traverse une collection **doit** se terminer par un champ simple :
+
+```java
+// ✅ VALIDE : traverse des collection(s), se termine par un champ
+"orders.total"                       // traverse orders, se termine par total
+"departments.teams.employees.salary" // traverse 3 collections, se termine par salary
+
+// ❌ INVALIDE : se termine par une collection
+"orders"                             // pas de champ final
+"departments.teams.employees"        // se termine par une collection
+```
+
+#### Exemple : Agréger les Salaires des Employés
+
+Considérez une hiérarchie Entreprise → Départements → Employés :
+
+```java
+@Entity
+public class Company {
+    @Id private Long id;
+    private String name;
+    
+    @OneToMany(mappedBy = "company")
+    private List<Department> departments;
+}
+
+@Entity
+public class Department {
+    @Id private Long id;
+    private String name;
+    private BigDecimal budget;
+    
+    @ManyToOne
+    private Company company;
+    
+    @OneToMany(mappedBy = "department")
+    private List<Employee> employees;
+}
+
+@Entity
+public class Employee {
+    @Id private Long id;
+    private String name;
+    private BigDecimal salary;
+    
+    @ManyToOne
+    private Department department;
+}
+```
+
+**DTO avec reducers d'agrégation :**
+
+```java
+@Projection(from = Company.class, providers = @Provider(CompanyUtils.class))
+@Exposure(value = "companies", basePath = "/api")
+public class CompanyDTO {
+    
+    @Projected(from = "id")
+    private Long id;
+    
+    @Projected(from = "name")
+    @ExposedAs(value = "NAME", operators = {Op.EQ, Op.MATCHES})
+    private String name;
+    
+    /**
+     * Salaire total à travers tous les départements et employés.
+     * Le chemin traverse : departments (collection) → employees (collection) → salary
+     */
+    @Computed(
+        dependsOn = {"departments.employees.salary"},
+        reducers = {Reduce.SUM}
+    )
+    private BigDecimal totalSalaries;
+    
+    /**
+     * Budget total à travers tous les départements.
+     * Le chemin traverse : departments (collection) → budget
+     */
+    @Computed(
+        dependsOn = {"departments.budget"},
+        reducers = {Reduce.SUM}
+    )
+    private BigDecimal totalBudget;
+    
+    /**
+     * Nombre d'employés à travers tous les départements.
+     * Utilise COUNT sur n'importe quel champ (ici : id) de la collection.
+     */
+    @Computed(
+        dependsOn = {"departments.employees.id"},
+        reducers = {Reduce.COUNT}
+    )
+    private Long employeeCount;
+    
+    // Getters...
+}
+```
+
+**Classe Provider :**
+
+```java
+public class CompanyUtils {
+    
+    /**
+     * Reçoit la SUM agrégée de tous les salaires des employés.
+     * Le reducer a déjà effectué l'agrégation.
+     */
+    public static BigDecimal getTotalSalaries(BigDecimal salarySum) {
+        return salarySum != null ? salarySum : BigDecimal.ZERO;
+    }
+    
+    public static BigDecimal getTotalBudget(BigDecimal budgetSum) {
+        return budgetSum != null ? budgetSum : BigDecimal.ZERO;
+    }
+    
+    public static Long getEmployeeCount(Long count) {
+        return count != null ? count : 0L;
+    }
+}
+```
+
+#### Dépendances Multiples : Mélanger Scalaires et Collections
+
+Vous pouvez mélanger des dépendances scalaires et des dépendances de collection. Seuls les chemins de collection nécessitent des reducers :
+
+```java
+@Computed(
+    dependsOn = {"name", "departments.employees.salary", "departments.budget"},
+    //          scalaire   collection→SUM                 collection→AVG
+    reducers = {Reduce.SUM, Reduce.AVG}
+)
+private String summary;
+
+// Le Provider reçoit : (String name, BigDecimal salarySum, BigDecimal budgetAvg)
+public static String getSummary(String name, BigDecimal salarySum, BigDecimal budgetAvg) {
+    return String.format("%s: %.2f€ total salaires, %.2f€ budget moyen", 
+        name, salarySum, budgetAvg);
+}
+```
+
+#### Règles et Contraintes
+
+1. **Reducer requis pour les chemins de collection** : Tout chemin `dependsOn` qui traverse un `@OneToMany` ou `@ManyToMany` doit avoir un reducer correspondant
+2. **Le chemin doit se terminer par un champ simple** : `departments.employees.salary` ✅ vs `departments.employees` ❌
+3. **Correspondance positionnelle** : Les reducers sont associés aux dépendances de collection **dans l'ordre**, en ignorant les dépendances scalaires
+4. **Nombre exact** : `reducers.length` doit être égal au nombre de dépendances traversant des collections
+5. **Le Provider reçoit les valeurs agrégées** : La méthode reçoit le résultat de l'agrégation, pas la collection brute
+
 ---
 
 ## Relations JPA {#relations}

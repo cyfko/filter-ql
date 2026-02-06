@@ -328,5 +328,6 @@ Les références multiples à la même collection doivent utiliser des options i
 
 ## Prochaines Étapes
 
+- [Agrégations sur Collections](../advanced-guide#reducers) - Calculer des totaux, moyennes, comptages sur des collections imbriquées
 - [Opérateurs Personnalisés](custom-operators) - Créer des opérateurs métier
 - [Référence JPA Adapter](../reference/jpa-adapter) - Stratégies d'exécution détaillées
