@@ -7,7 +7,7 @@ import io.github.cyfko.PersonDTO;
 import io.github.cyfko.PersonRepository;
 import io.github.cyfko.PersonDTO_;
 import io.github.cyfko.filterql.core.model.FilterRequest;
-import io.github.cyfko.filterql.core.validation.Op;
+import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.filterql.spring.pagination.PaginatedData;
 import io.github.cyfko.filterql.spring.service.FilterQlService;
 import jakarta.transaction.Transactional;

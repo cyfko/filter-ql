@@ -1,7 +1,7 @@
 package io.github.cyfko;
 
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
-import io.github.cyfko.filterql.core.validation.Op;
+import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.filterql.spring.ExposedAs;
 
 /**

@@ -64,7 +64,7 @@
 
         <dependency>
             <groupId>io.github.cyfko</groupId>
-            <artifactId>projection-metamodel-processor</artifactId>
+            <artifactId>jpa-metamodel-processor</artifactId>
             <version>1.0.0</version>
         </dependency>
 
