@@ -87,24 +87,28 @@
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
             <version>6.2.7</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- 🗄️ JPA Repository (pour @Entity, @Repository, JpaRepository...) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <!-- 🌐 RestController (pour @RestController, @RequestMapping, etc.) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <!-- Dépendance minimale pour avoir Spring Boot -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <!-- JPA API -->

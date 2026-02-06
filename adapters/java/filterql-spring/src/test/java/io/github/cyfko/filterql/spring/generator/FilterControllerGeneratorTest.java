@@ -203,22 +203,24 @@ class FilterControllerGeneratorTest {
         // Would verify packageImports Set behavior
     }
 
+    // Test handling of nested/inner DTO classes
+    static class OuterMapper {
+        public static class NestedDTO {
+            private String value;
+        }
+
+        public static NestedDTO map(TestEntity entity) {
+            return new NestedDTO();
+        }
+    }
+
+    static class EntityWithNestedDTO {
+        private String name;
+    }
+
     @Test
     void shouldHandleNestedDTOClasses() {
-        // Test handling of nested/inner DTO classes
-        class OuterMapper {
-            public static class NestedDTO {
-                private String value;
-            }
 
-            public static NestedDTO map(TestEntity entity) {
-                return new NestedDTO();
-            }
-        }
-
-        class EntityWithNestedDTO {
-            private String name;
-        }
 
         // Would verify proper FQCN handling with $ replacement
         assertNotNull(generator);
