@@ -1,0 +1,27 @@
+package io.github.cyfko.filterql.tests.entities.projection._3;
+
+import io.github.cyfko.projection.Projection;
+
+@Projection(from = OrderItemD.class)
+public class DtoOrderItemD {
+
+    private String productName;
+
+    private int quantity;
+
+    public String getProductName() {
+        return productName;
+    }
+
+    public void setProductName(String productName) {
+        this.productName = productName;
+    }
+
+    public int getQuantity() {
+        return quantity;
+    }
+
+    public void setQuantity(int quantity) {
+        this.quantity = quantity;
+    }
+}

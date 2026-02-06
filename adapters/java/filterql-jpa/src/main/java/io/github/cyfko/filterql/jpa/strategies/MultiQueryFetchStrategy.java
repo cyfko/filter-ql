@@ -15,7 +15,7 @@ import io.github.cyfko.filterql.jpa.strategies.helper.IdPredicateBuilder;
 import io.github.cyfko.filterql.jpa.strategies.helper.*;
 import io.github.cyfko.filterql.jpa.utils.PathResolverUtils;
 import io.github.cyfko.filterql.jpa.utils.ProjectionUtils;
-import io.github.cyfko.projection.metamodel.PersistenceRegistry;
+import io.github.cyfko.jpametamodel.PersistenceRegistry;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
 import jakarta.persistence.criteria.*;

@@ -1,10 +1,10 @@
 package io.github.cyfko.filterql.jpa.utils;
 
 import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
-import io.github.cyfko.projection.metamodel.ProjectionRegistry;
-import io.github.cyfko.projection.metamodel.model.projection.ComputationProvider;
-import io.github.cyfko.projection.metamodel.model.projection.ComputedField;
-import io.github.cyfko.projection.metamodel.model.projection.ProjectionMetadata;
+import io.github.cyfko.jpametamodel.ProjectionRegistry;
+import io.github.cyfko.jpametamodel.api.ComputationProvider;
+import io.github.cyfko.jpametamodel.api.ComputedField;
+import io.github.cyfko.jpametamodel.api.ProjectionMetadata;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;

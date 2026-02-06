@@ -1,11 +1,11 @@
 package io.github.cyfko.filterql.jpa.strategies.helper;
 
 import io.github.cyfko.filterql.core.projection.ProjectionFieldParser;
-import io.github.cyfko.projection.metamodel.PersistenceRegistry;
-import io.github.cyfko.projection.metamodel.ProjectionRegistry;
-import io.github.cyfko.projection.metamodel.model.PersistenceMetadata;
-import io.github.cyfko.projection.metamodel.model.projection.DirectMapping;
-import io.github.cyfko.projection.metamodel.model.projection.ProjectionMetadata;
+import io.github.cyfko.jpametamodel.PersistenceRegistry;
+import io.github.cyfko.jpametamodel.ProjectionRegistry;
+import io.github.cyfko.jpametamodel.api.PersistenceMetadata;
+import io.github.cyfko.jpametamodel.api.DirectMapping;
+import io.github.cyfko.jpametamodel.api.ProjectionMetadata;
 
 import java.util.*;
 import java.util.stream.Collectors;

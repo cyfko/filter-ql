@@ -7,7 +7,7 @@ import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
 import io.github.cyfko.filterql.jpa.strategies.helper.QueryPlan;
 import io.github.cyfko.filterql.jpa.strategies.helper.RowBuffer;
-import io.github.cyfko.projection.metamodel.ProjectionRegistry;
+import io.github.cyfko.jpametamodel.ProjectionRegistry;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
 import jakarta.persistence.criteria.CriteriaBuilder;

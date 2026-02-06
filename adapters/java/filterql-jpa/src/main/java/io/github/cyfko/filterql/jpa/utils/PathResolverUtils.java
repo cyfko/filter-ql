@@ -5,8 +5,8 @@ import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Root;
 
-import io.github.cyfko.projection.metamodel.PersistenceRegistry;
-import io.github.cyfko.projection.metamodel.model.PersistenceMetadata;
+import io.github.cyfko.jpametamodel.PersistenceRegistry;
+import io.github.cyfko.jpametamodel.api.PersistenceMetadata;
 
 import java.util.*;
 
@@ -357,8 +357,8 @@ public class PathResolverUtils {
      * @since 2.0.0
      */
     public record CollectionInfo(
-            io.github.cyfko.projection.metamodel.model.CollectionType collectionType,
-            io.github.cyfko.projection.metamodel.model.CollectionKind elementKind,
+            io.github.cyfko.jpametamodel.api.CollectionType collectionType,
+            io.github.cyfko.jpametamodel.api.CollectionKind elementKind,
             String mappedBy,
             String orderBy
     ) {
@@ -373,28 +373,28 @@ public class PathResolverUtils {
          * Checks if this collection is ordered (List type).
          */
         public boolean isOrdered() {
-            return collectionType == io.github.cyfko.projection.metamodel.model.CollectionType.LIST;
+            return collectionType == io.github.cyfko.jpametamodel.api.CollectionType.LIST;
         }
 
         /**
          * Checks if this collection contains entities.
          */
         public boolean isEntityCollection() {
-            return elementKind == io.github.cyfko.projection.metamodel.model.CollectionKind.ENTITY;
+            return elementKind == io.github.cyfko.jpametamodel.api.CollectionKind.ENTITY;
         }
 
         /**
          * Checks if this collection contains scalars.
          */
         public boolean isScalarCollection() {
-            return elementKind == io.github.cyfko.projection.metamodel.model.CollectionKind.SCALAR;
+            return elementKind == io.github.cyfko.jpametamodel.api.CollectionKind.SCALAR;
         }
 
         /**
          * Checks if this collection contains embeddables.
          */
         public boolean isEmbeddableCollection() {
-            return elementKind == io.github.cyfko.projection.metamodel.model.CollectionKind.EMBEDDABLE;
+            return elementKind == io.github.cyfko.jpametamodel.api.CollectionKind.EMBEDDABLE;
         }
     }
 }

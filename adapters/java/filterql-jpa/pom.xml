@@ -50,7 +50,7 @@
         <jakarta-persistence.version>3.1.0</jakarta-persistence.version>
         <filterql-core.version>4.0.0</filterql-core.version>
         <projection-spec.version>1.0.0</projection-spec.version>
-        <projection-processor.version>1.0.0</projection-processor.version>
+        <jpa-processor.version>1.0.0</jpa-processor.version>
 
         <!-- Tests dependencies Versions -->
         <junit.version>5.10.3</junit.version>
@@ -70,8 +70,8 @@
         <!-- Dépendance vers le processeur d'annotation du metamodel de projection JPA générant des métadonnées utiles -->
         <dependency>
             <groupId>io.github.cyfko</groupId>
-            <artifactId>projection-metamodel-processor</artifactId>
-            <version>${projection-processor.version}</version>
+            <artifactId>jpa-metamodel-processor</artifactId>
+            <version>${jpa-processor.version}</version>
             <scope>provided</scope>
         </dependency>
 

@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.jpa.spi;
 
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
+import io.github.cyfko.filterql.core.api.PropertyReference;
 
 /**
  * Strategy for resolving filter operations into JPA predicates.

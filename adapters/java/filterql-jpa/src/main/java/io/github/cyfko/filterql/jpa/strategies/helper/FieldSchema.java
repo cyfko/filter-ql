@@ -1,6 +1,6 @@
 package io.github.cyfko.filterql.jpa.strategies.helper;
 
-import io.github.cyfko.projection.metamodel.model.projection.ComputedField;
+import io.github.cyfko.jpametamodel.api.ComputedField;
 
 import java.util.*;
 

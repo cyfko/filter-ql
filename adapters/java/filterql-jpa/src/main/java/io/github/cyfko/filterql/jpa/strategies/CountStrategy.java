@@ -3,7 +3,7 @@ package io.github.cyfko.filterql.jpa.strategies;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 import io.github.cyfko.filterql.core.spi.ExecutionStrategy;
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
-import io.github.cyfko.projection.metamodel.ProjectionRegistry;
+import io.github.cyfko.jpametamodel.ProjectionRegistry;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.*;
 
@@ -27,7 +27,7 @@ import java.util.logging.Logger;
  *
  * <p>
  * In both cases, the underlying entity type is resolved through
- * {@link io.github.cyfko.projection.metamodel.ProjectionRegistry}, and the count is performed
+ * {@link io.github.cyfko.jpametamodel.ProjectionRegistry}, and the count is performed
  * against that entity, independently of how the data will be fetched or projected.
  * </p>
  *
