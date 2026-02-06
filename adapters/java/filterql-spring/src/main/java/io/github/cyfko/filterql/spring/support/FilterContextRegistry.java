@@ -11,7 +11,7 @@ import java.util.Map;
 /**
  * Central registry for all automatically generated {@link JpaFilterContext} instances in the FilterQL Spring Boot starter.
  * <p>
- * Enables retrieval of the appropriate filter context for a given {@link io.github.cyfko.filterql.core.validation.PropertyReference},
+ * Enables retrieval of the appropriate filter context for a given {@link io.github.cyfko.filterql.core.api.PropertyReference},
  * supporting type-safe query construction and validation. Populated at startup via dependency injection.
  * </p>
  *
