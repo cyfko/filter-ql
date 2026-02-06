@@ -69,7 +69,6 @@ public final class RowBuffer {
         return values[index];
     }
 
-
     /**
      * Gets the value for the given DTO field name (scalar, collection, or nested
      * prefix).
@@ -310,6 +309,11 @@ public final class RowBuffer {
 
     // ==================== Accessors ====================
 
+    /**
+     * Returns the schema associated with this RowBuffer.
+     *
+     * @return the field schema defining this buffer's structure
+     */
     public FieldSchema getSchema() {
         return schema;
     }
