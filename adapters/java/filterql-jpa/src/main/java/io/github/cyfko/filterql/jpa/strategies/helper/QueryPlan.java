@@ -10,11 +10,51 @@ import io.github.cyfko.jpametamodel.api.ProjectionMetadata;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Execution plan for multi-query projections with nested collections.
+ * <p>
+ * A QueryPlan encapsulates the complete structure needed to execute a
+ * projection query,
+ * including:
+ * <ul>
+ * <li>The root entity class and its field schema</li>
+ * <li>ID fields for parent-child linking</li>
+ * <li>Nested collection plans for hierarchical data</li>
+ * </ul>
+ * </p>
+ *
+ * <h2>Structure</h2>
+ * <p>
+ * Each QueryPlan contains a {@link FieldSchema} for the current level and
+ * optionally
+ * nested {@code QueryPlan} instances for collection relationships. Collection
+ * plans
+ * are organized by depth level (index) and path name.
+ * </p>
+ *
+ * <h2>Usage</h2>
+ * 
+ * <pre>{@code
+ * QueryPlan plan = QueryPlan.builder(CompanyDTO.class)
+ *         .add(new ProjectionField("", List.of("id", "name")))
+ *         .add(new ProjectionField("departments", List.of("name", "budget")))
+ *         .build();
+ * }</pre>
+ *
+ * @author Frank KOSSI
+ * @since 2.0.0
+ * @see FieldSchema
+ * @see RowBuffer
+ */
 public class QueryPlan {
+    /** Prefix for internal-only fields (not exposed in result) */
     public static final String PREFIX_FOR_INTERNAL_USAGE = "_i_";
-    public static final String PREFIX_FOR_COMPUTED = "_c_";
-    public static final String SUFFIX_PARENT_ID = "pid_";
 
+    /** Prefix for computed field placeholders */
+    public static final String PREFIX_FOR_COMPUTED = "_c_";
+
+    /** Suffix for parent ID reference fields in collection plans */
+    public static final String SUFFIX_PARENT_ID = "pid_";
 
     private final Class<?> entityClass;
     private final FieldSchema schema;
@@ -28,22 +68,52 @@ public class QueryPlan {
         this.collectionPlans = collectionPlans;
     }
 
+    /**
+     * Creates a new QueryPlan builder for the given projection class.
+     *
+     * @param projectionClass the projection DTO class
+     * @return new Builder instance
+     */
     public static Builder builder(Class<?> projectionClass) {
         return new Builder(projectionClass);
     }
 
+    /**
+     * Returns the field schema for this plan.
+     *
+     * @return field schema
+     */
     public FieldSchema getSchema() {
         return schema;
     }
 
+    /**
+     * Returns the entity class this plan queries.
+     *
+     * @return entity class
+     */
     public Class<?> getEntityClass() {
         return entityClass;
     }
 
+    /**
+     * Returns the ID field names for the entity.
+     *
+     * @return list of ID field names
+     */
     public List<String> getIdFields() {
         return idFields;
     }
 
+    /**
+     * Returns the collection plans organized by depth level.
+     * <p>
+     * Each array element represents a depth level in the collection hierarchy.
+     * The map at each level maps collection path names to their QueryPlan.
+     * </p>
+     *
+     * @return array of collection plan maps by depth
+     */
     public Map<String, QueryPlan>[] getCollectionPlans() {
         return collectionPlans;
     }
@@ -113,9 +183,9 @@ public class QueryPlan {
         }
 
         private void add(Class<?> dtoClass,
-                         ProjectionFieldParser.ProjectionField pf,
-                         String[] segments,
-                         int index) {
+                ProjectionFieldParser.ProjectionField pf,
+                String[] segments,
+                int index) {
             ProjectionMetadata pm = ProjectionRegistry.getMetadataFor(dtoClass);
 
             if (pf.prefix().isEmpty() || index >= segments.length) { // Add scalar fields
@@ -133,14 +203,16 @@ public class QueryPlan {
                                     // Add all direct fields of this collection (not inner collections)
                                     Set<String> defaultFields = defaultProjection(dm.dtoFieldType());
                                     for (String defaultField : defaultFields) {
-                                        var parsed = new ProjectionFieldParser.ProjectionField(dtoPath, List.of(defaultField));
+                                        var parsed = new ProjectionFieldParser.ProjectionField(dtoPath,
+                                                List.of(defaultField));
                                         this.add(parsed);
                                     }
 
                                     return;
                                 }
 
-                                String entityPath = ProjectionRegistry.toEntityPath(dtoPath, this.projectionClass, true);
+                                String entityPath = ProjectionRegistry.toEntityPath(dtoPath, this.projectionClass,
+                                        true);
                                 schemaBuilder.addField(entityPath, dtoPath, FieldSchema.FieldStatus.SQL);
                             });
                 }
@@ -153,8 +225,7 @@ public class QueryPlan {
                     .orElseThrow(() -> new IllegalArgumentException(String.format(
                             "Invalid segment. Segment: %s, Path: %s",
                             segments[index],
-                            pf.prefix()))
-                    );
+                            pf.prefix())));
 
             // If collection, add to collections plan and return; Otherwise continue
             if (dm.collection().isPresent()) {
@@ -249,8 +320,10 @@ public class QueryPlan {
     // ==================== Utility Methods ====================
 
     /**
-     * Return a chosen set of fields projected as default when no specific projected fields are defined for
+     * Return a chosen set of fields projected as default when no specific projected
+     * fields are defined for
      * the projection {@code dtoClass}
+     * 
      * @param dtoClass projection class.
      * @return a {@link Set} of defaut projected fields excluding collections.
      */

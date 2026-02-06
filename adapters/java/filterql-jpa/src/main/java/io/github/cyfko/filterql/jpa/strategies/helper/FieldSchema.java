@@ -70,6 +70,17 @@ public final class FieldSchema {
         }
     }
 
+    /**
+     * Returns the mapping of computed field names to their dependency information.
+     * <p>
+     * Each computed field maps to an array of {@link DependencyInfo} objects,
+     * one per dependency. The array index corresponds to the dependency index
+     * in the {@code @Computed.dependsOn} annotation.
+     * </p>
+     *
+     * @return unmodifiable map of computed field name to dependency info array
+     * @see DependencyInfo
+     */
     public Map<String, DependencyInfo[]> getComputedFieldIndexMap() {
         return computedFieldIndexMap;
     }
@@ -156,6 +167,17 @@ public final class FieldSchema {
         return fieldStatuses[index] == FieldStatus.SQL_ONLY;
     }
 
+    /**
+     * Returns the status of the field at the given index.
+     * <p>
+     * Field status determines how the field is handled during SQL generation
+     * and result mapping.
+     * </p>
+     *
+     * @param index field index
+     * @return the field status
+     * @see FieldStatus
+     */
     public FieldStatus getFieldStatus(int index) {
         return fieldStatuses[index];
     }
@@ -171,7 +193,7 @@ public final class FieldSchema {
         if (idx == null) {
             return Indexer.NONE;
         }
-        return new Indexer(idx,  fieldStatuses[idx] == FieldStatus.SQL_IGNORE_COLLECTION);
+        return new Indexer(idx, fieldStatuses[idx] == FieldStatus.SQL_IGNORE_COLLECTION);
     }
 
     /**
@@ -185,6 +207,16 @@ public final class FieldSchema {
         return idx != null ? idx : -1;
     }
 
+    /**
+     * Returns the count of internal fields (SQL_ONLY status).
+     * <p>
+     * Internal fields are used for query construction but are not
+     * exposed in the final result. This is useful for computed field
+     * dependencies that should not appear in the output.
+     * </p>
+     *
+     * @return number of internal fields
+     */
     public int getNumberOfInternalFields() {
         return numInternalFields;
     }
@@ -200,6 +232,15 @@ public final class FieldSchema {
         return collectionSlots;
     }
 
+    /**
+     * Returns the pre-split path segments for a collection at the given index.
+     * <p>
+     * Used for navigating nested collection paths during query construction.
+     * </p>
+     *
+     * @param collectionIndex index of the collection slot
+     * @return path segments array, or null if not a nested path
+     */
     public String[] collectionPaths(int collectionIndex) {
         return nestedPaths[collectionIndex];
     }
@@ -235,7 +276,26 @@ public final class FieldSchema {
     // ==================== Builder ====================
 
     /**
-     * Builder for constructing FieldSchema instances.
+     * Builder for constructing immutable {@link FieldSchema} instances.
+     * <p>
+     * The builder maintains synchronized lists for entity fields, DTO fields,
+     * nested paths, and field statuses. It also tracks computed field dependencies
+     * and collection slots.
+     * </p>
+     *
+     * <h3>Usage Example</h3>
+     * 
+     * <pre>{@code
+     * FieldSchema schema = FieldSchema.builder()
+     *         .addField("id", "id", FieldStatus.SQL)
+     *         .addField("name", "name", FieldStatus.SQL)
+     *         .addComputedField(employeeSummaryField, "employeeSummary")
+     *         .addCollection("orders")
+     *         .build();
+     * }</pre>
+     *
+     * @author Frank KOSSI
+     * @since 2.0.0
      */
     public static final class Builder {
         private final List<String> entityFields = new ArrayList<>();
@@ -252,7 +312,7 @@ public final class FieldSchema {
          *
          * @param entityField entity field name (for queries)
          * @param dtoField    DTO field name (for results)
-         * @param status  usage status of the field
+         * @param status      usage status of the field
          */
         public void addField(String entityField, String dtoField, FieldStatus status) {
             // Check if already added
@@ -286,7 +346,37 @@ public final class FieldSchema {
 
         }
 
-        // reducer == null For scalar dependency
+        /**
+         * Adds a computed field and its dependencies to the schema.
+         * <p>
+         * This method processes each dependency of the computed field:
+         * <ul>
+         * <li>Scalar dependencies (no reducer) are added with {@code SQL_ONLY}
+         * status</li>
+         * <li>Aggregate dependencies (with reducer like SUM, COUNT) are added with
+         * {@code SQL_IGNORE} status and prefixed to prevent SQL generation</li>
+         * </ul>
+         * </p>
+         * <p>
+         * After processing dependencies, a slot is created for the computed field
+         * output.
+         * The output slot is visible in the final result (not internal).
+         * </p>
+         *
+         * <h4>Dependency Handling</h4>
+         * <ul>
+         * <li>If a dependency already exists in the schema, its index is reused</li>
+         * <li>New dependencies are added with appropriate status based on reducer
+         * presence</li>
+         * <li>All internal lists (entityFields, dtoFields, internal, nestedPaths)
+         * remain synchronized</li>
+         * </ul>
+         *
+         * @param field    the computed field definition from annotation processing
+         * @param dtoField the DTO field name for the computed output
+         * @see ComputedField
+         * @see DependencyInfo
+         */
         public void addComputedField(ComputedField field, String dtoField) {
             String[] dependencies = field.dependencies();
             ComputedField.ReducerMapping[] reducers = field.reducers();
@@ -370,13 +460,66 @@ public final class FieldSchema {
         }
     }
 
+    /**
+     * Information about a computed field dependency.
+     * <p>
+     * Each dependency of a computed field has an index (position in the schema's
+     * field arrays) and optionally a reducer function for aggregate operations.
+     * </p>
+     *
+     * @param index   the index of the dependency in the schema's field arrays
+     * @param reducer the reducer function name (SUM, COUNT, AVG, etc.) or null for
+     *                scalar
+     * @author Frank KOSSI
+     * @since 2.0.0
+     */
     public record DependencyInfo(int index, String reducer) {
     }
 
-    public enum FieldStatus{
-        SQL, // Generate the SQL by projecting the target field as its DTO alias
-        SQL_ONLY, // When generating the result row exclude the target field but consider it for SQL
-        SQL_IGNORE, // When generating SQL query, exclude the target field
-        SQL_IGNORE_COLLECTION, // When generating SQL query, exclude the target field because it is a collection
+    /**
+     * Defines how a field is handled during SQL generation and result mapping.
+     * <p>
+     * The status determines whether a field appears in:
+     * <ul>
+     * <li>The generated SQL query (SELECT clause)</li>
+     * <li>The final result row (DTO mapping)</li>
+     * </ul>
+     * </p>
+     *
+     * @author Frank KOSSI
+     * @since 2.0.0
+     */
+    public enum FieldStatus {
+        /**
+         * Standard field: included in SQL SELECT and mapped to DTO.
+         * <p>
+         * Example: {@code SELECT e.name AS name}
+         * </p>
+         */
+        SQL,
+
+        /**
+         * Internal dependency: included in SQL SELECT but NOT in final result.
+         * <p>
+         * Used for computed field dependencies that should not be exposed.
+         * </p>
+         */
+        SQL_ONLY,
+
+        /**
+         * Computed output: NOT in SQL SELECT (value computed at runtime).
+         * <p>
+         * Used for computed field result slots.
+         * </p>
+         */
+        SQL_IGNORE,
+
+        /**
+         * Collection placeholder: NOT in SQL, fetched via separate query.
+         * <p>
+         * Used for @OneToMany or @ManyToMany collections.
+         * </p>
+         */
+        SQL_IGNORE_COLLECTION
     }
 }

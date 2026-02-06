@@ -179,6 +179,15 @@ public class AggregateQueryExecutor {
 
     /**
      * Builds the list of entity classes along the collection path.
+     * <p>
+     * Starting from the root entity, navigates through each segment to determine
+     * the entity type at each level. For collection-type fields, extracts the
+     * generic element type.
+     * </p>
+     *
+     * @param segments path segments (e.g., ["departments", "teams", "employees",
+     *                 "salary"])
+     * @return ordered list of entity classes from root to leaf's parent
      */
     private List<Class<?>> buildEntityPath(String[] segments) {
         List<Class<?>> path = new ArrayList<>();
@@ -229,7 +238,16 @@ public class AggregateQueryExecutor {
     }
 
     /**
-     * Applies the reducer function.
+     * Applies the specified reducer function to the path expression.
+     * <p>
+     * Supported reducers: SUM, AVG, COUNT, COUNT_DISTINCT, MIN, MAX.
+     * </p>
+     *
+     * @param cb      criteria builder
+     * @param path    the path to aggregate
+     * @param reducer reducer name (case-insensitive)
+     * @return aggregate expression
+     * @throws IllegalArgumentException if reducer is not supported
      */
     @SuppressWarnings("unchecked")
     private Expression<Number> applyReducer(CriteriaBuilder cb, Path<Number> path, String reducer) {
@@ -245,7 +263,15 @@ public class AggregateQueryExecutor {
     }
 
     /**
-     * Finds a field in a class hierarchy.
+     * Finds a field by name in a class hierarchy.
+     * <p>
+     * Searches the class and all superclasses for the field.
+     * </p>
+     *
+     * @param clazz     starting class
+     * @param fieldName field name to find
+     * @return the Field object
+     * @throws NoSuchFieldException if field not found in hierarchy
      */
     private Field findField(Class<?> clazz, String fieldName) throws NoSuchFieldException {
         Class<?> current = clazz;
