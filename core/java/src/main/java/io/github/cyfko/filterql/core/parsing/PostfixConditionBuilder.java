@@ -5,7 +5,7 @@ import io.github.cyfko.filterql.core.api.FilterContext;
 import io.github.cyfko.filterql.core.config.DslPolicy;
 import io.github.cyfko.filterql.core.exception.DSLSyntaxException;
 import io.github.cyfko.filterql.core.model.FilterDefinition;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
+import io.github.cyfko.filterql.core.api.PropertyReference;
 
 import java.util.ArrayDeque;
 import java.util.Deque;

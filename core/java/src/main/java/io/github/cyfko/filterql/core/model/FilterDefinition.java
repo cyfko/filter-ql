@@ -1,10 +1,8 @@
 package io.github.cyfko.filterql.core.model;
 
 import io.github.cyfko.filterql.core.exception.FilterDefinitionException;
-import io.github.cyfko.filterql.core.validation.Op;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
-
-import java.util.Objects;
+import io.github.cyfko.filterql.core.api.Op;
+import io.github.cyfko.filterql.core.api.PropertyReference;
 
 
 /**

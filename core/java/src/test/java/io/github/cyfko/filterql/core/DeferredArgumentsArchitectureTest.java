@@ -3,11 +3,10 @@ package io.github.cyfko.filterql.core;
 import io.github.cyfko.filterql.core.api.Condition;
 import io.github.cyfko.filterql.core.api.FilterContext;
 import io.github.cyfko.filterql.core.exception.FilterDefinitionException;
-import io.github.cyfko.filterql.core.model.FilterDefinition;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
-import io.github.cyfko.filterql.core.validation.Op;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
+import io.github.cyfko.filterql.core.api.Op;
+import io.github.cyfko.filterql.core.api.PropertyReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -16,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 

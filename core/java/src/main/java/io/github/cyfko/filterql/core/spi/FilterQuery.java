@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.core.spi;
 
 import io.github.cyfko.filterql.core.model.FilterRequest;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
+import io.github.cyfko.filterql.core.api.PropertyReference;
 
 /**
  * <h2>FilterQuery</h2>

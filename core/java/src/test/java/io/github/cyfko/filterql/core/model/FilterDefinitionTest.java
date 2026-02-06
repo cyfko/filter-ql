@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.core.model;
 
 import io.github.cyfko.filterql.core.exception.FilterDefinitionException;
-import io.github.cyfko.filterql.core.validation.Op;
+import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.filterql.core.validation.DefinedPropertyReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;

@@ -5,8 +5,8 @@ import io.github.cyfko.filterql.core.config.FilterConfig;
 import io.github.cyfko.filterql.core.config.NullValuePolicy;
 import io.github.cyfko.filterql.core.exception.FilterValidationException;
 import io.github.cyfko.filterql.core.model.FilterDefinition;
-import io.github.cyfko.filterql.core.validation.Op;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
+import io.github.cyfko.filterql.core.api.Op;
+import io.github.cyfko.filterql.core.api.PropertyReference;
 
 import java.util.ArrayList;
 import java.util.Collection;

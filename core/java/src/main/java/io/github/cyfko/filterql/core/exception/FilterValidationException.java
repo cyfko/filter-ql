@@ -1,5 +1,8 @@
 package io.github.cyfko.filterql.core.exception;
 
+import io.github.cyfko.filterql.core.api.Op;
+import io.github.cyfko.filterql.core.api.PropertyReference;
+
 /**
  * Exception thrown when a filter condition cannot be validated or constructed.
  * <p>
@@ -72,7 +75,7 @@ package io.github.cyfko.filterql.core.exception;
  * }</pre>
  * 
  * <p><strong>Integration with Property References:</strong></p>
- * <p>This exception is commonly thrown by {@link io.github.cyfko.filterql.core.validation.PropertyReference}
+ * <p>This exception is commonly thrown by {@link PropertyReference}
  * implementations during validation of operator-value combinations. The error messages
  * are designed to be informative enough for both developers and end users.</p>
  * 
@@ -87,9 +90,9 @@ package io.github.cyfko.filterql.core.exception;
  *
  * @author Frank KOSSI
  * @since 2.0.0
- * @see io.github.cyfko.filterql.core.validation.PropertyReference
+ * @see PropertyReference
  * @see io.github.cyfko.filterql.core.model.FilterDefinition
- * @see io.github.cyfko.filterql.core.validation.Op
+ * @see Op
  */
 public class FilterValidationException extends RuntimeException {
 

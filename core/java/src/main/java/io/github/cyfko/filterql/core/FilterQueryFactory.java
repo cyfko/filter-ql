@@ -15,7 +15,7 @@ import io.github.cyfko.filterql.core.model.FilterRequest;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 import io.github.cyfko.filterql.core.spi.QueryExecutor;
 import io.github.cyfko.filterql.core.spi.FilterQuery;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
+import io.github.cyfko.filterql.core.api.PropertyReference;
 
 import java.util.*;
 import java.util.logging.Logger;

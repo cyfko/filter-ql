@@ -3,7 +3,6 @@ package io.github.cyfko.filterql.core.api;
 import io.github.cyfko.filterql.core.exception.DSLSyntaxException;
 import io.github.cyfko.filterql.core.exception.FilterValidationException;
 import io.github.cyfko.filterql.core.model.FilterDefinition;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
 
 import java.util.Map;
 

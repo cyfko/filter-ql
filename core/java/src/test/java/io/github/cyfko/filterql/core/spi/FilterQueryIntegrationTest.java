@@ -2,8 +2,8 @@ package io.github.cyfko.filterql.core.spi;
 
 import io.github.cyfko.filterql.core.model.FilterRequest;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
-import io.github.cyfko.filterql.core.validation.Op;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
+import io.github.cyfko.filterql.core.api.Op;
+import io.github.cyfko.filterql.core.api.PropertyReference;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;

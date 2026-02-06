@@ -1,5 +1,6 @@
 package io.github.cyfko.filterql.core.validation;
 
+import io.github.cyfko.filterql.core.api.Op;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

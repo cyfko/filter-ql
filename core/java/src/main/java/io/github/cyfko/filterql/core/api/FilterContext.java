@@ -4,7 +4,6 @@ import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.exception.FilterDefinitionException;
 import io.github.cyfko.filterql.core.model.FilterDefinition;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
 
 /**
  * Framework-agnostic interface for bridging filter definitions to backend-specific query execution.

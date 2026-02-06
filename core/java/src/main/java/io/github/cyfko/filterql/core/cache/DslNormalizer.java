@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.core.cache;
 
 import io.github.cyfko.filterql.core.model.FilterRequest;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
+import io.github.cyfko.filterql.core.api.PropertyReference;
 
 /**
  * Strategy interface for normalizing DSL expressions to generate cache keys.

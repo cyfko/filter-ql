@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.core.utils;
 
-import io.github.cyfko.filterql.core.validation.Op;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
+import io.github.cyfko.filterql.core.api.Op;
+import io.github.cyfko.filterql.core.api.PropertyReference;
 
 import java.lang.reflect.Array;
 import java.util.Collection;

@@ -421,7 +421,7 @@ class TypeConversionUtilsTest {
         @Test
         void shouldThrowExceptionForUnsupportedConversion() {
             assertThrows(IllegalArgumentException.class, () ->
-                    TypeConversionUtils.convertValue(java.awt.Point.class, "invalid", EnumMatchMode.CASE_SENSITIVE)
+                    TypeConversionUtils.convertValue(List.class, "invalid", EnumMatchMode.CASE_SENSITIVE)
             );
         }
 
