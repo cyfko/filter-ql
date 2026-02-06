@@ -1,6 +1,6 @@
 package io.github.cyfko.example;
 
-import io.github.cyfko.filterql.core.validation.Op;
+import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.filterql.spring.ExposedAs;
 import io.github.cyfko.filterql.spring.Exposure;
 import io.github.cyfko.projection.MethodReference;

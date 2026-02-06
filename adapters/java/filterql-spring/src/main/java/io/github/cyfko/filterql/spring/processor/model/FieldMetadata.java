@@ -4,7 +4,7 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.function.Function;
 
-import io.github.cyfko.filterql.core.validation.Op;
+import io.github.cyfko.filterql.core.api.Op;
 
 /**
  * Métadonnées d'un champ filtrable (régulier ou virtuel).

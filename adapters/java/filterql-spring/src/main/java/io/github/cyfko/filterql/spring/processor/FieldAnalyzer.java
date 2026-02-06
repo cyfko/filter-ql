@@ -12,7 +12,7 @@ import io.github.cyfko.projection.Computed;
 import io.github.cyfko.filterql.spring.processor.model.FieldMetadata;
 import io.github.cyfko.filterql.spring.processor.model.SupportedType;
 import io.github.cyfko.filterql.spring.support.DefaultOperatorStrategy;
-import io.github.cyfko.filterql.core.validation.Op;
+import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.projection.Projection;
 import io.github.cyfko.projection.metamodel.util.AnnotationProcessorUtils;
 

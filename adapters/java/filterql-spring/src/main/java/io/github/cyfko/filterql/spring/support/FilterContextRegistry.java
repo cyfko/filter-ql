@@ -1,6 +1,6 @@
 package io.github.cyfko.filterql.spring.support;
 
-import io.github.cyfko.filterql.core.validation.PropertyReference;
+import io.github.cyfko.filterql.core.api.PropertyReference;
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
 import org.springframework.stereotype.Component;
 

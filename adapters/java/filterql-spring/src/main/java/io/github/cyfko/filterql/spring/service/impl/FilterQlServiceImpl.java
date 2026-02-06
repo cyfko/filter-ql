@@ -2,12 +2,12 @@ package io.github.cyfko.filterql.spring.service.impl;
 
 import io.github.cyfko.filterql.core.FilterQueryFactory;
 import io.github.cyfko.filterql.core.model.FilterRequest;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
+import io.github.cyfko.filterql.core.api.PropertyReference;
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
-import io.github.cyfko.filterql.jpa.projection.InstanceResolver;
+import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
 import io.github.cyfko.filterql.jpa.strategies.CountStrategy;
 import io.github.cyfko.filterql.jpa.strategies.MultiQueryFetchStrategy;
-import io.github.cyfko.filterql.jpa.strategies.TypedMultiQueryFetchStrategy;
+import io.github.cyfko.filterql.jpa.strategies.helper.RowBuffer;
 import io.github.cyfko.filterql.spring.pagination.ResultMapper;
 import io.github.cyfko.filterql.spring.pagination.PaginatedData;
 import io.github.cyfko.filterql.spring.pagination.PaginationInfo;
@@ -44,7 +44,7 @@ public class FilterQlServiceImpl implements FilterQlService {
 
         // 2. Exécuter avec le repository
         MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(projectionClass, instanceResolver);
-        List<Map<String, Object>> results = FilterQueryFactory.of(context).execute(filterRequest, em, strategy);
+        List<RowBuffer> results = FilterQueryFactory.of(context).execute(filterRequest, em, strategy);
 
         // 3. Count all matchs
         Long counted = FilterQueryFactory.of(context).execute(filterRequest, em, new CountStrategy(projectionClass));
@@ -54,7 +54,7 @@ public class FilterQlServiceImpl implements FilterQlService {
         PaginationInfo pagination = new PaginationInfo(page, results.size(), counted);
 
         // Ok
-        return new PaginatedData<>(results, pagination);
+        return new PaginatedData<>(results.stream().map(RowBuffer::toMap), pagination);
     }
 
     @Override

@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.spring.service;
 
 import io.github.cyfko.filterql.core.model.FilterRequest;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
+import io.github.cyfko.filterql.core.api.PropertyReference;
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
 import io.github.cyfko.filterql.spring.pagination.PaginatedData;
 import io.github.cyfko.filterql.spring.pagination.ResultMapper;

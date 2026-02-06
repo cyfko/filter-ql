@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.spring.service.impl;
 
 import io.github.cyfko.filterql.jpa.exception.InstanceResolutionException;
-import io.github.cyfko.filterql.jpa.projection.InstanceResolver;
+import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;

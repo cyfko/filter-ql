@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.spring.security;
 
 import io.github.cyfko.filterql.core.model.FilterDefinition;
-import io.github.cyfko.filterql.core.validation.PropertyReference;
+import io.github.cyfko.filterql.core.api.PropertyReference;
 
 import java.util.List;
 

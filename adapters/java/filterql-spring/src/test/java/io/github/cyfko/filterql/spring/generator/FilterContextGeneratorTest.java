@@ -1,14 +1,12 @@
 package io.github.cyfko.filterql.spring.generator;
 
-import io.github.cyfko.filterql.core.validation.Op;
+import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.filterql.spring.processor.model.FieldMetadata;
-import io.github.cyfko.filterql.spring.processor.model.SupportedType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 

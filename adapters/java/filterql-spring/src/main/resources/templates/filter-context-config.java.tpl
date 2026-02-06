@@ -1,8 +1,8 @@
 package io.github.cyfko.filterql.spring.config;
 
 import io.github.cyfko.filterql.core.spi.PredicateResolver;
-import io.github.cyfko.filterql.jpa.mappings.PredicateResolverMapping;
-import io.github.cyfko.filterql.jpa.projection.InstanceResolver;
+import io.github.cyfko.filterql.jpa.spi.PredicateResolverMapping;
+import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
 import io.github.cyfko.filterql.jpa.utils.ProjectionUtils;
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
 import org.springframework.context.annotation.Bean;

@@ -1,7 +1,7 @@
 package ${packageName};
 
-import io.github.cyfko.filterql.core.validation.PropertyReference;
-import io.github.cyfko.filterql.core.validation.Op;
+import io.github.cyfko.filterql.core.api.PropertyReference;
+import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.projection.metamodel.ProjectionRegistry;
 
 import java.util.Set;

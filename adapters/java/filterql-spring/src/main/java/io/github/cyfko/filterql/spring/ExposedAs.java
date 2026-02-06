@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.spring;
 
 import java.lang.annotation.*;
-import io.github.cyfko.filterql.core.validation.Op;
+import io.github.cyfko.filterql.core.api.Op;
 
 /**
  * Customizes how a projected field is exposed in the generated enum or filter DSL.

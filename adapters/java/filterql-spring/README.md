@@ -473,7 +473,7 @@ import io.github.cyfko.projection.Projected;
 // FilterQL Spring annotations
 import io.github.cyfko.filterql.spring.Exposure;
 import io.github.cyfko.filterql.spring.ExposedAs;
-import io.github.cyfko.filterql.core.validation.Op;
+import io.github.cyfko.filterql.core.api.Op;
 
 @Projection(from = Person.class)
 @Exposure(value = "users", basePath = "/api/v1")
