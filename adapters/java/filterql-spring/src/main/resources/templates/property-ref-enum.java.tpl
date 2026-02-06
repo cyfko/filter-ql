@@ -2,7 +2,7 @@ package ${packageName};
 
 import io.github.cyfko.filterql.core.api.PropertyReference;
 import io.github.cyfko.filterql.core.api.Op;
-import io.github.cyfko.projection.metamodel.ProjectionRegistry;
+import io.github.cyfko.jpametamodel.ProjectionRegistry;
 
 import java.util.Set;
 

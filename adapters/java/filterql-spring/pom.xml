@@ -55,7 +55,7 @@
         <!-- Dependencies Versions -->
         <compile-testing.version>0.21.0</compile-testing.version>
         <filterql-jpa.version>2.0.0</filterql-jpa.version>
-        <projection-processor.version>1.0.0</projection-processor.version>
+        <jpa-processor.version>1.0.0</jpa-processor.version>
     </properties>
 
     <dependencies>
@@ -70,8 +70,8 @@
         <!-- Projection processor -->
         <dependency>
             <groupId>io.github.cyfko</groupId>
-            <artifactId>projection-metamodel-processor</artifactId>
-            <version>${projection-processor.version}</version>
+            <artifactId>jpa-metamodel-processor</artifactId>
+            <version>${jpa-processor.version}</version>
             <scope>provided</scope>
         </dependency>
 

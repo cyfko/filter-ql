@@ -14,7 +14,7 @@ import io.github.cyfko.filterql.spring.processor.model.SupportedType;
 import io.github.cyfko.filterql.spring.support.DefaultOperatorStrategy;
 import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.projection.Projection;
-import io.github.cyfko.projection.metamodel.util.AnnotationProcessorUtils;
+import io.github.cyfko.jpametamodel.util.AnnotationProcessorUtils;
 
 /**
  * Analyzes entity classes annotated for FilterQL and extracts metadata for all filterable fields.
