@@ -92,14 +92,14 @@ public interface PropertyReference {
     Set<Op> getSupportedOperators();
 
     /**
-     * Returns the Java type of the target {@link jakarta.persistence.Entity}.
+     * Returns the Java type of the target domain entity or document.
      * <p>
-     * This method identifies which entity class this property reference belongs to.
+     * This method identifies which root type this property reference belongs to.
      * It is used by adapters to validate property mappings and ensure type safety
-     * when building queries.
+     * when building queries (e.g., JPA entities, MongoDB documents, etc.).
      * </p>
      *
-     * @return the Java class representing the entity type (e.g., User.class,
+     * @return the Java class representing the root type (e.g., User.class,
      *         Order.class)
      */
     Class<?> getEntityType();
