@@ -51,8 +51,7 @@ class PathResolverUtilsTest {
     void testSimpleField() {
         Root<ParentEntity> root = cb.createQuery(ParentEntity.class).from(ParentEntity.class);
 
-        PathResolverUtils.PathResolutionMetadata meta =
-                PathResolverUtils.resolvePathWithMeta(root, "id");
+        PathResolverUtils.PathResolutionMetadata meta = PathResolverUtils.resolvePathWithMeta(root, "id");
 
         assertNotNull(meta.finalPath());
         assertFalse(meta.hasCollections());
