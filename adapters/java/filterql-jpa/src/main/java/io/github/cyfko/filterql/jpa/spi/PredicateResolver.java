@@ -53,7 +53,7 @@ import java.util.Objects;
  *
  * @param <E> the JPA entity type this resolver operates on
  * @author Frank KOSSI
- * @since 4.0.0
+ * @since 2.0.0
  * @see Predicate
  * @see CriteriaBuilder
  */

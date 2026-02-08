@@ -53,7 +53,7 @@ package io.github.cyfko.filterql.jpa.spi;
  *
  * @param <E> the entity type this mapping applies to
  * @author Frank KOSSI
- * @since 4.0.0
+ * @since 2.0.0
  */
 @FunctionalInterface
 public interface PredicateResolverMapping<E> extends ReferenceMapping<E> {
@@ -85,7 +85,7 @@ public interface PredicateResolverMapping<E> extends ReferenceMapping<E> {
      * @param args the arguments of the filter's operator
      * @return the PredicateResolver for deferred predicate generation
      * @throws IllegalArgumentException if the operator or arguments are invalid
-     * @since 4.0.0
+     * @since 2.0.0
      */
     PredicateResolver<E> map(String op, Object[] args);
 }

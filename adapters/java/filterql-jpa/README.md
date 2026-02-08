@@ -155,22 +155,19 @@ List<User> users = entityExecutor.executeWith(em, new FullEntityFetchStrategy<>(
 For custom query construction or when you need full control:
 
 ```java
-// Get resolver only
-PredicateResolver<User> resolver = filterQuery.toResolver(request);
+// Get resolver and convert to PredicateResolver
+ConditionResolver<EntityManager, ?> resolver = filterQuery.toResolver(request);
+PredicateResolver<?> pr = PredicateResolver.from(resolver);
 
-// Manually construct JPA Criteria query
-CriteriaBuilder cb = em.getCriteriaBuilder();
-CriteriaQuery<User> query = cb.createQuery(User.class);
-Root<User> root = query.from(User.class);
-
-// Apply filter predicate
-query.where(resolver.resolve(root, query, cb));
+// Resolve to CriteriaBundle (contains predicate, query, cb, root)
+CriteriaBundle bundle = pr.resolve(User.class, em);
 
 // Add custom joins, selections, etc.
-// query.select(...).distinct(true)...
+// bundle.query().select(...).distinct(true)...
 
-// Execute
-List<User> users = em.createQuery(query).getResultList();
+// Apply filter predicate and execute
+bundle.query().where(bundle.predicate());
+List<User> users = em.createQuery(bundle.query()).getResultList();
 ```
 
 **When to use each approach:**

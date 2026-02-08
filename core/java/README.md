@@ -337,18 +337,18 @@ public interface FilterQuery<E> {
 
 ```java
 // Low-level approach (maximum control)
-FilterQuery<User> filterQuery = FilterQueryFactory.of(context);
-ConditionResolver<User> resolver = filterQuery.toResolver(request);
+FilterQuery<EntityManager> filterQuery = FilterQueryFactory.of(context);
+ConditionResolver<EntityManager, ?> resolver = filterQuery.toResolver(request);
 
-CriteriaBuilder cb = em.getCriteriaBuilder();
-CriteriaQuery<User> query = cb.createQuery(User.class);
-Root<User> root = query.from(User.class);
-query.where(resolver.resolve(root, query, cb));
-List<User> results = em.createQuery(query).getResultList();
+// Convert to PredicateResolver and resolve with CriteriaBundle
+PredicateResolver<?> pr = PredicateResolver.from(resolver);
+CriteriaBundle bundle = pr.resolve(User.class, em);
+bundle.query().where(bundle.predicate());
+List<User> results = em.createQuery(bundle.query()).getResultList();
 
 // Mid-level approach (strategy-based)
-QueryExecutor<List<UserDto>> executor = filterQuery.toExecutor(request);
-List<UserDto> dtos = executor.executeWith(em, new MultiQueryFetchStrategy<>(UserDto.class));
+QueryExecutor<EntityManager> executor = filterQuery.toExecutor(request);
+List<RowBuffer> dtos = executor.executeWith(em, new MultiQueryFetchStrategy(UserDto.class));
 ```
 
 ### FilterContext

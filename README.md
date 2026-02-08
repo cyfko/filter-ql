@@ -263,16 +263,15 @@ FilterContext context = new JpaFilterContext<>(
 
 ```java
 // 1. Create FilterQuery from context
-FilterQuery<User> filterQuery = FilterQueryFactory.of(context);
+FilterQuery<EntityManager> filterQuery = FilterQueryFactory.of(context);
 
 // 2. Build FilterRequest
 FilterRequest<UserPropertyRef> request = /* ... */;
 
-// 3. Execute with strategy
+// 3. Get executor and execute with strategy
 EntityManager em = /* ... */;
-ExecutionStrategy<List<UserDto>> strategy = new MultiQueryFetchStrategy<>();
-
-List<UserDto> results = filterQuery.execute(request, em, strategy);
+QueryExecutor<EntityManager> executor = filterQuery.toExecutor(request);
+List<RowBuffer> results = executor.executeWith(em, new MultiQueryFetchStrategy(UserDto.class));
 ```
 
 ---
@@ -341,16 +340,15 @@ PredicateResolver<User> resolver = context.toResolver(combined, executionParams)
 The `ExecutionStrategy` builds and executes the backend-specific query:
 
 ```java
-// JPA Criteria API example
-CriteriaBuilder cb = em.getCriteriaBuilder();
-CriteriaQuery<User> query = cb.createQuery(User.class);
-Root<User> root = query.from(User.class);
+// Using PredicateResolver with CriteriaBundle (JPA Adapter)
+PredicateResolver<?> pr = PredicateResolver.from(resolver);
+CriteriaBundle bundle = pr.resolve(User.class, em);
 
-// Apply filter predicate
-query.where(resolver.resolve(root, query, cb));
+// Access bundle components
+bundle.query().where(bundle.predicate());
 
 // Execute
-List<User> results = em.createQuery(query).getResultList();
+List<User> results = em.createQuery(bundle.query()).getResultList();
 ```
 
 ---
@@ -417,8 +415,8 @@ FilterRequest<ProductPropertyRef> request = FilterRequest.builder()
 
 // 5. Execute
 EntityManager em = entityManagerFactory.createEntityManager();
-ExecutionStrategy<List<Product>> strategy = new FullEntityFetchStrategy<>();
-List<Product> products = filterQuery.execute(request, em, strategy);
+QueryExecutor<EntityManager> executor = filterQuery.toExecutor(request);
+List<RowBuffer> products = executor.executeWith(em, new FullEntityFetchStrategy(Product.class));
 ```
 
 ### Advanced: DTO Projection
@@ -440,8 +438,8 @@ FilterRequest<ProductPropertyRef> request = FilterRequest.builder()
     .build();
 
 // Execute with multi-query strategy (optimized for DTOs)
-ExecutionStrategy<List<ProductDto>> strategy = new MultiQueryFetchStrategy<>();
-List<ProductDto> dtos = filterQuery.execute(request, em, strategy);
+QueryExecutor<EntityManager> executor = filterQuery.toExecutor(request);
+List<RowBuffer> dtos = executor.executeWith(em, new MultiQueryFetchStrategy(ProductDto.class));
 ```
 
 ### Custom Operators
