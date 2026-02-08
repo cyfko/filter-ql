@@ -19,25 +19,8 @@ import io.github.cyfko.filterql.core.model.QueryExecutionParams;
  *
  * <p>
  * This design provides maximum flexibility: the same executor can work with any
- * strategy
- * that produces results of type {@code R}.
+ * strategy. The chosen strategy govern the expected result type.
  * </p>
- *
- * <h3>Usage Examples:</h3>
- * 
- * <pre>{@code
- * // Execute to get a list of DTOs (JPA adapter example)
- * QueryExecutor<List<UserDto>> listExecutor = filterQuery.toExecutor(request);
- * List<UserDto> users = listExecutor.executeWith(entityManager, new MultiQueryFetchStrategy<>());
- *
- * // Execute to get a page of results
- * QueryExecutor<Page<UserDto>> pageExecutor = filterQuery.toExecutor(request);
- * Page<UserDto> page = pageExecutor.executeWith(entityManager, new PagedFetchStrategy<>());
- *
- * // Execute to get a count
- * QueryExecutor<Long> countExecutor = filterQuery.toExecutor(request);
- * Long count = countExecutor.executeWith(entityManager, new CountStrategy<>());
- * }</pre>
  *
  * <h3>Thread Safety:</h3>
  * <p>
@@ -47,12 +30,12 @@ import io.github.cyfko.filterql.core.model.QueryExecutionParams;
  * for thread safety (e.g., per-thread EntityManager in JPA).
  * </p>
  *
- * @param <Context> the type of execution context (e.g., EntityManager for JPA)
+ * @param <Em> The execution management context (e.g EntityManager for JPA).
  *
  * @see ExecutionStrategy
  * @see FilterQuery
  */
-public interface QueryExecutor<Context> {
+public interface QueryExecutor<Em> {
 
     /**
      * Executes the query using the provided strategy.
@@ -60,42 +43,40 @@ public interface QueryExecutor<Context> {
      * <p>
      * The strategy defines <b>how</b> the query is executed (single query,
      * multi-query,
-     * native SQL, cached, etc.) while the executor type {@code Result} defines
-     * <b>what</b>
-     * is returned.
+     * native SQL, cached, etc.) and <b>what</b> {@link Result} is returned.
      * </p>
      *
      * <p>
      * The executor orchestrates the execution by providing the strategy with:
      * <ul>
-     * <li>The execution context (e.g., EntityManager for JPA)</li>
+     * <li>The specific implementation defined execution management context (e.g., EntityManager for JPA)</li>
      * <li>The {@link ConditionResolver} for building filter predicates</li>
      * <li>The {@link QueryExecutionParams} containing projection, pagination,
      * sorting, etc.</li>
      * </ul>
      * </p>
      *
-     * <h4>Examples (JPA adapter):</h4>
-     * 
+     * <h4>Implementation Examples:</h4>
+     *
      * <pre>{@code
-     * // List execution
-     * QueryExecutor<EntityManager> executor = filterQuery.toExecutor(request);
-     * List<RowBuffer> users = executor.executeWith(entityManager, new MultiQueryFetchStrategy(UserDTO.class));
+     * var executor = filterQuery.toExecutor(request);
      *
-     * // Typed list execution
-     * List<UserDTO> typedUsers = executor.executeWith(entityManager,
-     *         new TypedMultiQueryFetchStrategy<>(UserDTO.class, UserDTO::new));
+     * // Execute to get a list of DTOs
+     * List<?> users = executor.executeWith(em, new MultiQueryFetchStrategy<>());
      *
-     * // Count execution
-     * Long total = executor.executeWith(entityManager, new CountStrategy(UserDTO.class));
+     * // Execute to get a page of results
+     * Page<UserDto> page = executor.executeWith(em, new PagedFetchStrategy<>());
+     *
+     * // Execute to get a count
+     * Long count = executor.executeWith(em, new CountStrategy<>());
      * }</pre>
      *
-     * @param ctx      the execution context. Must not be null.
+     * @param em      the execution context. Must not be null.
      * @param strategy the execution strategy defining the execution logic.
      *                 Must not be null and must produce results of type
      *                 {@code Result}.
      * @return a result of type {@code Result}
      * @throws IllegalArgumentException if ctx or strategy is null
      */
-    <Result> Result executeWith(Context ctx, ExecutionStrategy<Result> strategy);
+    <Result> Result executeWith(Em em, ExecutionStrategy<Result> strategy);
 }

@@ -1,15 +1,14 @@
 # FilterQL Core Module
 
-**Version**: 4.0.0  
+**Version**: 4.0.1  
 **License**: MIT  
-**Java**: 21+  
-**Dependencies**: Jakarta Persistence API 3.1.0, Jakarta Validation API 3.1.1
-
+**Java**: 21+
 ---
 
 ## Overview
 
-FilterQL Core is the foundational module providing framework-agnostic dynamic filtering capabilities through a type-safe Domain-Specific Language (DSL). It defines all core interfaces, SPIs, data models, validation logic, and parsing infrastructure that backend adapters (JPA, SQL, etc.) implement to provide concrete query execution.
+FilterQL Core is the foundational module providing framework-agnostic dynamic filtering capabilities through a type-safe 
+Domain-Specific Language (DSL). It defines all core interfaces, SPIs, data models, validation logic, and parsing infrastructure that backend adapters (JPA, SQL, etc.) implement to provide concrete query execution.
 
 **Key Characteristics:**
 - **Framework-Agnostic**: No assumptions about query backends
@@ -72,6 +71,8 @@ io.github.cyfko.filterql.core
 │   ├── Condition              # Composable filter conditions
 │   ├── DslParser              # DSL parsing contract
 │   ├── FilterContext          # Backend bridge interface
+│   ├── PropertyReference      # Enum-based property refs
+│   └── Op                     # Standard operators
 │   └── FilterTree             # Parsed AST representation
 ├── spi/                        # Service Provider Interfaces
 │   ├── FilterQuery            # Query lifecycle facade
@@ -84,9 +85,6 @@ io.github.cyfko.filterql.core
 │   ├── Pagination             # Pagination metadata
 │   ├── SortBy                 # Sort specification
 │   └── QueryExecutionParams   # Execution parameters
-├── validation/                 # Type safety & validation
-│   ├── PropertyReference      # Enum-based property refs
-│   └── Op                     # Standard operators
 ├── impl/                       # Default implementations
 │   └── BasicDslParser         # Default DSL parser
 ├── parsing/                    # Parsing infrastructure
@@ -105,13 +103,12 @@ io.github.cyfko.filterql.core
 │   ├── OperatorValidationUtils # Operator validation
 │   ├── TypeConversionUtils    # Type compatibility
 │   ├── ClassUtils             # Reflection utilities
+│   └── ProjectionFieldParser  # Field path parsing
 │   └── OperatorUtils          # Operator constants
 ├── exception/                  # Exception hierarchy
 │   ├── DSLSyntaxException     # DSL parsing errors
 │   ├── FilterValidationException # Validation failures
 │   └── FilterDefinitionException # Definition errors
-├── projection/                 # Projection utilities
-│   └── ProjectionFieldParser  # Field path parsing
 └── FilterQueryFactory          # Main factory facade
 ```
 

@@ -23,21 +23,6 @@ package io.github.cyfko.filterql.core.spi;
  * thread-safe</li>
  * </ul>
  *
- * <h2>Usage Example (JPA Adapter)</h2>
- * 
- * <pre>{@code
- * // In filterql-jpa module:
- * public interface PredicateResolver<E> extends ConditionResolver<EntityManager, CriteriaBundle> {
- *     Predicate resolve(Root<E> root, CriteriaQuery<?> query, CriteriaBuilder cb);
- * }
- *
- * // Usage:
- * PredicateResolver<User> resolver = (root, query, cb) -> cb.equal(root.get("status"), Status.ACTIVE);
- *
- * CriteriaBundle detail = resolver.resolve(User.class, entityManager);
- * Predicate predicate = detail.predicate();
- * }</pre>
- *
  * @param <Em> Execution management context type - implementation-specific
  *             (e.g., EntityManager)
  * @param <R>  Result type - backend-specific predicate type
@@ -80,7 +65,7 @@ public interface ConditionResolver<Em, R> {
      * </ul>
      *
      * @param subject the entity class being queried (e.g., User.class)
-     * @param em      implementation-specific execution manager context containing
+     * @param em      implementation-specific execution management context containing
      *                necessary components
      * @param <E>     entity type
      * @return backend-specific predicate ready for query execution

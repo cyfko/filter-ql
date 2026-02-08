@@ -87,12 +87,10 @@ import io.github.cyfko.filterql.core.api.PropertyReference;
  * <pre>{@code
  * FilterRequest<UserProperty> request = ...;
  *
- * ConditionResolver<EntityManager, ?> resolver = filterQuery.toResolver(request);
+ * ConditionResolver<Em, ?> resolver = filterQuery.toResolver(request);
  *
- * // Backend-specific usage in JPA adapter:
- * PredicateResolver<?> jpaResolver = PredicateResolver.from(resolver);
- * CriteriaBundle detail = jpaResolver.resolve(User.class, entityManager);
- * Predicate predicate = detail.predicate();
+ * // Implementation-specific usage:
+ * resolver.resolve(User.class, em); // The result of this call can be handled differently
  * }</pre>
  *
  * <h3>Design Considerations:</h3>
@@ -136,15 +134,6 @@ public interface FilterQuery<Em> {
      * building complex queries manually.
      * </p>
      *
-     * <h4>Example:</h4>
-     * 
-     * <pre>{@code
-     * ConditionResolver<EntityManager, ?> resolver = filterQuery.toResolver(request);
-     *
-     * // Cast to backend-specific resolver for actual usage
-     * PredicateResolver<?> jpaResolver = PredicateResolver.from(resolver);
-     * }</pre>
-     *
      * @param request FilterQL request containing filters and associated parameters
      * @param <P>     Enumeration type representing filterable properties (must
      *                implement {@link PropertyReference})
@@ -164,23 +153,11 @@ public interface FilterQuery<Em> {
      * or when you need to prepare an executor that will be used multiple times.
      * </p>
      *
-     * <p>
-     * The result type parameter allows transforming query results into:
-     * <ul>
-     * <li><b>Entity classes:</b> {@code User.class} for JPA entities</li>
-     * <li><b>DTO classes:</b> {@code UserDto.class} for data transfer objects</li>
-     * <li><b>Tuple:</b> {@code Tuple.class} for dynamic multi-column results</li>
-     * <li><b>Map:</b> {@code Map.class} for key-value results</li>
-     * <li><b>Custom types:</b> Any class with appropriate constructor or
-     * builder</li>
-     * </ul>
-     * </p>
-     *
      * <h4>Example with Multiple Strategies:</h4>
      * 
      * <pre>{@code
      * FilterRequest<ProductProperty> request = ...;
-     * QueryExecutor<ProductDto> executor = filterQuery.resolve(request, ProductDto.class);
+     * QueryExecutor<Em> executor = filterQuery.resolve(request, ProductDto.class);
      *
      * // Try different execution strategies
      * List<ProductDto> all = executor.executeWith(em, new SingleQueryExecutionStrategy<>());
@@ -243,8 +220,7 @@ public interface FilterQuery<Em> {
      * @return Result of type {@code T} as defined by the strategy
      * @throws IllegalArgumentException if any parameter is null
      */
-    default <P extends Enum<P> & PropertyReference, T> T execute(FilterRequest<P> request, Em ctx,
-            ExecutionStrategy<T> strategy) {
+    default <P extends Enum<P> & PropertyReference, T> T execute(FilterRequest<P> request, Em ctx, ExecutionStrategy<T> strategy) {
         QueryExecutor<Em> executor = this.toExecutor(request);
         return executor.executeWith(ctx, strategy);
     }

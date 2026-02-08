@@ -109,7 +109,7 @@ public interface ExecutionStrategy<R> {
      * <p>
      * This method receives all necessary components to build and execute the query:
      * <ul>
-     * <li>The execution context (e.g., EntityManager for JPA)</li>
+     * <li>The implementation-specific execution management context (e.g., EntityManager for JPA)</li>
      * <li>The {@link ConditionResolver} for constructing filter predicates</li>
      * <li>The {@link QueryExecutionParams} with projection, pagination, sorting,
      * etc.</li>
@@ -147,14 +147,12 @@ public interface ExecutionStrategy<R> {
      * }</pre>
      *
      * @param <Context> the type of execution context (e.g., EntityManager for JPA)
-     * @param ctx       the execution context used to build and execute the query.
+     * @param ctx       the implementation-specific execution management context used to build and execute the query.
      *                  Must not be null.
      * @param resolver  the {@link ConditionResolver} responsible for building
-     *                  filter predicates
-     *                  from the FilterQL request. Must not be null.
+     *                  filter predicates from the FilterQL request. Must not be null.
      * @param params    execution parameters including projection, pagination,
-     *                  sorting, etc.
-     *                  Must not be null.
+     *                  sorting, etc. Must not be null.
      * @return Result of type {@code R} as defined by this strategy implementation
      * @throws IllegalArgumentException if any parameter is null
      */
