@@ -1,16 +1,21 @@
 package io.github.cyfko.filterql.tests;
 
+import io.github.cyfko.filterql.core.spi.ConditionResolver;
+
 import io.github.cyfko.filterql.core.api.Condition;
 import io.github.cyfko.filterql.core.config.FilterConfig;
 import io.github.cyfko.filterql.core.config.StringCaseStrategy;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
+import io.github.cyfko.filterql.jpa.spi.ManagerDetail;
+import io.github.cyfko.filterql.jpa.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.filterql.core.api.PropertyReference;
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Persistence;
+import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Selection;
 import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.*;
 
@@ -24,8 +29,10 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for {@link StringCaseStrategy} behavior in the deferred arguments architecture.
- * Validates that case conversion strategies are properly applied during query execution.
+ * Tests for {@link StringCaseStrategy} behavior in the deferred arguments
+ * architecture.
+ * Validates that case conversion strategies are properly applied during query
+ * execution.
  */
 @Transactional
 class StringCaseStrategyTest {
@@ -47,26 +54,28 @@ class StringCaseStrategyTest {
     @AfterEach
     void tearDown() {
         em.getTransaction().commit();
-        if (em.isOpen()) em.close();
+        if (em.isOpen())
+            em.close();
     }
 
     @AfterAll
     static void close() {
-        if (emf.isOpen()) emf.close();
+        if (emf.isOpen())
+            emf.close();
     }
 
     enum Ref implements PropertyReference {
         NAME;
 
         @Override
-        public Class<?> getType(){
-            return switch (this){
+        public Class<?> getType() {
+            return switch (this) {
                 case NAME -> String.class;
             };
         }
 
         @Override
-        public Set<Op> getSupportedOperators(){
+        public Set<Op> getSupportedOperators() {
             return switch (this) {
                 case NAME -> Set.of(Op.MATCHES);
             };
@@ -80,10 +89,9 @@ class StringCaseStrategyTest {
 
     private JpaFilterContext<Ref> ctx(StringCaseStrategy strat) {
         return new JpaFilterContext<>(
-            Ref.class,
-            ref -> "name",
-            FilterConfig.builder().stringCaseStrategy(strat).build()
-        );
+                Ref.class,
+                ref -> "name",
+                FilterConfig.builder().stringCaseStrategy(strat).build());
     }
 
     @Test
@@ -113,13 +121,18 @@ class StringCaseStrategyTest {
         assertEquals(0, noneResult.size(), "NONE strategy should be case-sensitive and miss the row");
     }
 
-    private List<SimpleUser> run(PredicateResolver<?> resolver) {
-        var cb = em.getCriteriaBuilder();
-        var cq = cb.createQuery(SimpleUser.class);
-        var root = cq.from(SimpleUser.class);
-        //noinspection rawtypes,unchecked
-        cq.select(root).where(resolver.resolve((Root) root, cq, cb));
-        TypedQuery<SimpleUser> q = em.createQuery(cq);
+    private List<SimpleUser> run(ConditionResolver<EntityManager, ManagerDetail> resolver) {
+        ManagerDetail detail = resolver.resolve(SimpleUser.class, em);
+
+        @SuppressWarnings("unchecked")
+        CriteriaQuery<SimpleUser> query = (CriteriaQuery<SimpleUser>) detail.query();
+
+        @SuppressWarnings("unchecked")
+        Selection<? extends SimpleUser> root = (Selection<? extends SimpleUser>) detail.root();
+
+        query.select(root).where(detail.predicate());
+        TypedQuery<SimpleUser> q = em.createQuery(query);
+
         return q.getResultList();
     }
 }

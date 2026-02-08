@@ -1,7 +1,5 @@
 package io.github.cyfko.filterql.jpa.spi;
 
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
-
 /**
  * Functional interface for resolving JPA predicates from virtual fields.
  * <p>
@@ -12,27 +10,28 @@ import io.github.cyfko.filterql.core.spi.PredicateResolver;
  * 
  * <h2>Use Cases</h2>
  * <ul>
- *   <li>Complex business rules involving multiple entity properties</li>
- *   <li>Custom search algorithms (full-text search, fuzzy matching, etc.)</li>
- *   <li>Cross-entity filtering with joins and subqueries</li>
- *   <li>Calculated fields and aggregations</li>
- *   <li>Custom operators (SOUNDEX, GEO_WITHIN, etc.)</li>
+ * <li>Complex business rules involving multiple entity properties</li>
+ * <li>Custom search algorithms (full-text search, fuzzy matching, etc.)</li>
+ * <li>Cross-entity filtering with joins and subqueries</li>
+ * <li>Calculated fields and aggregations</li>
+ * <li>Custom operators (SOUNDEX, GEO_WITHIN, etc.)</li>
  * </ul>
  *
  * <h2>Best Practices</h2>
  * <ul>
- *   <li>Keep mappings stateless and thread-safe</li>
- *   <li>Validate input parameters inside the returned PredicateResolver</li>
- *   <li>Provide meaningful error messages</li>
- *   <li>Consider performance implications of complex queries</li>
- *   <li>Use appropriate indexes for custom filter paths</li>
- *   <li>Document business logic and expected parameter types</li>
+ * <li>Keep mappings stateless and thread-safe</li>
+ * <li>Validate input parameters inside the returned JpaPredicateResolver</li>
+ * <li>Provide meaningful error messages</li>
+ * <li>Consider performance implications of complex queries</li>
+ * <li>Use appropriate indexes for custom filter paths</li>
+ * <li>Document business logic and expected parameter types</li>
  * </ul>
  *
  * <h2>Example: SOUNDEX operator</h2>
+ * 
  * <pre>{@code
  * // Helper method for SOUNDEX on any field
- * static PredicateResolverMapping<User> soundexMapping(String fieldName) {
+ * static JpaPredicateResolverMapping<User> soundexMapping(String fieldName) {
  *     return (op, args) -> (root, query, cb) -> {
  *         if (!"SOUNDEX".equals(op)) {
  *             throw new IllegalArgumentException("Expected SOUNDEX operator");
@@ -60,27 +59,33 @@ import io.github.cyfko.filterql.core.spi.PredicateResolver;
 public interface PredicateResolverMapping<E> extends ReferenceMapping<E> {
 
     /**
-     * Resolves a {@link PredicateResolver} given the operator code and arguments.
+     * Resolves a {@link PredicateResolver} given the operator code and
+     * arguments.
      * <p>
-     * This method is called during query construction to obtain a deferred predicate
-     * generator. The actual predicate is built later when the PredicateResolver's
+     * This method is called during query construction to obtain a deferred
+     * predicate
+     * generator. The actual predicate is built later when the
+     * JpaPredicateResolver's
      * {@code resolve()} method is called with the JPA context.
      * </p>
      * 
-     * <p><strong>Guarantees:</strong></p>
+     * <p>
+     * <strong>Guarantees:</strong>
+     * </p>
      * <ul>
-     *     <li>{@code op} is never null nor blank.</li>
-     *     <li>{@code args} is never null.</li>
-     *     <li>{@code args} contains the single element if the initial operator's argument was a scalar value.</li>
-     *     <li>{@code args} contains all elements if the initial operator's argument was a collection.</li>
+     * <li>{@code op} is never null nor blank.</li>
+     * <li>{@code args} is never null.</li>
+     * <li>{@code args} contains the single element if the initial operator's
+     * argument was a scalar value.</li>
+     * <li>{@code args} contains all elements if the initial operator's argument was
+     * a collection.</li>
      * </ul>
      *
-     * @param op the filter operator to apply (e.g., "EQ", "LIKE", "SOUNDEX")
+     * @param op   the filter operator to apply (e.g., "EQ", "LIKE", "SOUNDEX")
      * @param args the arguments of the filter's operator
-     * @return the PredicateResolver for deferred predicate generation
+     * @return the JpaPredicateResolver for deferred predicate generation
      * @throws IllegalArgumentException if the operator or arguments are invalid
      * @since 4.0.0
      */
     PredicateResolver<E> map(String op, Object[] args);
 }
-

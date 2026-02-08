@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class LargeScaleBenchmarkTest {
 
     private static EntityManagerFactory emf;
-    private static FilterContext filterContext;
+    private static FilterContext<EntityManager> filterContext;
 
     // Large scale configuration - 100 companies = 6000 employees total
     private static final int NUM_COMPANIES = 100;

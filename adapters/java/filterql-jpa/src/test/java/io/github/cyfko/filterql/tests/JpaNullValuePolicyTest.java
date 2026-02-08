@@ -1,19 +1,20 @@
 package io.github.cyfko.filterql.tests;
 
+import io.github.cyfko.filterql.core.spi.ConditionResolver;
+import io.github.cyfko.filterql.jpa.spi.ManagerDetail;
+import jakarta.persistence.EntityManager;
+
 import io.github.cyfko.filterql.core.api.Condition;
 import io.github.cyfko.filterql.core.config.FilterConfig;
 import io.github.cyfko.filterql.core.config.NullValuePolicy;
 import io.github.cyfko.filterql.core.exception.FilterValidationException;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.filterql.core.api.PropertyReference;
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
 import io.github.cyfko.filterql.tests.entities.policies.Item;
 import jakarta.persistence.*;
-import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Root;
 import org.junit.jupiter.api.*;
 
 import java.util.HashMap;
@@ -90,15 +91,15 @@ class JpaNullValuePolicyTest {
         );
     }
 
-    private List<Item> executeQuery(PredicateResolver<?> resolver) {
+    private List<Item> executeQuery(ConditionResolver<EntityManager, ManagerDetail> resolver) {
         try (EntityManager em = emf.createEntityManager()) {
-            CriteriaBuilder cb = em.getCriteriaBuilder();
-            CriteriaQuery<Item> query = cb.createQuery(Item.class);
-            Root<Item> root = query.from(Item.class);
 
-            //noinspection rawtypes,unchecked
-            query.where(resolver.resolve((Root) root, query, cb));
+            ManagerDetail detail = resolver.resolve(Item.class, em);
 
+            @SuppressWarnings("unchecked")
+            CriteriaQuery<Item> query = (CriteriaQuery<Item>) detail.query();
+
+            query.where(detail.predicate());
             return em.createQuery(query).getResultList();
         }
     }
@@ -122,20 +123,16 @@ class JpaNullValuePolicyTest {
             // Phase 2: toResolver() with null value should NOT throw yet
             Map<String, Object> args = new HashMap<>();
             args.put("nameParam", null);
-            PredicateResolver<?> resolver = assertDoesNotThrow(() ->
+            ConditionResolver<EntityManager, ManagerDetail> resolver = assertDoesNotThrow(() ->
                 context.toResolver(condition, QueryExecutionParams.of(args))
             );
 
             // Phase 3: resolver.resolve() MUST throw (lazy validation triggers here)
             try (EntityManager em = emf.createEntityManager()) {
-                CriteriaBuilder cb = em.getCriteriaBuilder();
-                CriteriaQuery<Item> query = cb.createQuery(Item.class);
-                Root<Item> root = query.from(Item.class);
 
-                //noinspection unchecked,rawtypes
                 FilterValidationException exception = assertThrows(
                         FilterValidationException.class,
-                        () -> resolver.resolve((Root) root, query, cb)
+                        () -> resolver.resolve(Item.class, em)
                 );
 
                 assertTrue(exception.getMessage().contains("Null value not allowed"));
@@ -152,16 +149,11 @@ class JpaNullValuePolicyTest {
 
             Map<String, Object> args = new HashMap<>();
             args.put("qtyParam", null);
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             // Exception occurs at resolve time
             try (EntityManager em = emf.createEntityManager()) {
-                CriteriaBuilder cb = em.getCriteriaBuilder();
-                CriteriaQuery<Item> query = cb.createQuery(Item.class);
-                Root<Item> root = query.from(Item.class);
-
-                //noinspection unchecked,rawtypes
-                assertThrows(FilterValidationException.class, () -> resolver.resolve((Root) root, query, cb));
+                assertThrows(FilterValidationException.class, () -> resolver.resolve(Item.class, em));
             }
         }
 
@@ -174,7 +166,7 @@ class JpaNullValuePolicyTest {
 
             Map<String, Object> args = new HashMap<>();
             args.put("qtyParam", null); // IS_NULL accepts null
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             // Should execute without exception
             List<Item> results = assertDoesNotThrow(() -> executeQuery(resolver));
@@ -193,7 +185,7 @@ class JpaNullValuePolicyTest {
 
             Map<String, Object> args = new HashMap<>();
             args.put("qtyParam", null); // NOT_NULL accepts null
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<Item> results = executeQuery(resolver);
 
@@ -220,7 +212,7 @@ class JpaNullValuePolicyTest {
 
             Map<String, Object> args = new HashMap<>();
             args.put("qtyParam", null);
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             // Should execute without exception and return items with null quantity
             List<Item> results = executeQuery(resolver);
@@ -243,7 +235,7 @@ class JpaNullValuePolicyTest {
 
             Map<String, Object> args = new HashMap<>();
             args.put("qtyParam", null);
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             // Should return items with non-null quantity
             List<Item> results = executeQuery(resolver);
@@ -265,17 +257,13 @@ class JpaNullValuePolicyTest {
 
             Map<String, Object> args = new HashMap<>();
             args.put("qtyParam", null);
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             try (EntityManager em = emf.createEntityManager()) {
-                CriteriaBuilder cb = em.getCriteriaBuilder();
-                CriteriaQuery<Item> query = cb.createQuery(Item.class);
-                Root<Item> root = query.from(Item.class);
 
-                //noinspection unchecked,rawtypes
                 FilterValidationException exception = assertThrows(
                         FilterValidationException.class,
-                        () -> resolver.resolve((Root) root, query, cb)
+                        () -> resolver.resolve(Item.class, em)
                 );
 
                 assertTrue(exception.getMessage().contains("Cannot coerce null value"));
@@ -294,7 +282,7 @@ class JpaNullValuePolicyTest {
             Condition condition = context.toCondition("qtyParam", ItemProp.QUANTITY, "EQ");
 
             Map<String, Object> args = Map.of("qtyParam", 10);
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<Item> results = executeQuery(resolver);
 
@@ -321,7 +309,7 @@ class JpaNullValuePolicyTest {
 
             Map<String, Object> args = new HashMap<>();
             args.put("nameParam", null);
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             // Should return ALL items (neutral condition = always true)
             List<Item> results = executeQuery(resolver);
@@ -341,7 +329,7 @@ class JpaNullValuePolicyTest {
 
             Map<String, Object> args = new HashMap<>();
             args.put("qtyParam", null);
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             // Returns all items
             List<Item> results = executeQuery(resolver);
@@ -362,7 +350,7 @@ class JpaNullValuePolicyTest {
 
             Map<String, Object> args = new HashMap<>();
             args.put("qtyParam", null);
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             // No exception, returns all items
             List<Item> results = assertDoesNotThrow(() -> executeQuery(resolver));
@@ -381,7 +369,7 @@ class JpaNullValuePolicyTest {
             Condition condition = context.toCondition("qtyParam", ItemProp.QUANTITY, "GT");
 
             Map<String, Object> args = Map.of("qtyParam", 10);
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<Item> results = executeQuery(resolver);
 
@@ -407,7 +395,7 @@ class JpaNullValuePolicyTest {
             Map<String, Object> args = new HashMap<>();
             args.put("nameParam", null); // Ignored
             args.put("qtyParam", 10);     // Active filter
-            PredicateResolver<?> resolver = context.toResolver(combined, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(combined, QueryExecutionParams.of(args));
 
             // Should only apply the quantity filter
             List<Item> results = executeQuery(resolver);
@@ -460,19 +448,16 @@ class JpaNullValuePolicyTest {
             // Phase 2: OK
             Map<String, Object> args = new HashMap<>();
             args.put("param", null);
-            PredicateResolver<?> resolver = assertDoesNotThrow(() ->
+            ConditionResolver<EntityManager, ManagerDetail> resolver = assertDoesNotThrow(() ->
                 context.toResolver(condition, QueryExecutionParams.of(args))
             );
 
             // Phase 3: THROW
             try (EntityManager em = emf.createEntityManager()) {
-                CriteriaBuilder cb = em.getCriteriaBuilder();
-                CriteriaQuery<Item> query = cb.createQuery(Item.class);
-                Root<Item> root = query.from(Item.class);
-
-                //noinspection unchecked,rawtypes
-                assertThrows(FilterValidationException.class, () -> resolver.resolve((Root) root, query, cb));
+                assertThrows(FilterValidationException.class, () -> resolver.resolve(Item.class, em));
             }
         }
     }
 }
+
+

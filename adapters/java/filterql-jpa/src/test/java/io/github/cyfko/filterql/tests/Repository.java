@@ -1,11 +1,13 @@
 package io.github.cyfko.filterql.tests;
 
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
-import io.github.cyfko.filterql.core.utils.ClassUtils;
+import io.github.cyfko.filterql.core.spi.ConditionResolver;
+import io.github.cyfko.filterql.jpa.spi.ManagerDetail;
+import io.github.cyfko.filterql.jpa.spi.PredicateResolver;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaDelete;
 import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 
 import java.lang.reflect.ParameterizedType;
@@ -15,7 +17,6 @@ import java.util.List;
 public abstract class Repository<E> {
     protected final Class<E> entityClass;
 
-    @SuppressWarnings("unchecked")
     protected Repository() {
         this.entityClass = getGenericParameterClass(getClass(), 0);
     }
@@ -33,20 +34,25 @@ public abstract class Repository<E> {
 
     public abstract EntityManager getEntityManager();
 
-    List<E> findAll(PredicateResolver<E> resolver){
+    List<E> findAll(ConditionResolver<EntityManager, ManagerDetail> cr) {
         EntityManager em = getEntityManager();
 
         CriteriaBuilder cb = em.getCriteriaBuilder();
         CriteriaQuery<E> query = cb.createQuery(entityClass);
         Root<E> root = query.from(entityClass);
 
-        // appliquer les filtres
-        query.select(root).where(resolver.resolve(root, query, cb));
+        // Extract the JpaPredicateResolver from the ConditionResolver
+        if (!(cr instanceof PredicateResolver<?> pr))
+            throw new IllegalArgumentException("Expected JpaConditionResolver, got: " + cr.getClass());
+
+        // Apply filters
+        //noinspection unchecked
+        query.select(root).where(pr.resolve((Root) root, query, cb));
 
         return em.createQuery(query).getResultList();
     }
 
-    void deleteAll(){
+    void deleteAll() {
         EntityManager em = getEntityManager();
 
         try {
@@ -61,7 +67,8 @@ public abstract class Repository<E> {
             em.getTransaction().commit();
 
         } catch (Exception e) {
-            if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            if (em.getTransaction().isActive())
+                em.getTransaction().rollback();
             throw e;
         }
     }

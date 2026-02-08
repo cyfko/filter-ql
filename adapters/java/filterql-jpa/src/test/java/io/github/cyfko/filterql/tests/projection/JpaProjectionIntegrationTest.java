@@ -1,11 +1,15 @@
 package io.github.cyfko.filterql.tests.projection;
 
+import io.github.cyfko.filterql.core.spi.ConditionResolver;
+import io.github.cyfko.filterql.jpa.spi.ManagerDetail;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.criteria.Predicate;
+
 import io.github.cyfko.filterql.core.FilterQueryFactory;
 import io.github.cyfko.filterql.core.api.Condition;
 import io.github.cyfko.filterql.core.config.FilterConfig;
 import io.github.cyfko.filterql.core.model.FilterRequest;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.filterql.core.utils.OperatorUtils;
 import io.github.cyfko.filterql.core.api.PropertyReference;
@@ -18,7 +22,6 @@ import io.github.cyfko.filterql.jpa.strategies.helper.RowBuffer;
 import jakarta.persistence.*;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Root;
 import org.junit.jupiter.api.*;
 
 import java.util.List;
@@ -141,15 +144,15 @@ class JpaProjectionIntegrationTest {
 
                 // When: Resolve WITHOUT projection
                 QueryExecutionParams params = QueryExecutionParams.of(Map.of("activeArg", true));
-                PredicateResolver<?> resolver = context.toResolver(condition, params);
+                ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, params);
 
                 // Then: Should execute successfully
-                CriteriaBuilder cb = em.getCriteriaBuilder();
-                CriteriaQuery<UserB> query = cb.createQuery(UserB.class);
-                Root<UserB> root = query.from(UserB.class);
+                ManagerDetail detail = resolver.resolve(UserB.class, em);
 
-                //noinspection rawtypes,unchecked
-                query.where(resolver.resolve((Root) root, query, cb));
+                @SuppressWarnings("unchecked")
+                CriteriaQuery<UserB> query = (CriteriaQuery<UserB>) detail.query();
+
+                query.where(detail.predicate());
 
                 List<UserB> results = em.createQuery(query).getResultList();
                 assertNotNull(results);
@@ -230,3 +233,5 @@ class JpaProjectionIntegrationTest {
         }
     }
 }
+
+

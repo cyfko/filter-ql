@@ -2,9 +2,10 @@ package io.github.cyfko.filterql.jpa.strategies;
 
 import io.github.cyfko.filterql.core.model.Pagination;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
+import io.github.cyfko.filterql.core.spi.ConditionResolver;
 import io.github.cyfko.filterql.core.spi.ExecutionStrategy;
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
+import io.github.cyfko.filterql.jpa.spi.PredicateResolver;
 import io.github.cyfko.filterql.jpa.strategies.helper.QueryPlan;
 import io.github.cyfko.filterql.jpa.strategies.helper.RowBuffer;
 import io.github.cyfko.jpametamodel.ProjectionRegistry;
@@ -63,10 +64,15 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
      * This method is final to ensure the execution order is preserved.
      */
     @Override
-    public final <Context> List<RowBuffer> execute(Context ctx, PredicateResolver<?> pr, QueryExecutionParams params) {
+    public final <Em> List<RowBuffer> execute(Em emc,
+                                              ConditionResolver<Em, ?> conditionResolver,
+                                              QueryExecutionParams params) {
 
-        EntityManager em = (EntityManager) ctx;
+        EntityManager em = (EntityManager) emc;
         long startTime = System.nanoTime();
+
+        // Extract PredicateResolver from ConditionResolver
+        PredicateResolver<?> pr = PredicateResolver.from(conditionResolver);
 
         // Step 1: Build execution context
         ExecutionContext exeCtx = step1_BuildExecutionContext(em, pr, params, dtoClass);
@@ -104,7 +110,7 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
      * Step 1: Build the execution context with query, root, and plan.
      */
     protected abstract ExecutionContext step1_BuildExecutionContext(EntityManager em,
-            PredicateResolver<?> pr,
+            PredicateResolver<?> jpaResolver,
             QueryExecutionParams params,
             Class<?> dtoClass);
 
@@ -142,7 +148,7 @@ public abstract class AbstractMultiQueryFetchStrategy implements ExecutionStrate
             CriteriaBuilder cb,
             Root<?> root,
             CriteriaQuery<Tuple> query,
-            PredicateResolver<?> predicateResolver,
+            PredicateResolver<?> jpaResolver,
             QueryPlan plan,
             Map<String, Pagination> collectionPagination) {
     }

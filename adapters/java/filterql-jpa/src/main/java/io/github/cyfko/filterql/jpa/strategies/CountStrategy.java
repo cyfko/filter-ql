@@ -1,8 +1,9 @@
 package io.github.cyfko.filterql.jpa.strategies;
 
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
+import io.github.cyfko.filterql.core.spi.ConditionResolver;
 import io.github.cyfko.filterql.core.spi.ExecutionStrategy;
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
+import io.github.cyfko.filterql.jpa.spi.PredicateResolver;
 import io.github.cyfko.jpametamodel.ProjectionRegistry;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.*;
@@ -13,25 +14,35 @@ import java.util.logging.Logger;
 /**
  * Execution strategy that computes the number of rows matching a given filter.
  * <p>
- * This strategy builds a JPA {@link CriteriaQuery} that selects a {@link Long} count
- * for the entity type associated with the provided {@code projectionClass}, applying
- * the same filter logic as any other strategy via a shared {@link PredicateResolver}.
+ * This strategy builds a JPA {@link CriteriaQuery} that selects a {@link Long}
+ * count
+ * for the entity type associated with the provided {@code projectionClass},
+ * applying
+ * the same filter logic as any other strategy via a shared
+ * {@link ConditionResolver}.
  * </p>
  *
- * <p><b>Accepted classes:</b></p>
+ * <p>
+ * <b>Accepted classes:</b>
+ * </p>
  * <ul>
- *   <li>A class annotated with {@link io.github.cyfko.projection.Projection}, describing a DTO projection.</li>
- *   <li>Or directly an entity class annotated with {@link jakarta.persistence.Entity}, when the metamodel
- *       supports auto-projection for entities.</li>
+ * <li>A class annotated with {@link io.github.cyfko.projection.Projection},
+ * describing a DTO projection.</li>
+ * <li>Or directly an entity class annotated with
+ * {@link jakarta.persistence.Entity}, when the metamodel
+ * supports auto-projection for entities.</li>
  * </ul>
  *
  * <p>
  * In both cases, the underlying entity type is resolved through
- * {@link io.github.cyfko.jpametamodel.ProjectionRegistry}, and the count is performed
- * against that entity, independently of how the data will be fetched or projected.
+ * {@link io.github.cyfko.jpametamodel.ProjectionRegistry}, and the count is
+ * performed
+ * against that entity, independently of how the data will be fetched or
+ * projected.
  * </p>
  *
  * <h2>Example</h2>
+ * 
  * <pre>{@code
  * // Using a DTO projection class
  * ExecutionStrategy<Long> dtoCount = new CountMatchingStrategy(UserDTO.class);
@@ -39,7 +50,7 @@ import java.util.logging.Logger;
  * // Using the entity class directly (auto-projection enabled)
  * ExecutionStrategy<Long> entityCount = new CountMatchingStrategy(UserEntity.class);
  *
- * PredicateResolver<?> resolver = filterContext.toResolver(condition, params);
+ * ConditionResolver<EntityManager, Predicate> resolver = filterContext.toResolver(condition, params);
  *
  * Long totalFromDto = dtoCount.execute(entityManager, resolver, params);
  * Long totalFromEntity = entityCount.execute(entityManager, resolver, params);
@@ -47,10 +58,13 @@ import java.util.logging.Logger;
  *
  * @param projectionClass either:
  *                        <ul>
- *                          <li>a class annotated with {@link io.github.cyfko.projection.Projection}, or</li>
- *                          <li>an entity class annotated with {@link jakarta.persistence.Entity}</li>
+ *                        <li>a class annotated with
+ *                        {@link io.github.cyfko.projection.Projection}, or</li>
+ *                        <li>an entity class annotated with
+ *                        {@link jakarta.persistence.Entity}</li>
  *                        </ul>
- *                        for which projection metadata is available in the registry
+ *                        for which projection metadata is available in the
+ *                        registry
  *
  * @author Frank KOSSI
  * @since 2.0.0
@@ -63,10 +77,18 @@ public record CountStrategy(Class<?> projectionClass) implements ExecutionStrate
     }
 
     @Override
-    public <Context> Long execute(Context ctx, PredicateResolver<?> pr, QueryExecutionParams params) {
-        EntityManager em = (EntityManager) ctx;
+    public <Em> Long execute(Em emc,
+                             ConditionResolver<Em, ?> cr,
+                             QueryExecutionParams params) {
+
+        if (!(emc instanceof EntityManager em)) {
+            throw new IllegalArgumentException("Expected EntityManager but got: " + emc.getClass().getName());
+        }
+
+
         long startTime = System.nanoTime();
 
+        PredicateResolver<?> pr = PredicateResolver.from(cr);
         CriteriaBuilder cb = em.getCriteriaBuilder();
         CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
         Root<?> root = countQuery.from(ProjectionRegistry.getMetadataFor(projectionClass).entityClass());

@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class UltimateNestedBenchmarkTest {
 
     private static EntityManagerFactory emf;
-    private static FilterContext filterContext;
+    private static FilterContext<EntityManager> filterContext;
 
     private static final int NUM_COMPANIES = 10;
     private static final int DEPTS_PER_COMPANY = 3;

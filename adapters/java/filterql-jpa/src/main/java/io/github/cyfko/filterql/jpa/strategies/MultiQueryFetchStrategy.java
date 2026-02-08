@@ -7,11 +7,9 @@ import io.github.cyfko.filterql.core.config.ProjectionPolicy;
 import io.github.cyfko.filterql.core.model.Pagination;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 import io.github.cyfko.filterql.core.model.SortBy;
-import io.github.cyfko.filterql.core.projection.ProjectionFieldParser;
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
+import io.github.cyfko.filterql.core.utils.ProjectionFieldParser;
+import io.github.cyfko.filterql.jpa.spi.PredicateResolver;
 import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
-import io.github.cyfko.filterql.jpa.strategies.helper.IdPredicateBuilder;
-
 import io.github.cyfko.filterql.jpa.strategies.helper.*;
 import io.github.cyfko.filterql.jpa.utils.PathResolverUtils;
 import io.github.cyfko.filterql.jpa.utils.ProjectionUtils;
@@ -83,7 +81,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
             // Skip computed output placeholder slots - they're not in the entity
             FieldSchema.FieldStatus fieldStatus = schema.getFieldStatus(i);
             if (fieldStatus == FieldSchema.FieldStatus.SQL_IGNORE ||
-                fieldStatus == FieldSchema.FieldStatus.SQL_IGNORE_COLLECTION) {
+                    fieldStatus == FieldSchema.FieldStatus.SQL_IGNORE_COLLECTION) {
                 continue;
             }
             Path<?> path = PathResolverUtils.resolvePath(ctx.root(), entityField);
@@ -94,7 +92,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
 
         // Apply filter predicate
         @SuppressWarnings({ "rawtypes", "unchecked" })
-        Predicate filterPredicate = ctx.predicateResolver().resolve((Root) ctx.root(), ctx.query(), ctx.cb());
+        Predicate filterPredicate = ctx.jpaResolver().resolve((Root) ctx.root(), ctx.query(), ctx.cb());
         if (filterPredicate != null) {
             ctx.query().where(filterPredicate);
         }

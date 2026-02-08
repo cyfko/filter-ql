@@ -1,6 +1,6 @@
 package io.github.cyfko.filterql.jpa.strategies.helper;
 
-import io.github.cyfko.filterql.core.projection.ProjectionFieldParser;
+import io.github.cyfko.filterql.core.utils.ProjectionFieldParser;
 import io.github.cyfko.jpametamodel.PersistenceRegistry;
 import io.github.cyfko.jpametamodel.ProjectionRegistry;
 import io.github.cyfko.jpametamodel.api.PersistenceMetadata;

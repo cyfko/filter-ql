@@ -60,7 +60,7 @@
 
         <!-- Dependencies Versions -->
         <jakarta-persistence.version>3.1.0</jakarta-persistence.version>
-        <filterql-core.version>4.0.0</filterql-core.version>
+        <filterql-core.version>4.0.0-SNAPSHOT</filterql-core.version>
         <projection-spec.version>1.0.0</projection-spec.version>
         <jpa-processor.version>1.0.2</jpa-processor.version>
 
@@ -85,6 +85,13 @@
             <artifactId>jpa-metamodel-processor</artifactId>
             <version>${jpa-processor.version}</version>
             <scope>provided</scope>
+        </dependency>
+
+        <!-- Jakarta dependency -->
+        <dependency>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+            <version>${jakarta-persistence.version}</version>
         </dependency>
 
         <!-- Hibernate (JPA implementation) -->

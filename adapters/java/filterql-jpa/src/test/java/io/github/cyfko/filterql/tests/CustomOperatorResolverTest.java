@@ -6,6 +6,7 @@ import io.github.cyfko.filterql.core.api.PropertyReference;
 import io.github.cyfko.filterql.jpa.JpaCondition;
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
 import io.github.cyfko.filterql.jpa.spi.CustomOperatorResolver;
+import io.github.cyfko.filterql.jpa.spi.PredicateResolverMapping;
 import org.junit.jupiter.api.*;
 
 import java.util.Set;
@@ -296,14 +297,14 @@ class CustomOperatorResolverTest {
     class IntegrationWithMappingTests {
 
         @Test
-        @DisplayName("Context with both CustomOperatorResolver and PredicateResolverMapping should create conditions")
+        @DisplayName("Context with both CustomOperatorResolver and JpaPredicateResolverMapping should create conditions")
         void contextWithBothShouldCreateConditions() {
-            // Given - context with PredicateResolverMapping and CustomOperatorResolver
+            // Given - context with JpaPredicateResolverMapping and CustomOperatorResolver
             JpaFilterContext<UserProperty> contextWithMapping = new JpaFilterContext<>(
                 UserProperty.class,
                 ref -> {
                     if (ref == UserProperty.FIRST_NAME) {
-                        return (io.github.cyfko.filterql.jpa.spi.PredicateResolverMapping<User>) (op, args) -> {
+                        return (PredicateResolverMapping<User>) (op, args) -> {
                             return (root, query, cb) -> cb.conjunction();
                         };
                     }

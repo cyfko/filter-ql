@@ -1,8 +1,13 @@
 package io.github.cyfko.filterql.tests;
 
+import io.github.cyfko.filterql.core.spi.ConditionResolver;
+import io.github.cyfko.filterql.jpa.spi.ManagerDetail;
+import io.github.cyfko.filterql.jpa.spi.PredicateResolver;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.criteria.Predicate;
+
 import io.github.cyfko.filterql.core.api.Condition;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.filterql.core.api.PropertyReference;
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
@@ -92,16 +97,14 @@ class JpaBasicOperatorsTest {
         );
     }
 
-    private List<ProductB> executeQuery(PredicateResolver<?> resolver) {
+    @SuppressWarnings("unchecked")
+    private List<ProductB> executeQuery(ConditionResolver<EntityManager, ManagerDetail> resolver) {
         try (EntityManager em = emf.createEntityManager()) {
-            CriteriaBuilder cb = em.getCriteriaBuilder();
-            CriteriaQuery<ProductB> query = cb.createQuery(ProductB.class);
-            Root<ProductB> root = query.from(ProductB.class);
+            ManagerDetail detail = resolver.resolve(ProductB.class, em);
+            CriteriaQuery<?> query = detail.query();
+            query.where(detail.predicate());
 
-            //noinspection rawtypes,unchecked
-            query.where(resolver.resolve((Root) root, query, cb));
-
-            return em.createQuery(query).getResultList();
+            return (List<ProductB>) em.createQuery(query).getResultList();
         }
     }
 
@@ -113,7 +116,7 @@ class JpaBasicOperatorsTest {
         Condition condition = context.toCondition("nameParam", ProductProp.NAME, "EQ");
         
         Map<String, Object> args = Map.of("nameParam", "Laptop");
-        PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -129,7 +132,7 @@ class JpaBasicOperatorsTest {
         Condition condition = context.toCondition("nameParam", ProductProp.NAME, "NE");
         
         Map<String, Object> args = Map.of("nameParam", "Laptop");
-        PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -145,7 +148,7 @@ class JpaBasicOperatorsTest {
         Condition condition = context.toCondition("priceParam", ProductProp.PRICE, "GT");
         
         Map<String, Object> args = Map.of("priceParam", 100);
-        PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -161,7 +164,7 @@ class JpaBasicOperatorsTest {
         Condition condition = context.toCondition("priceParam", ProductProp.PRICE, "LT");
         
         Map<String, Object> args = Map.of("priceParam", 100);
-        PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -177,7 +180,7 @@ class JpaBasicOperatorsTest {
         Condition condition = context.toCondition("namesParam", ProductProp.NAME, "IN");
         
         Map<String, Object> args = Map.of("namesParam", List.of("Laptop", "Mouse", "Tablet"));
-        PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -195,7 +198,7 @@ class JpaBasicOperatorsTest {
         Condition condition = context.toCondition("pricesParam", ProductProp.PRICE, "NOT_IN");
         
         Map<String, Object> args = Map.of("pricesParam", List.of(25, 75));
-        PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -214,7 +217,7 @@ class JpaBasicOperatorsTest {
         
         Map<String, Object> args = new HashMap<>();
         args.put("priceParam", new Object[]{50, 200});
-        PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -232,7 +235,7 @@ class JpaBasicOperatorsTest {
         Condition condition = context.toCondition("nameParam", ProductProp.NAME, "MATCHES");
         
         Map<String, Object> args = Map.of("nameParam", "%top");
-        PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -249,7 +252,7 @@ class JpaBasicOperatorsTest {
         
         Map<String, Object> args = new HashMap<>();
         args.put("priceParam", null); // IS_NULL accepts null
-        PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -267,7 +270,7 @@ class JpaBasicOperatorsTest {
         
         Map<String, Object> args = new HashMap<>();
         args.put("priceParam", null); // NOT_NULL also accepts null
-        PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -289,7 +292,7 @@ class JpaBasicOperatorsTest {
         Map<String, Object> args = new HashMap<>();
         args.put("minParam", 50);
         args.put("maxParam", 200);
-        PredicateResolver<?> resolver = context.toResolver(combined, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(combined, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -313,7 +316,7 @@ class JpaBasicOperatorsTest {
         Map<String, Object> args = new HashMap<>();
         args.put("lowParam", 30);
         args.put("highParam", 300);
-        PredicateResolver<?> resolver = context.toResolver(combined, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(combined, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -331,7 +334,7 @@ class JpaBasicOperatorsTest {
         Condition negated = ltCondition.not();
         
         Map<String, Object> args = Map.of("priceParam", 100);
-        PredicateResolver<?> resolver = context.toResolver(negated, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(negated, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -352,7 +355,7 @@ class JpaBasicOperatorsTest {
         Condition condition = context.toCondition("priceParam", ProductProp.PRICE, "GTE");
         
         Map<String, Object> args = Map.of("priceParam", 120);
-        PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -370,7 +373,7 @@ class JpaBasicOperatorsTest {
         Condition condition = context.toCondition("priceParam", ProductProp.PRICE, "LTE");
         
         Map<String, Object> args = Map.of("priceParam", 120);
-        PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -388,7 +391,7 @@ class JpaBasicOperatorsTest {
         Condition condition = context.toCondition("nameParam", ProductProp.NAME, "NOT_MATCHES");
         
         Map<String, Object> args = Map.of("nameParam", "%top%");
-        PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -408,7 +411,7 @@ class JpaBasicOperatorsTest {
         Condition condition = context.toCondition("priceParam", ProductProp.PRICE, "NOT_RANGE");
         
         Map<String, Object> args = Map.of("priceParam", List.of(50, 300));
-        PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+        ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
         
         List<ProductB> results = executeQuery(resolver);
         
@@ -420,3 +423,5 @@ class JpaBasicOperatorsTest {
         ));
     }
 }
+
+

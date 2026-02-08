@@ -1,16 +1,18 @@
 package io.github.cyfko.filterql.tests;
 
+import io.github.cyfko.filterql.core.spi.ConditionResolver;
+import io.github.cyfko.filterql.jpa.spi.ManagerDetail;
+import jakarta.persistence.EntityManager;
+
 import io.github.cyfko.filterql.core.api.Condition;
 import io.github.cyfko.filterql.core.config.FilterConfig;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.filterql.core.api.PropertyReference;
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
 import jakarta.persistence.*;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Root;
 import org.junit.jupiter.api.*;
 
 import java.time.LocalDate;
@@ -95,15 +97,14 @@ class JpaTypeConversionTest {
         );
     }
 
-    private List<SimpleUser> executeQuery(PredicateResolver<?> resolver) {
+    private List<SimpleUser> executeQuery(ConditionResolver<EntityManager, ManagerDetail> resolver) {
         try (EntityManager em = emf.createEntityManager()) {
-            CriteriaBuilder cb = em.getCriteriaBuilder();
-            CriteriaQuery<SimpleUser> query = cb.createQuery(SimpleUser.class);
-            Root<SimpleUser> root = query.from(SimpleUser.class);
+            ManagerDetail detail = resolver.resolve(SimpleUser.class, em);
 
-            //noinspection rawtypes,unchecked
-            query.where(resolver.resolve((Root) root, query, cb));
+            @SuppressWarnings("unchecked")
+            CriteriaQuery<SimpleUser> query = (CriteriaQuery<SimpleUser>) detail.query();
 
+            query.where(detail.predicate());
             return em.createQuery(query).getResultList();
         }
     }
@@ -122,7 +123,7 @@ class JpaTypeConversionTest {
 
             // Pass String "30" instead of Integer 30
             Map<String, Object> args = Map.of("ageParam", "30");
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<SimpleUser> results = executeQuery(resolver);
 
@@ -139,7 +140,7 @@ class JpaTypeConversionTest {
             Condition condition = context.toCondition("ageParam", EmployeeProp.AGE, "GT");
 
             Map<String, Object> args = Map.of("ageParam", "28");
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<SimpleUser> results = executeQuery(resolver);
 
@@ -155,7 +156,7 @@ class JpaTypeConversionTest {
             Condition condition = context.toCondition("ageParam", EmployeeProp.AGE, "IN");
 
             Map<String, Object> args = Map.of("ageParam", List.of("25", "30", "35"));
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<SimpleUser> results = executeQuery(resolver);
 
@@ -173,18 +174,14 @@ class JpaTypeConversionTest {
             Condition condition = context.toCondition("ageParam", EmployeeProp.AGE, "EQ");
 
             Map<String, Object> args = Map.of("ageParam", "invalid");
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             try (EntityManager em = emf.createEntityManager()) {
-                CriteriaBuilder cb = em.getCriteriaBuilder();
-                CriteriaQuery<SimpleUser> query = cb.createQuery(SimpleUser.class);
-                Root<SimpleUser> root = query.from(SimpleUser.class);
 
                 // Should throw IllegalArgumentException wrapping NumberFormatException at resolve time
-                //noinspection rawtypes,unchecked
                 assertThrows(
                         IllegalArgumentException.class,
-                        () -> resolver.resolve((Root) root, query, cb)
+                        () -> resolver.resolve(SimpleUser.class, em)
                 );
             }
         }
@@ -204,7 +201,7 @@ class JpaTypeConversionTest {
 
             // ISO 8601 format
             Map<String, Object> args = Map.of("hireDateParam", "2020-01-15");
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<SimpleUser> results = executeQuery(resolver);
 
@@ -221,7 +218,7 @@ class JpaTypeConversionTest {
             Condition condition = context.toCondition("hireDateParam", EmployeeProp.HIRE_DATE, "GT");
 
             Map<String, Object> args = Map.of("hireDateParam", "2021-01-01");
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<SimpleUser> results = executeQuery(resolver);
 
@@ -241,7 +238,7 @@ class JpaTypeConversionTest {
             Map<String, Object> args = Map.of("hireDateParam", 
                 List.of("2020-01-15", "2021-06-10")
             );
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<SimpleUser> results = executeQuery(resolver);
 
@@ -256,18 +253,14 @@ class JpaTypeConversionTest {
             Condition condition = context.toCondition("hireDateParam", EmployeeProp.HIRE_DATE, "EQ");
 
             Map<String, Object> args = Map.of("hireDateParam", "invalid-date");
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             try (EntityManager em = emf.createEntityManager()) {
-                CriteriaBuilder cb = em.getCriteriaBuilder();
-                CriteriaQuery<SimpleUser> query = cb.createQuery(SimpleUser.class);
-                Root<SimpleUser> root = query.from(SimpleUser.class);
 
                 // Should throw DateTimeParseException at resolve time
-                //noinspection rawtypes,unchecked
                 assertThrows(
                         Exception.class,
-                        () -> resolver.resolve((Root) root, query, cb)
+                        () -> resolver.resolve(SimpleUser.class, em)
                 );
             }
         }
@@ -286,7 +279,7 @@ class JpaTypeConversionTest {
             Condition condition = context.toCondition("activeParam", EmployeeProp.ACTIVE, "EQ");
 
             Map<String, Object> args = Map.of("activeParam", "true");
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<SimpleUser> results = executeQuery(resolver);
 
@@ -302,7 +295,7 @@ class JpaTypeConversionTest {
             Condition condition = context.toCondition("activeParam", EmployeeProp.ACTIVE, "EQ");
 
             Map<String, Object> args = Map.of("activeParam", "false");
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<SimpleUser> results = executeQuery(resolver);
 
@@ -318,7 +311,7 @@ class JpaTypeConversionTest {
             Condition condition = context.toCondition("activeParam", EmployeeProp.ACTIVE, "IN");
 
             Map<String, Object> args = Map.of("activeParam", List.of("true"));
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<SimpleUser> results = executeQuery(resolver);
 
@@ -340,7 +333,7 @@ class JpaTypeConversionTest {
             Condition condition = context.toCondition("statusParam", EmployeeProp.STATUS, "EQ");
 
             Map<String, Object> args = Map.of("statusParam", "ACTIVE");
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<SimpleUser> results = executeQuery(resolver);
 
@@ -358,7 +351,7 @@ class JpaTypeConversionTest {
             Map<String, Object> args = Map.of("statusParam", 
                 List.of("ACTIVE", "PENDING")
             );
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<SimpleUser> results = executeQuery(resolver);
 
@@ -380,7 +373,7 @@ class JpaTypeConversionTest {
 
             // Mix of Integer and String
             Map<String, Object> args = Map.of("ageParam", List.of(25, "30", 35));
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<SimpleUser> results = executeQuery(resolver);
 
@@ -404,7 +397,7 @@ class JpaTypeConversionTest {
             Condition condition = context.toCondition("ageParam", EmployeeProp.AGE, "RANGE");
 
             Map<String, Object> args = Map.of("ageParam", List.of("25", "30"));
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<SimpleUser> results = executeQuery(resolver);
 
@@ -423,7 +416,7 @@ class JpaTypeConversionTest {
             Map<String, Object> args = Map.of("hireDateParam", 
                 List.of("2020-01-01", "2021-12-31")
             );
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<SimpleUser> results = executeQuery(resolver);
 
@@ -431,3 +424,5 @@ class JpaTypeConversionTest {
         }
     }
 }
+
+

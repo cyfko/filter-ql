@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class FilterRequestProjectionIntegrationTest {
 
     private static EntityManagerFactory emf;
-    private static FilterQuery<UserC> filterQuery;
+    private static FilterQuery<EntityManager> filterQuery;
 
     enum UserProperty implements PropertyReference {
         NAME,

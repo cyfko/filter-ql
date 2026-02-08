@@ -1,10 +1,14 @@
 package io.github.cyfko.filterql.tests;
 
+import io.github.cyfko.filterql.core.spi.ConditionResolver;
+import io.github.cyfko.filterql.jpa.spi.ManagerDetail;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.criteria.Predicate;
+
 import io.github.cyfko.filterql.core.api.Condition;
 import io.github.cyfko.filterql.core.config.FilterConfig;
 import io.github.cyfko.filterql.core.config.StringCaseStrategy;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.filterql.core.api.PropertyReference;
 import io.github.cyfko.filterql.jpa.JpaCondition;
@@ -135,7 +139,7 @@ class JpaFilterContextTest {
             // When - Phase 2: Fourniture de la valeur
             Map<String, Object> args = new HashMap<>();
             args.put("nameParam", "John");
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             // Then
             assertNotNull(resolver, "Resolver ne doit pas être null");
@@ -210,7 +214,7 @@ class JpaFilterContextTest {
             // When
             Condition condition = context.toCondition("arg1", TestProp.NAME, "EQ");
             Map<String, Object> args = Map.of("arg1", "value");
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             // Then
             assertNotNull(resolver);
@@ -235,7 +239,7 @@ class JpaFilterContextTest {
             String expectedValue = "testValue";
             Condition condition = context.toCondition("arg1", TestProp.NAME, "EQ");
             Map<String, Object> args = Map.of("arg1", expectedValue);
-            PredicateResolver<?> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             // Then
             assertNotNull(resolver, "Resolver should not be null");
@@ -379,3 +383,5 @@ class JpaFilterContextTest {
         }
     }
 }
+
+

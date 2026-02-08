@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.tests;
 
 import io.github.cyfko.filterql.core.api.Condition;
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
+import io.github.cyfko.filterql.jpa.spi.PredicateResolver;
 import io.github.cyfko.filterql.jpa.JpaCondition;
 import org.junit.jupiter.api.Test;
 
