@@ -535,11 +535,9 @@ FilterQL JPA offers several execution strategies:
 
 ```java
 // Explicit use of a strategy
-FilterQuery<User> query = FilterQueryFactory.of(context);
-PaginatedResult<User> result = query.execute(
-    request, 
-    new MultiQueryFetchStrategy<>(em, User.class)
-);
+FilterQuery<EntityManager> filterQuery = FilterQueryFactory.of(context);
+QueryExecutor<EntityManager> executor = filterQuery.toExecutor(request);
+List<RowBuffer> result = executor.executeWith(em, new MultiQueryFetchStrategy(UserDTO.class));
 ```
 
 ---
