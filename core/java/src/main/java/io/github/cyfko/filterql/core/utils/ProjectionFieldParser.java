@@ -1,4 +1,4 @@
-package io.github.cyfko.filterql.core.projection;
+package io.github.cyfko.filterql.core.utils;
 
 import io.github.cyfko.filterql.core.exception.ProjectionDefinitionException;
 import io.github.cyfko.filterql.core.model.Pagination;

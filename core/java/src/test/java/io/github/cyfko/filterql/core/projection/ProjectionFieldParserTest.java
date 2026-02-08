@@ -3,6 +3,7 @@ package io.github.cyfko.filterql.core.projection;
 import io.github.cyfko.filterql.core.exception.ProjectionDefinitionException;
 import io.github.cyfko.filterql.core.model.Pagination;
 import io.github.cyfko.filterql.core.model.SortBy;
+import io.github.cyfko.filterql.core.utils.ProjectionFieldParser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

@@ -43,12 +43,12 @@ import io.github.cyfko.filterql.core.model.QueryExecutionParams;
  * for thread safety (e.g., per-thread EntityManager in JPA).
  * </p>
  *
- * @param <Result> Result type produced by this executor (e.g. {@code List<UserDto>}, {@code Page<UserDto>}, {@code Long})
+ * @param <Context> the type of execution context (e.g., EntityManager for JPA)
  *
  * @see ExecutionStrategy
  * @see FilterQuery
  */
-public interface QueryExecutor<Result> {
+public interface QueryExecutor<Context> {
 
     /**
      * Executes the query using the provided strategy.
@@ -63,7 +63,7 @@ public interface QueryExecutor<Result> {
      * The executor orchestrates the execution by providing the strategy with:
      * <ul>
      *   <li>The execution context (e.g., EntityManager for JPA)</li>
-     *   <li>The {@link PredicateResolver} for building filter predicates</li>
+     *   <li>The {@link ConditionResolver} for building filter predicates</li>
      *   <li>The {@link QueryExecutionParams} containing projection, pagination, sorting, etc.</li>
      * </ul>
      * </p>
@@ -83,12 +83,11 @@ public interface QueryExecutor<Result> {
      * Long total = countExecutor.executeWith(entityManager, new CountStrategy<>());
      * }</pre>
      *
-     * @param <Context> the type of execution context (e.g., EntityManager for JPA)
      * @param ctx the execution context. Must not be null.
      * @param strategy the execution strategy defining the execution logic.
      *                Must not be null and must produce results of type {@code Result}.
      * @return a result of type {@code Result}
      * @throws IllegalArgumentException if ctx or strategy is null
      */
-    <Context> Result executeWith(Context ctx, ExecutionStrategy<Result> strategy);
+    <Result> Result executeWith(Context ctx, ExecutionStrategy<Result> strategy);
 }

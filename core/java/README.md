@@ -54,7 +54,7 @@ FilterQL Core is the foundational module providing framework-agnostic dynamic fi
                  │
 ┌────────────────▼────────────────────────────┐
 │           SPI LAYER                         │
-│  FilterQuery, PredicateResolver,            │
+│  FilterQuery, ConditionResolver,            │
 │  ExecutionStrategy, QueryExecutor           │
 └────────────────┬────────────────────────────┘
                  │
@@ -75,7 +75,7 @@ io.github.cyfko.filterql.core
 │   └── FilterTree             # Parsed AST representation
 ├── spi/                        # Service Provider Interfaces
 │   ├── FilterQuery            # Query lifecycle facade
-│   ├── PredicateResolver      # Deferred predicate generator
+│   ├── ConditionResolver      # Deferred predicate generator
 │   ├── ExecutionStrategy      # Execution strategy contract
 │   └── QueryExecutor          # Query execution coordinator
 ├── model/                      # Immutable data structures
@@ -325,7 +325,7 @@ High-level query lifecycle facade.
 public interface FilterQuery<E> {
     // Low-level: Get predicate resolver for manual query building
     <P extends Enum<P> & PropertyReference> 
-    PredicateResolver<E> toResolver(FilterRequest<P> request);
+    ConditionResolver<E> toResolver(FilterRequest<P> request);
     
     // Mid-level: Get executor with strategy control
     <P extends Enum<P> & PropertyReference, R> 
@@ -338,7 +338,7 @@ public interface FilterQuery<E> {
 ```java
 // Low-level approach (maximum control)
 FilterQuery<User> filterQuery = FilterQueryFactory.of(context);
-PredicateResolver<User> resolver = filterQuery.toResolver(request);
+ConditionResolver<User> resolver = filterQuery.toResolver(request);
 
 CriteriaBuilder cb = em.getCriteriaBuilder();
 CriteriaQuery<User> query = cb.createQuery(User.class);
@@ -357,7 +357,7 @@ Backend bridge interface for adapters to implement.
 
 **Core Responsibilities:**
 1. Transform FilterDefinition → Condition
-2. Convert Condition → PredicateResolver
+2. Convert Condition → ConditionResolver
 3. Support deferred value binding for structural caching
 
 **Lifecycle:**
@@ -367,7 +367,7 @@ Backend bridge interface for adapters to implement.
 Condition condition = context.toCondition("argKey", propertyRef, "EQ");
 
 // Phase 2: Bind values and resolve to predicate
-PredicateResolver<User> resolver = context.toResolver(condition, executionParams);
+ConditionResolver<User> resolver = context.toResolver(condition, executionParams);
 ```
 
 ### Condition
@@ -411,7 +411,7 @@ FilterQuery<User> filterQuery = FilterQueryFactory.of(context);
 
 // 4. Execute query (adapter-specific)
 // Example with JPA adapter:
-PredicateResolver<User> resolver = filterQuery.toResolver(request);
+ConditionResolver<User> resolver = filterQuery.toResolver(request);
 // ... use resolver in JPA Criteria API query
 ```
 
@@ -752,7 +752,7 @@ See the [Custom Operators Guide](../../docs/docs/guides/custom-operators.md) for
 ```java
 case COORDINATES -> new PredicateResolverMapping<Location>() {
     @Override
-    public PredicateResolver<Location> map(String op, Object[] args) {
+    public ConditionResolver<Location> map(String op, Object[] args) {
         return (root, query, cb) -> {
             if ("NEAR".equals(op)) {
                 @SuppressWarnings("unchecked")
@@ -891,7 +891,7 @@ public class MyBackendFilterContext implements FilterContext {
     }
     
     @Override
-    public <E> PredicateResolver<E> toResolver(
+    public <E> ConditionResolver<E> toResolver(
             Class<E> entityClass,
             Condition condition,
             QueryExecutionParams params) {
@@ -922,7 +922,7 @@ public class MyCustomStrategy<R> implements ExecutionStrategy<R> {
     @Override
     public <Context> R execute(
             Context ctx,
-            PredicateResolver<?> resolver,
+            ConditionResolver<?> resolver,
             QueryExecutionParams params) {
         
         // Cast context to your specific type (e.g., EntityManager for JPA)
@@ -965,7 +965,7 @@ void testCustomAdapter() {
         .build();
     
     // Resolve
-    PredicateResolver<User> resolver = filterQuery.toResolver(request);
+    ConditionResolver<User> resolver = filterQuery.toResolver(request);
     
     // Verify (adapter-specific verification)
     assertNotNull(resolver);

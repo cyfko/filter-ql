@@ -7,7 +7,7 @@ import io.github.cyfko.filterql.core.api.FilterTree;
 import io.github.cyfko.filterql.core.impl.BasicDslParser;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 import io.github.cyfko.filterql.core.spi.FilterQuery;
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
+import io.github.cyfko.filterql.core.spi.ConditionResolver;
 import io.github.cyfko.filterql.core.exception.DSLSyntaxException;
 import io.github.cyfko.filterql.core.exception.FilterValidationException;
 import io.github.cyfko.filterql.core.model.FilterDefinition;
@@ -61,7 +61,7 @@ public class FilterQueryFactoryIndependentTest {
     private FilterTree mockFilterTree;
 
     @Mock
-    private PredicateResolver<?> mockPredicateResolver;
+    private ConditionResolver<?,?> mockConditionResolver;
 
     @BeforeEach
     void setUp() {
@@ -88,7 +88,7 @@ public class FilterQueryFactoryIndependentTest {
 
         // Setup mock context
         when(mockFilterContext.toCondition(any(String.class), any(), any(String.class))).thenReturn(mockCondition);
-        when(mockFilterContext.toResolver(any(Condition.class), any(QueryExecutionParams.class))).thenReturn((PredicateResolver) mockPredicateResolver);
+        when(mockFilterContext.toResolver(any(Condition.class), any(QueryExecutionParams.class))).thenReturn((ConditionResolver) mockConditionResolver);
 
         // Create FilterResolver with mocked dependencies
         filterManager = FilterQueryFactory.of(mockFilterContext,mockDslParser);
@@ -157,7 +157,7 @@ public class FilterQueryFactoryIndependentTest {
             
             FilterRequest<TestPropertyRef> request = new FilterRequest<>(filters, "nameFilter", null, null);
             
-            PredicateResolver<TestEntity> result = filterManager.toResolver(request);
+            ConditionResolver<?,?> result = filterManager.toResolver(request);
 
             assertNotNull(result);
             verify(mockDslParser).parse("nameFilter");
@@ -361,9 +361,9 @@ public class FilterQueryFactoryIndependentTest {
             filters.put("nameFilter", new FilterDefinition<>(TestPropertyRef.NAME, Op.MATCHES, "test%"));
             FilterRequest<TestPropertyRef> request = new FilterRequest<>(filters, "nameFilter",null, null);
             
-            PredicateResolver<TestEntity> result = filterManager.toResolver(request);
+            ConditionResolver<?,?> result = filterManager.toResolver(request);
             
-            assertNotNull(result, "PredicateResolver should never be null for valid requests");
+            assertNotNull(result, "ConditionResolver should never be null for valid requests");
         }
 
         @Test
@@ -375,7 +375,7 @@ public class FilterQueryFactoryIndependentTest {
             
             // Multiple calls with the same request should behave consistently
             for (int i = 0; i < 10; i++) {
-                PredicateResolver<TestEntity> result = filterManager.toResolver(request);
+                ConditionResolver<?,?> result = filterManager.toResolver(request);
                 assertNotNull(result);
             }
             
@@ -444,7 +444,7 @@ public class FilterQueryFactoryIndependentTest {
                 threads[i] = new Thread(() -> {
                     try {
                         for (int j = 0; j < operationsPerThread; j++) {
-                            PredicateResolver<TestEntity> result = filterManager.toResolver(request);
+                            ConditionResolver<?,?> result = filterManager.toResolver(request);
                             if (result == null) {
                                 results[threadIndex] = false;
                                 return;

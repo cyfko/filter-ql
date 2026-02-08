@@ -4,7 +4,7 @@ import io.github.cyfko.filterql.core.api.Condition;
 import io.github.cyfko.filterql.core.api.FilterContext;
 import io.github.cyfko.filterql.core.exception.FilterDefinitionException;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
-import io.github.cyfko.filterql.core.spi.PredicateResolver;
+import io.github.cyfko.filterql.core.spi.ConditionResolver;
 import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.filterql.core.api.PropertyReference;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,7 +77,7 @@ public class DeferredArgumentsArchitectureTest {
             argumentRegistry.put(argKey, "John Doe");
 
             // Then: toResolver should use the deferred value
-            PredicateResolver<TestEntity> resolver = testContext.toResolver(
+            ConditionResolver<TestEntity,?> resolver = testContext.toResolver(
                 condition,
                 QueryExecutionParams.of(argumentRegistry)
             );
@@ -102,7 +102,7 @@ public class DeferredArgumentsArchitectureTest {
             );
 
             // Then: All arguments should be retrievable
-            PredicateResolver<TestEntity> resolver = testContext.toResolver(
+            ConditionResolver<TestEntity,?> resolver = testContext.toResolver(
                 combined,
                 QueryExecutionParams.of(argumentRegistry)
             );
@@ -123,10 +123,10 @@ public class DeferredArgumentsArchitectureTest {
             Map<String, Object> registry1 = Map.of(argKey, "Alice");
             Map<String, Object> registry2 = Map.of(argKey, "Bob");
 
-            PredicateResolver<TestEntity> resolver1 = testContext.toResolver(
+            ConditionResolver<TestEntity,?> resolver1 = testContext.toResolver(
                 condition, QueryExecutionParams.of(registry1)
             );
-            PredicateResolver<TestEntity> resolver2 = testContext.toResolver(
+            ConditionResolver<TestEntity,?> resolver2 = testContext.toResolver(
                 condition, QueryExecutionParams.of(registry2)
             );
 
@@ -177,7 +177,7 @@ public class DeferredArgumentsArchitectureTest {
 
             // Then: Should succeed if IS_NULL doesn't need a value
             assertDoesNotThrow(() -> {
-                PredicateResolver<TestEntity> resolver = testContext.toResolver(
+                ConditionResolver<TestEntity,?> resolver = testContext.toResolver(
                     condition,
                     QueryExecutionParams.of(emptyRegistry)
                 );
@@ -314,7 +314,7 @@ public class DeferredArgumentsArchitectureTest {
     /**
      * Minimal FilterContext implementation for testing deferred arguments
      */
-    private static class TestFilterContext implements FilterContext {
+    private static class TestFilterContext implements FilterContext<TestEntity> {
 
         private final Map<String, Object> retrievedValues = new HashMap<>();
 
@@ -338,7 +338,7 @@ public class DeferredArgumentsArchitectureTest {
         }
 
         @Override
-        public PredicateResolver<TestEntity> toResolver(
+        public ConditionResolver<TestEntity,?> toResolver(
                 Condition condition,
                 QueryExecutionParams params) throws FilterDefinitionException {
 
@@ -352,7 +352,12 @@ public class DeferredArgumentsArchitectureTest {
             // Extract argKeys from condition tree and retrieve values from registry
             extractAndValidateArgKeys(condition, params.arguments());
 
-            return (root, query, cb) -> null; // Simplified for testing
+            return new ConditionResolver<>() {
+                @Override
+                public <E> Object resolve(Class<E> subject, TestEntity context) {
+                    return null; // Simplified for testing
+                }
+            };
         }
 
         private void extractAndValidateArgKeys(Condition condition, Map<String, Object> argumentRegistry)

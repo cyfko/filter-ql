@@ -32,7 +32,7 @@ import java.util.*;
  *     .arguments(Map.of("name", "John", "age", 25))
  *     .build();
  *
- * PredicateResolver<User> resolver = context.toResolver(User.class, condition, params);
+ * ConditionResolver<User> resolver = context.toResolver(User.class, condition, params);
  * }</pre>
  *
  * <h3>Example 2: Arguments + Projection</h3>
@@ -44,7 +44,7 @@ import java.util.*;
  *     .projectionPolicy(ProjectionPolicy.INCLUDE)
  *     .build();
  *
- * PredicateResolver<Tuple> resolver = context.toResolver(Tuple.class, condition, params);
+ * ConditionResolver<Tuple> resolver = context.toResolver(Tuple.class, condition, params);
  * }</pre>
  *
  * <h3>Example 3: Full Configuration with Pagination</h3>
