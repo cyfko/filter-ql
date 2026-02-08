@@ -16,18 +16,22 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Tests for the CustomOperatorResolver functionality.
  * 
- * <p>CustomOperatorResolver allows centralized handling of custom operators
+ * <p>
+ * CustomOperatorResolver allows centralized handling of custom operators
  * (like SOUNDEX, GEO_WITHIN) that can apply to multiple properties.
  * 
- * <p>Resolution flow (deferred execution):
+ * <p>
+ * Resolution flow (deferred execution):
  * <ol>
- *   <li>toCondition() creates a JpaCondition with a wrapped resolver</li>
- *   <li>At resolution time, CustomOperatorResolver.resolve() is called first</li>
- *   <li>If it returns non-null, that resolver is used</li>
- *   <li>If it returns null, default mechanism (path/PredicateResolverMapping) is used</li>
+ * <li>toCondition() creates a JpaCondition with a wrapped resolver</li>
+ * <li>At resolution time, CustomOperatorResolver.resolve() is called first</li>
+ * <li>If it returns non-null, that resolver is used</li>
+ * <li>If it returns null, default mechanism (path/PredicateResolverMapping) is
+ * used</li>
  * </ol>
  * 
- * <p>Note: Due to deferred arguments architecture, the CustomOperatorResolver
+ * <p>
+ * Note: Due to deferred arguments architecture, the CustomOperatorResolver
  * is called at predicate resolution time, not at condition creation time.
  */
 @DisplayName("CustomOperatorResolver Tests")
@@ -48,10 +52,10 @@ class CustomOperatorResolverTest {
         LAST_NAME,
         EMAIL,
         AGE;
-    
+
         @Override
         public Class<?> getType() {
-            return switch(this){
+            return switch (this) {
                 case FIRST_NAME, LAST_NAME, EMAIL -> String.class;
                 case AGE -> Integer.class;
             };
@@ -73,14 +77,13 @@ class CustomOperatorResolverTest {
     @BeforeEach
     void setUp() {
         context = new JpaFilterContext<>(
-            UserProperty.class,
-            ref -> switch (ref) {
-                case FIRST_NAME -> "firstName";
-                case LAST_NAME -> "lastName";
-                case EMAIL -> "email";
-                case AGE -> "age";
-            }
-        );
+                UserProperty.class,
+                ref -> switch (ref) {
+                    case FIRST_NAME -> "firstName";
+                    case LAST_NAME -> "lastName";
+                    case EMAIL -> "email";
+                    case AGE -> "age";
+                });
     }
 
     @Nested
@@ -220,10 +223,10 @@ class CustomOperatorResolverTest {
             // Then - both should be combinable
             assertNotNull(customCond);
             assertNotNull(standardCond);
-            
+
             Condition combined = customCond.and(standardCond);
             assertNotNull(combined);
-            
+
             Condition orCombined = customCond.or(standardCond);
             assertNotNull(orCombined);
         }
@@ -297,20 +300,19 @@ class CustomOperatorResolverTest {
     class IntegrationWithMappingTests {
 
         @Test
-        @DisplayName("Context with both CustomOperatorResolver and JpaPredicateResolverMapping should create conditions")
+        @DisplayName("Context with both CustomOperatorResolver and PredicateResolverMapping should create conditions")
         void contextWithBothShouldCreateConditions() {
-            // Given - context with JpaPredicateResolverMapping and CustomOperatorResolver
+            // Given - context with PredicateResolverMapping and CustomOperatorResolver
             JpaFilterContext<UserProperty> contextWithMapping = new JpaFilterContext<>(
-                UserProperty.class,
-                ref -> {
-                    if (ref == UserProperty.FIRST_NAME) {
-                        return (PredicateResolverMapping<User>) (op, args) -> {
-                            return (root, query, cb) -> cb.conjunction();
-                        };
-                    }
-                    return "name";
-                }
-            );
+                    UserProperty.class,
+                    ref -> {
+                        if (ref == UserProperty.FIRST_NAME) {
+                            return (PredicateResolverMapping<User>) (op, args) -> {
+                                return (root, query, cb) -> cb.conjunction();
+                            };
+                        }
+                        return "name";
+                    });
 
             // Add CustomOperatorResolver
             contextWithMapping.withCustomOperatorResolver((ref, op, args) -> {
@@ -356,10 +358,9 @@ class CustomOperatorResolverTest {
             // Given - first resolver
             CustomOperatorResolver<UserProperty> first = (ref, op, args) -> null;
             context.withCustomOperatorResolver(first);
-            
+
             // When - replace with second resolver
-            CustomOperatorResolver<UserProperty> second = (ref, op, args) -> 
-                (root, query, cb) -> cb.conjunction();
+            CustomOperatorResolver<UserProperty> second = (ref, op, args) -> (root, query, cb) -> cb.conjunction();
             context.withCustomOperatorResolver(second);
 
             // Then - second should be active

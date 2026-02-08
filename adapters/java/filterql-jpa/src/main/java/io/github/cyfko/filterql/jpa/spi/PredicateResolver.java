@@ -41,7 +41,7 @@ import java.util.Objects;
  * 
  * <pre>{@code
  * // Create a resolver for filtering active users
- * JpaPredicateResolver<User> activeUsers = (root, query, cb) -> cb.equal(root.get("status"), UserStatus.ACTIVE);
+ * PredicateResolver<User> activeUsers = (root, query, cb) -> cb.equal(root.get("status"), UserStatus.ACTIVE);
  *
  * // Use in a criteria query
  * CriteriaBuilder cb = entityManager.getCriteriaBuilder();
@@ -58,7 +58,7 @@ import java.util.Objects;
  * @see CriteriaBuilder
  */
 @FunctionalInterface
-public interface PredicateResolver<E> extends ConditionResolver<EntityManager, ManagerDetail> {
+public interface PredicateResolver<E> extends ConditionResolver<EntityManager, CriteriaBundle> {
 
     /**
      * Resolves a JPA {@link Predicate} using the provided JPA Criteria API context.
@@ -87,14 +87,14 @@ public interface PredicateResolver<E> extends ConditionResolver<EntityManager, M
      *
      * @param subject the entity class to query (must match the resolver's entity
      *                type)
-     * @param em the JPA EntityManager providing the criteria builder
+     * @param em      the JPA EntityManager providing the criteria builder
      * @param <T>     the entity type
      * @return the resolved JPA Predicate
      * @throws ClassCastException if subject doesn't match the resolver's entity
      *                            type
      */
     @Override
-    default <T> ManagerDetail resolve(Class<T> subject, EntityManager em) {
+    default <T> CriteriaBundle resolve(Class<T> subject, EntityManager em) {
         Objects.requireNonNull(subject, "subject cannot be null");
         Objects.requireNonNull(em, "EntityManager cannot be null");
 
@@ -105,10 +105,48 @@ public interface PredicateResolver<E> extends ConditionResolver<EntityManager, M
         @SuppressWarnings("unchecked")
         Predicate predicate = resolve((Root<E>) root, query, cb);
 
-        return new ManagerDetail(predicate, query, cb, root);
+        return new CriteriaBundle(predicate, query, cb, root);
     }
 
-    static PredicateResolver<?> from(ConditionResolver<?,?> cr) {
+    /**
+     * Extracts a {@link PredicateResolver} from a generic
+     * {@link ConditionResolver}.
+     * <p>
+     * This utility method provides type-safe extraction of JPA-specific resolvers
+     * from
+     * the backend-agnostic {@link ConditionResolver} interface. It handles three
+     * cases:
+     * </p>
+     * <ul>
+     * <li>If the resolver is already a {@link PredicateResolver}, it is returned
+     * as-is</li>
+     * <li>If the resolver is the {@link ConditionResolver#SENTINEL} marker, a no-op
+     * resolver returning {@code cb.conjunction()} (always true) is returned</li>
+     * <li>Otherwise, an {@link IllegalArgumentException} is thrown</li>
+     * </ul>
+     *
+     * <p>
+     * <strong>Usage example:</strong>
+     * </p>
+     * 
+     * <pre>{@code
+     * // In strategy execute() method:
+     * PredicateResolver<?> pr = PredicateResolver.from(conditionResolver);
+     * 
+     * // Resolve to CriteriaBundle (contains predicate, query, cb, root)
+     * CriteriaBundle bundle = pr.resolve(User.class, entityManager);
+     * 
+     * // Use the bundle components
+     * bundle.query().where(bundle.predicate());
+     * List<User> results = entityManager.createQuery(bundle.query()).getResultList();
+     * }</pre>
+     *
+     * @param cr the condition resolver to extract from (must not be null)
+     * @return the extracted {@link PredicateResolver}, never null
+     * @throws IllegalArgumentException if cr is not a PredicateResolver and not
+     *                                  SENTINEL
+     */
+    static PredicateResolver<?> from(ConditionResolver<?, ?> cr) {
         if (cr instanceof PredicateResolver<?> pr_) {
             return pr_;
         } else if (cr == ConditionResolver.SENTINEL) {

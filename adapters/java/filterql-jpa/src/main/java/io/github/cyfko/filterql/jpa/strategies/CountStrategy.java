@@ -45,10 +45,10 @@ import java.util.logging.Logger;
  * 
  * <pre>{@code
  * // Using a DTO projection class
- * ExecutionStrategy<Long> dtoCount = new CountMatchingStrategy(UserDTO.class);
+ * ExecutionStrategy<Long> dtoCount = new CountStrategy(UserDTO.class);
  *
  * // Using the entity class directly (auto-projection enabled)
- * ExecutionStrategy<Long> entityCount = new CountMatchingStrategy(UserEntity.class);
+ * ExecutionStrategy<Long> entityCount = new CountStrategy(UserEntity.class);
  *
  * ConditionResolver<EntityManager, Predicate> resolver = filterContext.toResolver(condition, params);
  *
@@ -76,15 +76,28 @@ public record CountStrategy(Class<?> projectionClass) implements ExecutionStrate
         Objects.requireNonNull(projectionClass, "projectionClass must not be null");
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Executes a COUNT query using JPA Criteria API to determine the number
+     * of entities matching the provided filter condition.
+     * </p>
+     *
+     * @param <Em>   the execution context type (must be {@link EntityManager})
+     * @param emc    the JPA EntityManager instance
+     * @param cr     the condition resolver containing the filter predicate
+     * @param params query execution parameters (pagination is ignored for count)
+     * @return the count of matching entities as a {@link Long}
+     * @throws IllegalArgumentException if emc is not an EntityManager
+     */
     @Override
     public <Em> Long execute(Em emc,
-                             ConditionResolver<Em, ?> cr,
-                             QueryExecutionParams params) {
+            ConditionResolver<Em, ?> cr,
+            QueryExecutionParams params) {
 
         if (!(emc instanceof EntityManager em)) {
             throw new IllegalArgumentException("Expected EntityManager but got: " + emc.getClass().getName());
         }
-
 
         long startTime = System.nanoTime();
 
@@ -93,7 +106,7 @@ public record CountStrategy(Class<?> projectionClass) implements ExecutionStrate
         CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
         Root<?> root = countQuery.from(ProjectionRegistry.getMetadataFor(projectionClass).entityClass());
 
-        @SuppressWarnings({"rawtypes", "unchecked"})
+        @SuppressWarnings({ "rawtypes", "unchecked" })
         Predicate predicate = pr.resolve((Root) root, countQuery, cb);
 
         countQuery.select(cb.count(root));

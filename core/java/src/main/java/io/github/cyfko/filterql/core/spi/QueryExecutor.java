@@ -13,15 +13,18 @@ import io.github.cyfko.filterql.core.model.QueryExecutionParams;
  * <p>
  * The {@code QueryExecutor} does not handle query execution internals itself:
  * it delegates this responsibility to an {@link ExecutionStrategy},
- * which encapsulates the execution logic (simple JPA, multi-query, native SQL, etc.).
+ * which encapsulates the execution logic (simple JPA, multi-query, native SQL,
+ * etc.).
  * </p>
  *
  * <p>
- * This design provides maximum flexibility: the same executor can work with any strategy
+ * This design provides maximum flexibility: the same executor can work with any
+ * strategy
  * that produces results of type {@code R}.
  * </p>
  *
  * <h3>Usage Examples:</h3>
+ * 
  * <pre>{@code
  * // Execute to get a list of DTOs (JPA adapter example)
  * QueryExecutor<List<UserDto>> listExecutor = filterQuery.toExecutor(request);
@@ -39,7 +42,8 @@ import io.github.cyfko.filterql.core.model.QueryExecutionParams;
  * <h3>Thread Safety:</h3>
  * <p>
  * Implementations should be thread-safe if they maintain internal state.
- * The context object passed to {@code executeWith} should be managed appropriately
+ * The context object passed to {@code executeWith} should be managed
+ * appropriately
  * for thread safety (e.g., per-thread EntityManager in JPA).
  * </p>
  *
@@ -54,38 +58,42 @@ public interface QueryExecutor<Context> {
      * Executes the query using the provided strategy.
      *
      * <p>
-     * The strategy defines <b>how</b> the query is executed (single query, multi-query,
-     * native SQL, cached, etc.) while the executor type {@code Result} defines <b>what</b>
+     * The strategy defines <b>how</b> the query is executed (single query,
+     * multi-query,
+     * native SQL, cached, etc.) while the executor type {@code Result} defines
+     * <b>what</b>
      * is returned.
      * </p>
      *
      * <p>
      * The executor orchestrates the execution by providing the strategy with:
      * <ul>
-     *   <li>The execution context (e.g., EntityManager for JPA)</li>
-     *   <li>The {@link ConditionResolver} for building filter predicates</li>
-     *   <li>The {@link QueryExecutionParams} containing projection, pagination, sorting, etc.</li>
+     * <li>The execution context (e.g., EntityManager for JPA)</li>
+     * <li>The {@link ConditionResolver} for building filter predicates</li>
+     * <li>The {@link QueryExecutionParams} containing projection, pagination,
+     * sorting, etc.</li>
      * </ul>
      * </p>
      *
      * <h4>Examples (JPA adapter):</h4>
+     * 
      * <pre>{@code
      * // List execution
-     * QueryExecutor<List<UserDto>> listExecutor = ...;
-     * List<UserDto> users = listExecutor.executeWith(entityManager, new MultiQueryFetchStrategy<>());
+     * QueryExecutor<EntityManager> executor = filterQuery.toExecutor(request);
+     * List<RowBuffer> users = executor.executeWith(entityManager, new MultiQueryFetchStrategy(UserDTO.class));
      *
-     * // Paginated execution
-     * QueryExecutor<Page<UserDto>> pageExecutor = ...;
-     * Page<UserDto> page = pageExecutor.executeWith(entityManager, new PagedFetchStrategy<>());
+     * // Typed list execution
+     * List<UserDTO> typedUsers = executor.executeWith(entityManager,
+     *         new TypedMultiQueryFetchStrategy<>(UserDTO.class, UserDTO::new));
      *
      * // Count execution
-     * QueryExecutor<Long> countExecutor = ...;
-     * Long total = countExecutor.executeWith(entityManager, new CountStrategy<>());
+     * Long total = executor.executeWith(entityManager, new CountStrategy(UserDTO.class));
      * }</pre>
      *
-     * @param ctx the execution context. Must not be null.
+     * @param ctx      the execution context. Must not be null.
      * @param strategy the execution strategy defining the execution logic.
-     *                Must not be null and must produce results of type {@code Result}.
+     *                 Must not be null and must produce results of type
+     *                 {@code Result}.
      * @return a result of type {@code Result}
      * @throws IllegalArgumentException if ctx or strategy is null
      */

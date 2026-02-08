@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.tests;
 
 import io.github.cyfko.filterql.core.spi.ConditionResolver;
-import io.github.cyfko.filterql.jpa.spi.ManagerDetail;
+import io.github.cyfko.filterql.jpa.spi.CriteriaBundle;
 import io.github.cyfko.filterql.jpa.spi.PredicateResolver;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -34,19 +34,19 @@ public abstract class Repository<E> {
 
     public abstract EntityManager getEntityManager();
 
-    List<E> findAll(ConditionResolver<EntityManager, ManagerDetail> cr) {
+    List<E> findAll(ConditionResolver<EntityManager, CriteriaBundle> cr) {
         EntityManager em = getEntityManager();
 
         CriteriaBuilder cb = em.getCriteriaBuilder();
         CriteriaQuery<E> query = cb.createQuery(entityClass);
         Root<E> root = query.from(entityClass);
 
-        // Extract the JpaPredicateResolver from the ConditionResolver
+        // Extract the PredicateResolver from the ConditionResolver
         if (!(cr instanceof PredicateResolver<?> pr))
             throw new IllegalArgumentException("Expected JpaConditionResolver, got: " + cr.getClass());
 
         // Apply filters
-        //noinspection unchecked
+        // noinspection unchecked
         query.select(root).where(pr.resolve((Root) root, query, cb));
 
         return em.createQuery(query).getResultList();

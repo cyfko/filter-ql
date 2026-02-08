@@ -54,7 +54,7 @@
 
         <!-- Dependencies Versions -->
         <compile-testing.version>0.21.0</compile-testing.version>
-        <filterql-jpa.version>2.0.0</filterql-jpa.version>
+        <filterql-jpa.version>2.0.0-SNAPSHOT</filterql-jpa.version>
         <jpa-processor.version>1.0.0</jpa-processor.version>
     </properties>
 

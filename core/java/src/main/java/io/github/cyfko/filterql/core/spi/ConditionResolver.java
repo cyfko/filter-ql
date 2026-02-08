@@ -27,22 +27,22 @@ package io.github.cyfko.filterql.core.spi;
  * 
  * <pre>{@code
  * // In filterql-jpa module:
- * public record JpaQueryContext(Root<?> root, CriteriaQuery<?> query, CriteriaBuilder cb) {
- * }
- *
- * public interface JpaConditionResolver extends ConditionResolver<JpaQueryContext, Predicate> {
+ * public interface PredicateResolver<E> extends ConditionResolver<EntityManager, CriteriaBundle> {
+ *     Predicate resolve(Root<E> root, CriteriaQuery<?> query, CriteriaBuilder cb);
  * }
  *
  * // Usage:
- * JpaConditionResolver resolver = (subject, ctx) -> ctx.cb().equal(ctx.root().get("status"), "ACTIVE");
+ * PredicateResolver<User> resolver = (root, query, cb) -> cb.equal(root.get("status"), Status.ACTIVE);
  *
- * Predicate predicate = resolver.resolve(User.class, jpaQueryContext);
+ * CriteriaBundle detail = resolver.resolve(User.class, entityManager);
+ * Predicate predicate = detail.predicate();
  * }</pre>
  *
- * @param <Em> Execution management context type - implementation-specific (e.g., EntityManager)
- * @param <R> Result type - backend-specific predicate type
- *            (e.g., jakarta.persistence.criteria.Predicate for JPA,
- *            org.bson.conversions.Bson for MongoDB)
+ * @param <Em> Execution management context type - implementation-specific
+ *             (e.g., EntityManager)
+ * @param <R>  Result type - backend-specific predicate type
+ *             (e.g., jakarta.persistence.criteria.Predicate for JPA,
+ *             org.bson.conversions.Bson for MongoDB)
  *
  * @author Frank KOSSI
  * @since 5.0.0
@@ -51,9 +51,10 @@ package io.github.cyfko.filterql.core.spi;
 public interface ConditionResolver<Em, R> {
 
     /**
-     * A resolver that returns null (backend <strong>SHOULD</strong> interprets as no defined filter condition)
+     * A resolver that returns null (backend <strong>SHOULD</strong> interprets as
+     * no defined filter condition)
      */
-    ConditionResolver<Object,Object> SENTINEL = new ConditionResolver<>() {
+    ConditionResolver<Object, Object> SENTINEL = new ConditionResolver<>() {
         @Override
         public <E> Object resolve(Class<E> subject, Object o) {
             return null;
@@ -79,8 +80,9 @@ public interface ConditionResolver<Em, R> {
      * </ul>
      *
      * @param subject the entity class being queried (e.g., User.class)
-     * @param em implementation-specific execution manager context containing necessary components
-     * @param <E> entity type
+     * @param em      implementation-specific execution manager context containing
+     *                necessary components
+     * @param <E>     entity type
      * @return backend-specific predicate ready for query execution
      * @throws IllegalArgumentException if resolver cannot create a predicate
      */

@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.tests.projection;
 
 import io.github.cyfko.filterql.core.spi.ConditionResolver;
-import io.github.cyfko.filterql.jpa.spi.ManagerDetail;
+import io.github.cyfko.filterql.jpa.spi.CriteriaBundle;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.Predicate;
 
@@ -144,10 +144,10 @@ class JpaProjectionIntegrationTest {
 
                 // When: Resolve WITHOUT projection
                 QueryExecutionParams params = QueryExecutionParams.of(Map.of("activeArg", true));
-                ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, params);
+                ConditionResolver<EntityManager, CriteriaBundle> resolver = context.toResolver(condition, params);
 
                 // Then: Should execute successfully
-                ManagerDetail detail = resolver.resolve(UserB.class, em);
+                CriteriaBundle detail = resolver.resolve(UserB.class, em);
 
                 @SuppressWarnings("unchecked")
                 CriteriaQuery<UserB> query = (CriteriaQuery<UserB>) detail.query();

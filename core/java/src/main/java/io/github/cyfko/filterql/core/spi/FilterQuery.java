@@ -87,12 +87,12 @@ import io.github.cyfko.filterql.core.api.PropertyReference;
  * <pre>{@code
  * FilterRequest<UserProperty> request = ...;
  *
- * ConditionResolver<?, ?> resolver = filterQuery.toResolver(request);
+ * ConditionResolver<EntityManager, ?> resolver = filterQuery.toResolver(request);
  *
  * // Backend-specific usage in JPA adapter:
- * JpaConditionResolver jpaResolver = (JpaConditionResolver) resolver;
- * JpaQueryContext ctx = new JpaQueryContext(root, query, cb);
- * Predicate predicate = jpaResolver.resolve(User.class, ctx);
+ * PredicateResolver<?> jpaResolver = PredicateResolver.from(resolver);
+ * CriteriaBundle detail = jpaResolver.resolve(User.class, entityManager);
+ * Predicate predicate = detail.predicate();
  * }</pre>
  *
  * <h3>Design Considerations:</h3>
@@ -139,10 +139,10 @@ public interface FilterQuery<Em> {
      * <h4>Example:</h4>
      * 
      * <pre>{@code
-     * ConditionResolver<?, ?> resolver = filterQuery.toResolver(request);
+     * ConditionResolver<EntityManager, ?> resolver = filterQuery.toResolver(request);
      *
      * // Cast to backend-specific resolver for actual usage
-     * JpaConditionResolver jpaResolver = (JpaConditionResolver) resolver;
+     * PredicateResolver<?> jpaResolver = PredicateResolver.from(resolver);
      * }</pre>
      *
      * @param request FilterQL request containing filters and associated parameters
@@ -230,20 +230,21 @@ public interface FilterQuery<Em> {
      * Long count = filterQuery.execute(request, context, countStrategy);
      * }</pre>
      *
-     * @param request   FilterQL request to execute
-     * @param ctx       the execution context used for query execution (e.g.,
-     *                  EntityManager for JPA).
-     *                  Must not be null.
-     * @param strategy  Execution strategy defining how to execute and what to
-     *                  return.
-     *                  The generic type parameter {@code T} determines the return
-     *                  type.
-     * @param <P>       Filter property enumeration type
-     * @param <T>       Return type, inferred from the strategy's type parameter
+     * @param request  FilterQL request to execute
+     * @param ctx      the execution context used for query execution (e.g.,
+     *                 EntityManager for JPA).
+     *                 Must not be null.
+     * @param strategy Execution strategy defining how to execute and what to
+     *                 return.
+     *                 The generic type parameter {@code T} determines the return
+     *                 type.
+     * @param <P>      Filter property enumeration type
+     * @param <T>      Return type, inferred from the strategy's type parameter
      * @return Result of type {@code T} as defined by the strategy
      * @throws IllegalArgumentException if any parameter is null
      */
-    default <P extends Enum<P> & PropertyReference, T> T execute(FilterRequest<P> request, Em ctx, ExecutionStrategy<T> strategy) {
+    default <P extends Enum<P> & PropertyReference, T> T execute(FilterRequest<P> request, Em ctx,
+            ExecutionStrategy<T> strategy) {
         QueryExecutor<Em> executor = this.toExecutor(request);
         return executor.executeWith(ctx, strategy);
     }

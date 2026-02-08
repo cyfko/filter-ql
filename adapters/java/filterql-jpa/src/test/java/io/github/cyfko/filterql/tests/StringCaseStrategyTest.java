@@ -6,7 +6,7 @@ import io.github.cyfko.filterql.core.api.Condition;
 import io.github.cyfko.filterql.core.config.FilterConfig;
 import io.github.cyfko.filterql.core.config.StringCaseStrategy;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
-import io.github.cyfko.filterql.jpa.spi.ManagerDetail;
+import io.github.cyfko.filterql.jpa.spi.CriteriaBundle;
 import io.github.cyfko.filterql.jpa.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.filterql.core.api.PropertyReference;
@@ -121,8 +121,8 @@ class StringCaseStrategyTest {
         assertEquals(0, noneResult.size(), "NONE strategy should be case-sensitive and miss the row");
     }
 
-    private List<SimpleUser> run(ConditionResolver<EntityManager, ManagerDetail> resolver) {
-        ManagerDetail detail = resolver.resolve(SimpleUser.class, em);
+    private List<SimpleUser> run(ConditionResolver<EntityManager, CriteriaBundle> resolver) {
+        CriteriaBundle detail = resolver.resolve(SimpleUser.class, em);
 
         @SuppressWarnings("unchecked")
         CriteriaQuery<SimpleUser> query = (CriteriaQuery<SimpleUser>) detail.query();

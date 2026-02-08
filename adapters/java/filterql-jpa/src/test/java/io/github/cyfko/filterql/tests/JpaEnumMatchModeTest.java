@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.tests;
 
 import io.github.cyfko.filterql.core.spi.ConditionResolver;
-import io.github.cyfko.filterql.jpa.spi.ManagerDetail;
+import io.github.cyfko.filterql.jpa.spi.CriteriaBundle;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.Predicate;
 
@@ -94,9 +94,9 @@ class JpaEnumMatchModeTest {
         );
     }
 
-    private List<Task> executeQuery(ConditionResolver<EntityManager, ManagerDetail> resolver) {
+    private List<Task> executeQuery(ConditionResolver<EntityManager, CriteriaBundle> resolver) {
         try (EntityManager em = emf.createEntityManager()) {
-            ManagerDetail detail = resolver.resolve(Task.class, em);
+            CriteriaBundle detail = resolver.resolve(Task.class, em);
 
             @SuppressWarnings("unchecked")
             CriteriaQuery<Task> query = (CriteriaQuery<Task>) detail.query();
@@ -122,7 +122,7 @@ class JpaEnumMatchModeTest {
             Condition condition = context.toCondition("priorityParam", TaskProp.PRIORITY, "EQ");
 
             Map<String, Object> args = Map.of("priorityParam", "HIGH");
-            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, CriteriaBundle> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<Task> results = executeQuery(resolver);
 
@@ -142,7 +142,7 @@ class JpaEnumMatchModeTest {
             Condition condition = context.toCondition("priorityParam", TaskProp.PRIORITY, "EQ");
 
             Map<String, Object> args = Map.of("priorityParam", "high");
-            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, CriteriaBundle> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             try (EntityManager em = emf.createEntityManager()) {
 
@@ -167,7 +167,7 @@ class JpaEnumMatchModeTest {
             Condition condition = context.toCondition("priorityParam", TaskProp.PRIORITY, "IN");
 
             Map<String, Object> args = Map.of("priorityParam", List.of("HIGH", "CRITICAL"));
-            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, CriteriaBundle> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<Task> results = executeQuery(resolver);
 
@@ -194,7 +194,7 @@ class JpaEnumMatchModeTest {
             Condition condition = context.toCondition("priorityParam", TaskProp.PRIORITY, "EQ");
 
             Map<String, Object> args = Map.of("priorityParam", "high");
-            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, CriteriaBundle> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<Task> results = executeQuery(resolver);
 
@@ -213,7 +213,7 @@ class JpaEnumMatchModeTest {
             Condition condition = context.toCondition("priorityParam", TaskProp.PRIORITY, "EQ");
 
             Map<String, Object> args = Map.of("priorityParam", "CrItIcAl");
-            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, CriteriaBundle> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<Task> results = executeQuery(resolver);
 
@@ -232,7 +232,7 @@ class JpaEnumMatchModeTest {
             Condition condition = context.toCondition("priorityParam", TaskProp.PRIORITY, "IN");
 
             Map<String, Object> args = Map.of("priorityParam", List.of("low", "Medium", "HIGH"));
-            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, CriteriaBundle> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<Task> results = executeQuery(resolver);
 
@@ -255,7 +255,7 @@ class JpaEnumMatchModeTest {
             Condition condition = context.toCondition("priorityParam", TaskProp.PRIORITY, "EQ");
 
             Map<String, Object> args = Map.of("priorityParam", "INVALID");
-            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, CriteriaBundle> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             try (EntityManager em = emf.createEntityManager()) {
 
@@ -284,7 +284,7 @@ class JpaEnumMatchModeTest {
             Condition condition = context.toCondition("priorityParam", TaskProp.PRIORITY, "EQ");
 
             Map<String, Object> args = Map.of("priorityParam", "medium");
-            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, CriteriaBundle> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             List<Task> results = executeQuery(resolver);
 

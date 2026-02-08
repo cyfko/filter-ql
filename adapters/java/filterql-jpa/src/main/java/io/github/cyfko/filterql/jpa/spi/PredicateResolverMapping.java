@@ -20,7 +20,7 @@ package io.github.cyfko.filterql.jpa.spi;
  * <h2>Best Practices</h2>
  * <ul>
  * <li>Keep mappings stateless and thread-safe</li>
- * <li>Validate input parameters inside the returned JpaPredicateResolver</li>
+ * <li>Validate input parameters inside the returned PredicateResolver</li>
  * <li>Provide meaningful error messages</li>
  * <li>Consider performance implications of complex queries</li>
  * <li>Use appropriate indexes for custom filter paths</li>
@@ -31,7 +31,7 @@ package io.github.cyfko.filterql.jpa.spi;
  * 
  * <pre>{@code
  * // Helper method for SOUNDEX on any field
- * static JpaPredicateResolverMapping<User> soundexMapping(String fieldName) {
+ * static PredicateResolverMapping<User> soundexMapping(String fieldName) {
  *     return (op, args) -> (root, query, cb) -> {
  *         if (!"SOUNDEX".equals(op)) {
  *             throw new IllegalArgumentException("Expected SOUNDEX operator");
@@ -65,7 +65,7 @@ public interface PredicateResolverMapping<E> extends ReferenceMapping<E> {
      * This method is called during query construction to obtain a deferred
      * predicate
      * generator. The actual predicate is built later when the
-     * JpaPredicateResolver's
+     * PredicateResolver's
      * {@code resolve()} method is called with the JPA context.
      * </p>
      * 
@@ -83,7 +83,7 @@ public interface PredicateResolverMapping<E> extends ReferenceMapping<E> {
      *
      * @param op   the filter operator to apply (e.g., "EQ", "LIKE", "SOUNDEX")
      * @param args the arguments of the filter's operator
-     * @return the JpaPredicateResolver for deferred predicate generation
+     * @return the PredicateResolver for deferred predicate generation
      * @throws IllegalArgumentException if the operator or arguments are invalid
      * @since 4.0.0
      */

@@ -51,7 +51,7 @@ import io.github.cyfko.filterql.core.model.QueryExecutionParams;
  * ExecutionStrategy<List<UserDto>> strategy = new MultiQueryExecutionStrategy<>();
  *
  * // 2. Get executor from FilterQuery
- * QueryExecutor<UserDto> executor = filterQuery.resolve(request, UserDto.class);
+ * QueryExecutor<EntityManager> executor = filterQuery.toExecutor(request);
  *
  * // 3. Execute
  * List<UserDto> results = executor.executeWith(entityManager, strategy);
@@ -133,19 +133,16 @@ public interface ExecutionStrategy<R> {
      * public List<R> execute(Object ctx, ConditionResolver<?, ?> resolver, QueryExecutionParams params) {
      *     // Cast context to backend-specific type
      *     EntityManager em = (EntityManager) ctx;
-     *     JpaConditionResolver jpaResolver = (JpaConditionResolver) resolver;
+     *     PredicateResolver<?> pr = PredicateResolver.from(resolver);
      *
-     *     CriteriaBuilder cb = em.getCriteriaBuilder();
-     *     CriteriaQuery<R> query = cb.createQuery(resultType);
-     *     Root<?> root = query.from(entityClass);
+     *     // Use PredicateResolver.from() to extract JPA-specific resolver
+     *     CriteriaBundle detail = pr.resolve(entityClass, em);
      *
-     *     // Apply filters
-     *     JpaQueryContext jpaCtx = new JpaQueryContext(root, query, cb);
-     *     Predicate predicate = jpaResolver.resolve(entityClass, jpaCtx);
-     *     query.where(predicate);
+     *     // Apply filters using returned detail
+     *     detail.query().where(detail.predicate());
      *
      *     // Execute with pagination
-     *     return em.createQuery(query).getResultList();
+     *     return em.createQuery(detail.query()).getResultList();
      * }
      * }</pre>
      *

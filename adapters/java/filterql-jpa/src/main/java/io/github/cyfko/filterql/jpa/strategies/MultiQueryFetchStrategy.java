@@ -20,18 +20,66 @@ import jakarta.persistence.criteria.*;
 
 import static io.github.cyfko.filterql.jpa.strategies.helper.QueryPlan.*;
 
+/**
+ * Multi-query execution strategy for JPA projections with nested collections.
+ * <p>
+ * This strategy optimizes queries involving nested collections by executing
+ * separate queries for the root entity and each collection level, then
+ * assembling the results efficiently. This approach avoids Cartesian product
+ * issues that occur with JOINs on multiple collections.
+ * </p>
+ *
+ * <h2>Key Features</h2>
+ * <ul>
+ * <li>Efficient handling of multiple nested collections</li>
+ * <li>Automatic parent-child result linking</li>
+ * <li>Support for computed fields via {@link InstanceResolver}</li>
+ * <li>Configurable batch size for collection fetching</li>
+ * </ul>
+ *
+ * <h2>Usage Example</h2>
+ * 
+ * <pre>{@code
+ * MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserDTO.class);
+ * List<RowBuffer> results = strategy.execute(entityManager, resolver, params);
+ * }</pre>
+ *
+ * @author Frank KOSSI
+ * @since 2.0.0
+ * @see AbstractMultiQueryFetchStrategy
+ * @see TypedMultiQueryFetchStrategy
+ */
 public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
     private static final int BATCH_SIZE = 1000;
 
     /**
-     * Initializes the strategy with the given projection class.
+     * Constructs a new strategy for the given projection class.
+     * <p>
+     * Uses a null instance resolver, meaning computed fields requiring
+     * bean injection will use static method resolution only.
+     * </p>
+     *
+     * @param dtoClass the projection DTO class describing the query structure
+     * @throws NullPointerException     if dtoClass is null
+     * @throws IllegalArgumentException if no projection metadata found for dtoClass
      */
     public MultiQueryFetchStrategy(Class<?> dtoClass) {
         this(dtoClass, null);
     }
 
     /**
-     * Initializes the strategy with projection class and instance resolver.
+     * Constructs a new strategy with projection class and instance resolver.
+     * <p>
+     * The instance resolver enables computed field providers to be resolved
+     * from an IoC container (Spring, CDI, etc.) for dependency injection.
+     * </p>
+     *
+     * @param dtoClass         the projection DTO class describing the query
+     *                         structure
+     * @param instanceResolver resolver for computed field providers, or null for
+     *                         static-only resolution
+     * @throws NullPointerException     if dtoClass is null
+     * @throws IllegalArgumentException if no projection metadata found for dtoClass
      */
     public MultiQueryFetchStrategy(Class<?> dtoClass, InstanceResolver instanceResolver) {
         super(dtoClass, instanceResolver);

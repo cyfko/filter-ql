@@ -6,7 +6,7 @@ import io.github.cyfko.filterql.core.config.FilterConfig;
 import io.github.cyfko.filterql.core.model.FilterDefinition;
 import io.github.cyfko.filterql.core.model.QueryExecutionParams;
 import io.github.cyfko.filterql.core.spi.ConditionResolver;
-import io.github.cyfko.filterql.jpa.spi.ManagerDetail;
+import io.github.cyfko.filterql.jpa.spi.CriteriaBundle;
 import io.github.cyfko.filterql.jpa.spi.PredicateResolver;
 import io.github.cyfko.filterql.core.utils.TypeConversionUtils;
 import io.github.cyfko.filterql.core.utils.FilterConfigUtils;
@@ -159,7 +159,7 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
      * <ul>
      * <li><strong>String:</strong> Property path for direct JPA attribute access
      * (e.g., "name", "address.city")</li>
-     * <li><strong>JpaPredicateResolverMapping:</strong> Custom filter logic
+     * <li><strong>PredicateResolverMapping:</strong> Custom filter logic
      * implementation</li>
      * </ul>
      *
@@ -190,7 +190,7 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
      *         case EMAIL -> "email";
      *
      *         // Custom full-name search logic
-     *         case FULL_NAME -> new JpaPredicateResolverMapping<User>() {
+     *         case FULL_NAME -> new PredicateResolverMapping<User>() {
      *             &#64;Override
      *             public Predicate resolve(Root<E> root, CriteriaQuery<?> query, CriteriaBuilder cb, Object[] params) {
      *                 String searchTerm = (String) params[0];
@@ -203,7 +203,7 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
      *         };
      *
      *         // Age range calculation from birth date
-     *         case AGE_RANGE -> new JpaPredicateResolverMapping<User>() {
+     *         case AGE_RANGE -> new PredicateResolverMapping<User>() {
      *             @Override
      *             public Predicate resolve(Root<E> root, CriteriaQuery<?> query, CriteriaBuilder cb, Object[] params) {
      *                 int minAge = (int) params[0];
@@ -396,7 +396,7 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
 
     /**
      * Creates a Condition using the default resolution mechanism (path or
-     * JpaPredicateResolverMapping).
+     * PredicateResolverMapping).
      */
     private Condition resolveWithDefaultMechanismCondition(P ref, String op, Supplier<Object> param) {
         Object mapping = mappingBuilder.apply(ref);
@@ -419,12 +419,12 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
         }
 
         throw new IllegalArgumentException(
-                "Invalid mapping function: only String and JpaPredicateResolverMapping are supported");
+                "Invalid mapping function: only String and PredicateResolverMapping are supported");
     }
 
     /**
      * Resolves a predicate using the default mechanism (path or
-     * JpaPredicateResolverMapping).
+     * PredicateResolverMapping).
      * Used when customOperatorResolver returns null.
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -446,7 +446,7 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
         }
 
         throw new IllegalArgumentException(
-                "Invalid mapping function: only String and JpaPredicateResolverMapping are supported");
+                "Invalid mapping function: only String and PredicateResolverMapping are supported");
     }
 
     /**
@@ -493,13 +493,14 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
      * @param condition Condition created by
      *                  {@link #toCondition(String, Enum, String)}
      * @param params    Execution parameters containing argument values
-     * @return JpaPredicateResolver bound to current thread arguments
+     * @return PredicateResolver bound to current thread arguments
      *
      * @throws IllegalArgumentException if condition is {@code null}
      * @throws NullPointerException     if params is {@code null}
      */
     @Override
-    public ConditionResolver<EntityManager, ManagerDetail> toResolver(Condition condition, QueryExecutionParams params) {
+    public ConditionResolver<EntityManager, CriteriaBundle> toResolver(Condition condition,
+            QueryExecutionParams params) {
         if (condition == null) {
             throw new IllegalArgumentException("condition cannot be null");
         }
@@ -529,7 +530,7 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
             return jpaCondition.getResolver();
         } catch (ClassCastException e) {
             throw new IllegalStateException(
-                    "Unable to convert Condition to JpaPredicateResolver. " +
+                    "Unable to convert Condition to PredicateResolver. " +
                             "Expected JpaCondition but got: " + condition.getClass().getSimpleName(),
                     e);
         }
@@ -555,7 +556,7 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
      *                           raw value
      * @param <E>                Entity type
      * @param <P>                Property enum type
-     * @return JpaPredicateResolver that can be used in a Criteria query
+     * @return PredicateResolver that can be used in a Criteria query
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public static <E, P extends Enum<P> & PropertyReference> PredicateResolver<E> getResolverFromPath(
@@ -656,9 +657,9 @@ public class JpaFilterContext<P extends Enum<P> & PropertyReference> implements 
                 }
 
                 case CUSTOM -> throw new IllegalStateException(
-                        "CUSTOM operator should be handled via JpaPredicateResolverMapping, not path-based resolution. "
+                        "CUSTOM operator should be handled via PredicateResolverMapping, not path-based resolution. "
                                 +
-                                "Ensure the property reference returns a JpaPredicateResolverMapping instead of a path string.");
+                                "Ensure the property reference returns a PredicateResolverMapping instead of a path string.");
             };
         };
     }

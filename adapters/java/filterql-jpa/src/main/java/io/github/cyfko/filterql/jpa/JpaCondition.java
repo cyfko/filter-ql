@@ -44,7 +44,7 @@ import io.github.cyfko.filterql.jpa.spi.PredicateResolver;
  * 
  * <pre>{@code
  * // Create a simple resolver
- * JpaPredicateResolver<User> activeResolver = (root, query, cb) -> cb.equal(root.get("status"), Status.ACTIVE);
+ * PredicateResolver<User> activeResolver = (root, query, cb) -> cb.equal(root.get("status"), Status.ACTIVE);
  *
  * // Wrap in JpaCondition
  * JpaCondition<User> activeCondition = new JpaCondition<>(activeResolver);
@@ -53,9 +53,9 @@ import io.github.cyfko.filterql.jpa.spi.PredicateResolver;
  * <h3>Combining Conditions with AND</h3>
  * 
  * <pre>{@code
- * JpaPredicateResolver<User> nameResolver = (root, query, cb) -> cb.like(root.get("name"), "John%");
+ * PredicateResolver<User> nameResolver = (root, query, cb) -> cb.like(root.get("name"), "John%");
  *
- * JpaPredicateResolver<User> ageResolver = (root, query, cb) -> cb.greaterThan(root.get("age"), 25);
+ * PredicateResolver<User> ageResolver = (root, query, cb) -> cb.greaterThan(root.get("age"), 25);
  *
  * JpaCondition<User> nameCondition = new JpaCondition<>(nameResolver);
  * JpaCondition<User> ageCondition = new JpaCondition<>(ageResolver);
@@ -94,7 +94,7 @@ import io.github.cyfko.filterql.jpa.spi.PredicateResolver;
  *
  * // Combine and resolve
  * Condition finalCondition = nameCondition.and(ageCondition);
- * JpaPredicateResolver<User> resolver = context.toResolver(argumentMap);
+ * PredicateResolver<User> resolver = context.toResolver(argumentMap);
  * }</pre>
  *
  * <h2>Performance Characteristics</h2>
@@ -141,7 +141,7 @@ import io.github.cyfko.filterql.jpa.spi.PredicateResolver;
  */
 public record JpaCondition<T>(PredicateResolver<T> resolver) implements Condition {
     /**
-     * Constructs a new FilterCondition wrapping a JpaPredicateResolver.
+     * Constructs a new FilterCondition wrapping a PredicateResolver.
      * <p>
      * The provided resolver will be used to generate JPA predicates
      * when this condition is evaluated in a query context.
@@ -152,14 +152,14 @@ public record JpaCondition<T>(PredicateResolver<T> resolver) implements Conditio
      * </p>
      * 
      * <pre>{@code
-     * // Create a JpaPredicateResolver for active users
-     * JpaPredicateResolver<User> activeSpec = (root, query, cb) -> cb.equal(root.get("status"), UserStatus.ACTIVE);
+     * // Create a PredicateResolver for active users
+     * PredicateResolver<User> activeSpec = (root, query, cb) -> cb.equal(root.get("status"), UserStatus.ACTIVE);
      *
      * // Wrap in FilterCondition
      * FilterCondition<User> activeCondition = new FilterCondition<>(activeSpec);
      * }</pre>
      *
-     * @param resolver The JpaPredicateResolver to wrap. Must not be null.
+     * @param resolver The PredicateResolver to wrap. Must not be null.
      * @throws NullPointerException if resolver is {@code null}
      */
     public JpaCondition {
@@ -224,9 +224,9 @@ public record JpaCondition<T>(PredicateResolver<T> resolver) implements Conditio
     }
 
     /**
-     * Gets the underlying JpaPredicateResolver.
+     * Gets the underlying PredicateResolver.
      * <p>
-     * Returns the wrapped JpaPredicateResolver that can be used directly with
+     * Returns the wrapped PredicateResolver that can be used directly with
      * criteria
      * queries.
      * </p>
@@ -243,7 +243,7 @@ public record JpaCondition<T>(PredicateResolver<T> resolver) implements Conditio
      * query.where(resolver.resolve(root, query, cb));
      * }</pre>
      *
-     * @return The JpaPredicateResolver wrapped by this condition
+     * @return The PredicateResolver wrapped by this condition
      */
     public PredicateResolver<T> getResolver() {
         return resolver;

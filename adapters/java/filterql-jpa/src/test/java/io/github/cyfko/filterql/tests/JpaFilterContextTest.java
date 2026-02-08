@@ -1,7 +1,7 @@
 package io.github.cyfko.filterql.tests;
 
 import io.github.cyfko.filterql.core.spi.ConditionResolver;
-import io.github.cyfko.filterql.jpa.spi.ManagerDetail;
+import io.github.cyfko.filterql.jpa.spi.CriteriaBundle;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.Predicate;
 
@@ -139,7 +139,7 @@ class JpaFilterContextTest {
             // When - Phase 2: Fourniture de la valeur
             Map<String, Object> args = new HashMap<>();
             args.put("nameParam", "John");
-            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, CriteriaBundle> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             // Then
             assertNotNull(resolver, "Resolver ne doit pas être null");
@@ -214,7 +214,7 @@ class JpaFilterContextTest {
             // When
             Condition condition = context.toCondition("arg1", TestProp.NAME, "EQ");
             Map<String, Object> args = Map.of("arg1", "value");
-            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, CriteriaBundle> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             // Then
             assertNotNull(resolver);
@@ -239,7 +239,7 @@ class JpaFilterContextTest {
             String expectedValue = "testValue";
             Condition condition = context.toCondition("arg1", TestProp.NAME, "EQ");
             Map<String, Object> args = Map.of("arg1", expectedValue);
-            ConditionResolver<EntityManager, ManagerDetail> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
+            ConditionResolver<EntityManager, CriteriaBundle> resolver = context.toResolver(condition, QueryExecutionParams.of(args));
 
             // Then
             assertNotNull(resolver, "Resolver should not be null");
