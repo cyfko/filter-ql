@@ -122,7 +122,9 @@ JpaFilterContext<UserPropertyRef> context = new JpaFilterContext<>(
 ### 3. Build FilterQuery
 
 ```java
-FilterQuery<User> filterQuery = FilterQueryFactory.of(context);
+import jakarta.persistence.EntityManager;
+
+FilterQuery<EntityManager> filterQuery = FilterQueryFactory.of(context);
 ```
 
 ### 4. Execute Query
@@ -142,11 +144,11 @@ FilterRequest<UserPropertyRef> request = FilterRequest.<UserPropertyRef>builder(
     .build();
 
 // Recommended: MultiQueryFetchStrategy for DTO projection with batch optimization
-QueryExecutor<List<Map<String, Object>>> executor = filterQuery.toExecutor(request);
-List<Map<String, Object>> results = executor.executeWith(em, new MultiQueryFetchStrategy(UserDTO.class));
+var executor = filterQuery.toExecutor(request);
+List<RowBuffer> results = executor.executeWith(em, new MultiQueryFetchStrategy(UserDTO.class));
 
 // Alternative: FullEntityFetchStrategy for simple cases (no projection, returns full entities)
-QueryExecutor<List<User>> entityExecutor = filterQuery.toExecutor(requestWithoutProjection);
+var entityExecutor = filterQuery.toExecutor(requestWithoutProjection);
 List<User> users = entityExecutor.executeWith(em, new FullEntityFetchStrategy<>(User.class));
 ```
 
@@ -155,12 +157,11 @@ List<User> users = entityExecutor.executeWith(em, new FullEntityFetchStrategy<>(
 For custom query construction or when you need full control:
 
 ```java
-// Get resolver and convert to PredicateResolver
-ConditionResolver<EntityManager, ?> resolver = filterQuery.toResolver(request);
-PredicateResolver<?> pr = PredicateResolver.from(resolver);
+// Get resolver from request
+ConditionResolver<EntityManager, CriteriaBundle> resolver = filterQuery.toResolver(request);
 
 // Resolve to CriteriaBundle (contains predicate, query, cb, root)
-CriteriaBundle bundle = pr.resolve(User.class, em);
+CriteriaBundle bundle = resolver.resolve(em);
 
 // Add custom joins, selections, etc.
 // bundle.query().select(...).distinct(true)...
@@ -215,7 +216,8 @@ JpaFilterContext<UserPropertyRef> context = new JpaFilterContext<>(
 
 Use the `@Projection` annotation from [projection-spec](https://github.com/cyfko/projection-spec):
 
-**Note:** The `@Projection` annotation is **not part of FilterQL**. It comes from the external [projection-metamodel-processor](https://github.com/cyfko/jpa-metamodel-processor) library which implements the [projection-spec](https://github.com/cyfko/projection-spec).
+**Note:** The `@Projection` annotation is **not part of FilterQL**. It comes from the [projection-spec](https://github.com/cyfko/projection-spec) 
+specification implemented by the dependency [jpa-metamodel-processor](https://github.com/cyfko/jpa-metamodel-processor).
 
 ```java
 import io.github.cyfko.projection.Projection;  // External dependency
@@ -240,9 +242,9 @@ FilterRequest<UserPropertyRef> request = FilterRequest.<UserPropertyRef>builder(
     .projection("id", "username", "email", "age")
     .build();
 
-MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(UserDTO.class);
-QueryExecutor<List<Map<String, Object>>> executor = filterQuery.toExecutor(request);
-List<Map<String, Object>> results = executor.executeWith(em, strategy);
+var strategy = new MultiQueryFetchStrategy(UserDTO.class);
+var executor = filterQuery.toExecutor(request);
+List<RowBuffer> results = executor.executeWith(em, strategy);
 ```
 
 ---
@@ -334,9 +336,9 @@ FilterRequest<AuthorPropertyRef> request = FilterRequest.<AuthorPropertyRef>buil
     .pagination(new Pagination(0, 20, List.of(new SortBy("name", "ASC"))))
     .build();
 
-MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(AuthorDTO.class);
-QueryExecutor<List<Map<String, Object>>> executor = filterQuery.toExecutor(request);
-List<Map<String, Object>> results = executor.executeWith(em, strategy);
+var strategy = new MultiQueryFetchStrategy(AuthorDTO.class);
+var executor = filterQuery.toExecutor(request);
+List<RowBuffer> results = executor.executeWith(em, strategy);
 
 // Result: All books and awards for each author (no limit)
 ```
@@ -358,24 +360,10 @@ FilterRequest<AuthorPropertyRef> request = FilterRequest.<AuthorPropertyRef>buil
     .pagination(new Pagination(0, 20, List.of(new SortBy("name", "ASC"))))
     .build();
 
-MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(AuthorDTO.class);
-List<Map<String, Object>> results = executor.executeWith(em, strategy);
+var strategy = new MultiQueryFetchStrategy(AuthorDTO.class);
+List<RowBuffer> results = executor.executeWith(em, strategy);
 
-// Result structure:
-// [
-//   {
-//     "id": 1,
-//     "name": "John Smith",
-//     "books": [
-//       {"id": 101, "title": "Book 1", "year": 2023},  // Only first 10 books
-//       {"id": 102, "title": "Book 2", "year": 2022}
-//     ],
-//     "awards": [
-//       {"id": 1, "name": "Best Author 2023"},
-//       {"id": 2, "name": "Novel Prize 2022"}
-//     ]
-//   }
-// ]
+// Result structure can be mapped to DTOs or used directly
 ```
 
 ### Sorted Collection Projection
@@ -483,7 +471,7 @@ FilterRequest<AuthorPropertyRef> request = FilterRequest.<AuthorPropertyRef>buil
     .build();
 
 MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(AuthorDTO.class);
-List<Map<String, Object>> results = executor.executeWith(em, strategy);
+List<RowBuffer> results = executor.executeWith(em, strategy);
 
 // Result: 50 authors × 20 books = 1000 book records (instead of 50,000+ without pagination)
 ```

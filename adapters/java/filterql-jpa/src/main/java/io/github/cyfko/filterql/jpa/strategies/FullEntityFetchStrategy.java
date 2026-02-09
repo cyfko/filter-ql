@@ -58,11 +58,31 @@ public record FullEntityFetchStrategy<E>(Class<E> rootEntityClass) implements Ex
         PredicateResolver<?> pr = PredicateResolver.from(cr);
         CriteriaBundle detail = pr.resolve(rootEntityClass, em);
 
+        // 2. Apply Filtering
         detail.query().where(detail.predicate());
 
-        // Execute the query as-is, returning full entities
+        // 3. Apply Sorting
+        if (params.hasPagination() && params.pagination().hasSort()) {
+            List<jakarta.persistence.criteria.Order> orders = new java.util.ArrayList<>();
+            for (io.github.cyfko.filterql.core.model.SortBy sortField : params.pagination().sort()) {
+                jakarta.persistence.criteria.Path<?> path = io.github.cyfko.filterql.jpa.utils.PathResolverUtils
+                        .resolvePath(detail.root(), sortField.field());
+                orders.add("desc".equalsIgnoreCase(sortField.direction())
+                        ? detail.cb().desc(path)
+                        : detail.cb().asc(path));
+            }
+            detail.query().orderBy(orders);
+        }
+
+        // 4. Create TypedQuery
         @SuppressWarnings("unchecked")
         TypedQuery<E> query = (TypedQuery<E>) em.createQuery(detail.query());
+
+        // 5. Apply Pagination
+        if (params.hasPagination()) {
+            query.setFirstResult(params.pagination().offset());
+            query.setMaxResults(params.pagination().size());
+        }
 
         return query.getResultList();
     }
