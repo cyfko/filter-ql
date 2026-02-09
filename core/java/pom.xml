@@ -4,7 +4,7 @@
 
     <groupId>io.github.cyfko</groupId>
     <artifactId>filterql-core</artifactId>
-    <version>4.0.1</version>
+    <version>4.0.2-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>FilterQL</name>
@@ -31,7 +31,7 @@
         <connection>scm:git:git://github.com/cyfko/filter-ql</connection>
         <developerConnection>scm:git:git@github.com:cyfko/filter-ql.git</developerConnection>
         <url>https://github.com/cyfko/filter-ql/tree/main/core/java</url>
-      <tag>v4.0.1</tag>
+      <tag>HEAD</tag>
   </scm>
 
     <properties>
