@@ -300,16 +300,16 @@ Main entry point for creating FilterQuery instances.
 
 ```java
 // Default parser
-FilterQuery<User> query = FilterQueryFactory.of(context);
+var query = FilterQueryFactory.of(context);
 
 // Custom parser
-FilterQuery<User> query = FilterQueryFactory.of(context, customParser);
+var query = FilterQueryFactory.of(context, customParser);
 
 // With projection policy
-FilterQuery<User> query = FilterQueryFactory.of(context, ProjectionPolicy.strict());
+var query = FilterQueryFactory.of(context, ProjectionPolicy.strict());
 
 // Full customization
-FilterQuery<User> query = FilterQueryFactory.of(context, customParser, projectionPolicy);
+var query = FilterQueryFactory.of(context, customParser, projectionPolicy);
 ```
 
 ### FilterQuery
@@ -319,33 +319,31 @@ High-level query lifecycle facade.
 **Methods:**
 
 ```java
-public interface FilterQuery<E> {
+public interface FilterQuery<Em> {
     // Low-level: Get predicate resolver for manual query building
     <P extends Enum<P> & PropertyReference> 
-    ConditionResolver<E> toResolver(FilterRequest<P> request);
+    ConditionResolver<Em,?> toResolver(FilterRequest<P> request);
     
     // Mid-level: Get executor with strategy control
-    <P extends Enum<P> & PropertyReference, R> 
-    QueryExecutor<R> toExecutor(FilterRequest<P> request);
+    <P extends Enum<P> & PropertyReference> 
+    QueryExecutor<Em> toExecutor(FilterRequest<P> request);
 }
 ```
 
 **Usage Example:**
 
 ```java
-// Low-level approach (maximum control)
-FilterQuery<EntityManager> filterQuery = FilterQueryFactory.of(context);
-ConditionResolver<EntityManager, ?> resolver = filterQuery.toResolver(request);
+// Create FilterQuery from adapter-specific context
+var filterQuery = FilterQueryFactory.of(context);
 
-// Convert to PredicateResolver and resolve with CriteriaBundle
-PredicateResolver<?> pr = PredicateResolver.from(resolver);
-CriteriaBundle bundle = pr.resolve(User.class, em);
-bundle.query().where(bundle.predicate());
-List<User> results = em.createQuery(bundle.query()).getResultList();
+// Low-level approach: Get resolver for manual query building
+var resolver = filterQuery.toResolver(request);
+// Use resolver with adapter-specific APIs (see adapter documentation)
 
-// Mid-level approach (strategy-based)
-QueryExecutor<EntityManager> executor = filterQuery.toExecutor(request);
-List<RowBuffer> dtos = executor.executeWith(em, new MultiQueryFetchStrategy(UserDto.class));
+// Mid-level approach: Get executor and use with strategy
+var executor = filterQuery.toExecutor(request);
+// Execute with adapter-specific strategy
+var results = executor.executeWith(executionContext, strategy);
 ```
 
 ### FilterContext
@@ -364,7 +362,7 @@ Backend bridge interface for adapters to implement.
 Condition condition = context.toCondition("argKey", propertyRef, "EQ");
 
 // Phase 2: Bind values and resolve to predicate
-ConditionResolver<User> resolver = context.toResolver(condition, executionParams);
+var resolver = context.toResolver(condition, executionParams);
 ```
 
 ### Condition
@@ -403,12 +401,13 @@ FilterRequest<UserPropertyRef> request = FilterRequest.<UserPropertyRef>builder(
     .build();
 
 // 3. Create FilterQuery with adapter's context
-FilterContext context = /* adapter-specific context */;
-FilterQuery<User> filterQuery = FilterQueryFactory.of(context);
+var context = /* adapter-specific FilterContext */;
+var filterQuery = FilterQueryFactory.of(context);
 
 // 4. Execute query (adapter-specific)
-// Example with JPA adapter:
-ConditionResolver<User> resolver = filterQuery.toResolver(request);
+var resolver = filterQuery.toResolver(request);
+// Or with executor:
+var executor = filterQuery.toExecutor(request);
 // ... use resolver in JPA Criteria API query
 ```
 
@@ -738,41 +737,21 @@ ProjectionPolicy.builder()
 
 ---
 
-## Custom Operators
+### Custom Operators
 
-FilterQL provides 14 standard operators for most filtering needs. For advanced use cases requiring custom filter logic, the **JPA Adapter** supports custom predicates via `PredicateResolverMapping`.
+FilterQL provides 14 standard operators for most filtering needs. Adapters can support custom operators by implementing specific logic in their `FilterContext`.
 
-See the [Custom Operators Guide](../../docs/docs/guides/custom-operators.md) for implementation examples.
-
-### Example: Custom Mapping in JpaFilterContext
+For example, a geospatial adapter might support a `NEAR` operator:
 
 ```java
-case COORDINATES -> new PredicateResolverMapping<Location>() {
-    @Override
-    public ConditionResolver<Location> map(String op, Object[] args) {
-        return (root, query, cb) -> {
-            if ("NEAR".equals(op)) {
-                @SuppressWarnings("unchecked")
-                Map<String, Double> params = (Map<String, Double>) args[0];
-                Double lat = params.get("lat");
-                Double lon = params.get("lon");
-                Double distance = params.get("distance");
-                
-                // Custom predicate logic - ST_Distance(location, point) < threshold
-                return cb.lessThan(
-                    cb.function("ST_Distance", Double.class, 
-                        root.get("location"),
-                        cb.function("ST_Point", Object.class,
-                            cb.literal(lon), cb.literal(lat))
-                    ),
-                    distance
-                );
-            }
-            throw new IllegalArgumentException("Unsupported operator: " + op);
-        };
-    }
-};
+// Adapter implementation handles the "NEAR" operator
+if ("NEAR".equals(op)) {
+    // Custom logic to build backend-specific query
+    return context.createSpatialQuery(field, params);
+}
 ```
+
+See the [Custom Operators Guide](../../docs/docs/guides/custom-operators.md) for implementation details.
 
 ### Usage
 
@@ -901,11 +880,11 @@ public class MyBackendFilterContext implements FilterContext {
         Object value = arguments.get(backendCondition.getArgKey());
         
         // Return executable predicate resolver
-        return (root, query, cb) -> {
+        return (context) -> {
             // Backend-specific predicate construction
-            // Example for JPA:
-            // return cb.equal(root.get("propertyName"), value);
-            return cb.conjunction(); // placeholder
+            // Example:
+            // return context.createPredicate(backendCondition.getField(), value);
+            return null; // placeholder
         };
     }
 }
@@ -922,26 +901,24 @@ public class MyCustomStrategy<R> implements ExecutionStrategy<R> {
             ConditionResolver<?> resolver,
             QueryExecutionParams params) {
         
-        // Cast context to your specific type (e.g., EntityManager for JPA)
-        EntityManager em = (EntityManager) ctx;
+        // Cast context to your specific type
+        MyExecutionContext executionContext = (MyExecutionContext) ctx;
         
         // Access execution parameters
         List<String> projection = params.projection();
         Pagination pagination = params.pagination();
         
         // Build and execute query using resolver
-        CriteriaBuilder cb = em.getCriteriaBuilder();
-        CriteriaQuery<R> query = cb.createQuery(/* result type */);
-        Root<?> root = query.from(/* entity class */);
+        var query = executionContext.createQuery();
         
         // Apply predicate
-        query.where(resolver.resolve(root, query, cb));
+        // query.where(resolver.resolve(executionContext));
         
         // Apply pagination/sorting if needed
         // Apply projection if needed
         
         // Execute and return results
-        return em.createQuery(query).getResultList();
+        return (R) query.execute();
     }
 }
 ```
@@ -953,7 +930,7 @@ public class MyCustomStrategy<R> implements ExecutionStrategy<R> {
 void testCustomAdapter() {
     // Setup
     FilterContext context = new MyBackendFilterContext();
-    FilterQuery<User> filterQuery = FilterQueryFactory.of(context);
+    FilterQuery<MyExecutionContext> filterQuery = FilterQueryFactory.of(context);
     
     // Build request
     FilterRequest<UserPropertyRef> request = FilterRequest.<UserPropertyRef>builder()
@@ -962,7 +939,7 @@ void testCustomAdapter() {
         .build();
     
     // Resolve
-    ConditionResolver<User> resolver = filterQuery.toResolver(request);
+    ConditionResolver<MyExecutionContext, ?> resolver = filterQuery.toResolver(request);
     
     // Verify (adapter-specific verification)
     assertNotNull(resolver);
@@ -1147,10 +1124,9 @@ FilterRequest<UserPropertyRef> request = new FilterRequest<>(
 **Debugging:**
 
 ```java
-// Temporarily disable caching
 CachePolicy noCachePolicy = CachePolicy.disabled();
 DslParser parser = new BasicDslParser(DslPolicy.defaults(), noCachePolicy);
-FilterQuery<User> query = FilterQueryFactory.of(context, parser);
+FilterQuery<MyExecutionContext> query = FilterQueryFactory.of(context, parser);
 ```
 
 **Solution:** If issue disappears with caching disabled, report as a bug with filter structure details.
