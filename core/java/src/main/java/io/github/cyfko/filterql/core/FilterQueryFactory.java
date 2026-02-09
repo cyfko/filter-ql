@@ -71,12 +71,9 @@ import java.util.logging.Logger;
  * ConditionResolver<?, ?> conditionResolver = query.toResolver(request);
  *
  * // 5. Execute query (implementation-specific, depends on adapter used)
- * // For example, with JPA adapter:
- * // CriteriaBuilder cb = entityManager.getCriteriaBuilder();
- * // CriteriaQuery<User> query = cb.createQuery(User.class);
- * // Root<User> root = query.from(User.class);
- * // query.where(predicateResolver.resolve(root, query, cb));
- * // List<User> results = entityManager.createQuery(query).getResultList();
+ * // For example:
+ * // MyQuery query = resolver.resolve(User.class, context);
+ * // List<User> results = query.execute();
  * }</pre>
  *
  * <p>
@@ -123,7 +120,7 @@ public class FilterQueryFactory {
      * strategies.
      * </p>
      *
-     * @param <Em> The execution management context (e.g EntityManager for JPA).
+     * @param <Em>    The execution management context (e.g DatabaseSession).
      * @param context The context to use for condition resolution. Must not be null.
      * @return A new FilterQueryFactory instance with default DSL parser
      * @throws NullPointerException if context is null
@@ -155,7 +152,7 @@ public class FilterQueryFactory {
      * FilterRequestManager manager = FilterQueryFactory.of(customParser, context);
      * }</pre>
      *
-     * @param <Em> The execution management context (e.g EntityManager for JPA).
+     * @param <Em>      The execution management context (e.g DatabaseSession).
      * @param context   The context to use for condition resolution. Must not be
      *                  null.
      * @param dslParser The parser to use for DSL expressions. Must not be null.
@@ -176,7 +173,7 @@ public class FilterQueryFactory {
      * @param dslParser The parser to use for DSL expressions. Must not be null.
      * @param policy    The projection policy to use for query execution. Must not
      *                  be null.
-     * @param <Em> The execution management context (e.g EntityManager for JPA).
+     * @param <Em>      The execution management context (e.g DatabaseSession).
      * @return A new FilterQuery instance with the provided components.
      * @throws NullPointerException if any parameter is null.
      */
@@ -191,7 +188,7 @@ public class FilterQueryFactory {
      * @param context The context to use for condition resolution. Must not be null.
      * @param policy  The projection policy to use for query execution. Must not be
      *                null.
-     * @param <Em> The execution management context (e.g EntityManager for JPA).
+     * @param <Em>    The execution management context (e.g DatabaseSession).
      * @return A new FilterQuery instance with the provided components.
      * @throws NullPointerException if any parameter is null.
      */
@@ -207,14 +204,15 @@ public class FilterQueryFactory {
      * to process filter requests and generate executable predicates.
      * </p>
      *
-     * @param <Em>            The execution management context (e.g EntityManager for JPA).
+     * @param <Em>             The execution management context (e.g
+     *                         DatabaseSession).
      * @param filterContext    The context for condition resolution.
      * @param dslParser        The parser for DSL expressions.
      * @param projectionPolicy The policy for projection handling.
      */
     private record DefaultFilterQuery<Em>(FilterContext<Em> filterContext,
-                                          DslParser dslParser,
-                                          ProjectionPolicy projectionPolicy) implements FilterQuery<Em> {
+            DslParser dslParser,
+            ProjectionPolicy projectionPolicy) implements FilterQuery<Em> {
         private DefaultFilterQuery {
             Objects.requireNonNull(filterContext, "Context cannot be null");
             Objects.requireNonNull(dslParser, "DSL parser cannot be null");
@@ -227,7 +225,7 @@ public class FilterQueryFactory {
             Objects.requireNonNull(request, "Filter request cannot be null");
 
             if (!request.hasFilters()) {
-                //noinspection unchecked
+                // noinspection unchecked
                 return (ConditionResolver<Em, ?>) ConditionResolver.SENTINEL;
             }
 
@@ -256,8 +254,7 @@ public class FilterQueryFactory {
             Map<String, Object> params = toFilterArgumentRegistry((Map) request.filters());
             return new DefaultQueryExecutor<>(
                     cr,
-                    new QueryExecutionParams(params, request.projection(), request.pagination(), projectionPolicy)
-            );
+                    new QueryExecutionParams(params, request.projection(), request.pagination(), projectionPolicy));
         }
 
         /**
@@ -305,16 +302,16 @@ public class FilterQueryFactory {
      * <h3>Usage Example:</h3>
      * 
      * <pre>{@code
-     * ConditionResolver<User> resolver = filterContext.toResolver(Tuple.class, condition, params);
-     * QueryExecutor<User, Tuple> executor = new DefaultQueryExecutor<>(resolver, params);
+     * ConditionResolver<MyContext, ?> resolver = filterContext.toResolver(condition, params);
+     * QueryExecutor<MyContext> executor = new DefaultQueryExecutor<>(resolver, params);
      *
-     * List<Tuple> results = executor.executeWith(em, new SingleQueryExecutionStrategy<>());
+     * List<Tuple> results = executor.executeWith(context, new SingleQueryExecutionStrategy<>());
      * }</pre>
      *
-     * @param <Em> The execution management context (e.g EntityManager for JPA).
+     * @param <Em> The execution management context (e.g DatabaseSession).
      */
     private record DefaultQueryExecutor<Em>(ConditionResolver<Em, ?> resolver,
-                                            QueryExecutionParams params) implements QueryExecutor<Em> {
+            QueryExecutionParams params) implements QueryExecutor<Em> {
 
         private static final Logger log = Logger.getLogger(DefaultQueryExecutor.class.getName());
 
@@ -330,11 +327,12 @@ public class FilterQueryFactory {
          * </ol>
          * </p>
          *
-         * @param <R> Result type produced by this executor (e.g. {@code List<UserDto>}, {@code Page<UserDto>}, {@code Long})
+         * @param <R>      Result type produced by this executor (e.g.
+         *                 {@code List<UserDto>}, {@code Page<UserDto>}, {@code Long})
          * @param em       Execution management context used to execute the query (e.g.,
-         *                  EntityManager for JPA)
-         * @param strategy  Execution strategy (e.g.
-         *                  {@code MultiQueryExecutionStrategy})
+         *                 DatabaseSession)
+         * @param strategy Execution strategy (e.g.
+         *                 {@code MultiQueryExecutionStrategy})
          * @return Typed result from the execution strategy
          */
         @Override

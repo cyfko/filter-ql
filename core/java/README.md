@@ -67,48 +67,58 @@ Domain-Specific Language (DSL). It defines all core interfaces, SPIs, data model
 
 ```
 io.github.cyfko.filterql.core
-├── api/                        # Core abstractions
-│   ├── Condition              # Composable filter conditions
-│   ├── DslParser              # DSL parsing contract
-│   ├── FilterContext          # Backend bridge interface
-│   ├── PropertyReference      # Enum-based property refs
-│   └── Op                     # Standard operators
-│   └── FilterTree             # Parsed AST representation
-├── spi/                        # Service Provider Interfaces
-│   ├── FilterQuery            # Query lifecycle facade
-│   ├── ConditionResolver      # Deferred predicate generator
-│   ├── ExecutionStrategy      # Execution strategy contract
-│   └── QueryExecutor          # Query execution coordinator
-├── model/                      # Immutable data structures
-│   ├── FilterRequest          # Request container
-│   ├── FilterDefinition       # Atomic filter spec
-│   ├── Pagination             # Pagination metadata
-│   ├── SortBy                 # Sort specification
+├── api/                    # Public API interfaces
+│   ├── FilterContext          # Context definition
+│   ├── FilterTree             # Tree representation
+│   ├── Condition              # Condition hierarchy
+│   ├── Op                     # Operator enum
+│   ├── DslParser              # Parser interface
+│   └── PropertyReference      # Property metadata
+├── spi/                    # Service Provider Interfaces
+│   ├── FilterQuery            # Query orchestration facade
+│   ├── ConditionResolver      # Backend resolution
+│   ├── QueryExecutor          # Query execution
+│   └── ExecutionStrategy      # Execution strategies
+├── model/                  # Data models
+│   ├── FilterRequest          # Request object
+│   ├── FilterDefinition       # Standard filter
+│   ├── Pagination             # Page request
+│   ├── SortBy                 # Sort definition
 │   └── QueryExecutionParams   # Execution parameters
-├── impl/                       # Default implementations
-│   └── BasicDslParser         # Default DSL parser
-├── parsing/                    # Parsing infrastructure
-│   ├── FastPostfixConverter   # Infix-to-postfix conversion
-│   ├── PostfixConditionBuilder # Condition tree builder
-│   └── BooleanSimplifier      # Expression simplification
-├── cache/                      # Caching infrastructure
-│   ├── BoundedLRUCache        # LRU cache implementation
-│   ├── StructuralNormalizer   # Structure-based cache keys
-│   └── DslNormalizer          # DSL normalization
-├── config/                     # Configuration policies
-│   ├── DslPolicy              # DSL complexity limits
+├── impl/                   # Default implementations
+│   └── BasicDslParser         # Recursive descent parser
+├── parsing/                # DSL parsing logic
+│   ├── PostfixConditionBuilder # Shunting-yard algo
+│   ├── BooleanSimplifier      # Logic simplification
+│   └── FastPostfixConverter   # Fast postfix conversion
+├── cache/                  # Caching strategies
+│   ├── BoundedLRUCache        # LRU implementation
+│   ├── StructuralNormalizer   # Structure normalization
+│   ├── DslNormalizer          # DSL normalization
+│   └── ValueAwareNormalizer   # Value-aware normalization
+├── config/                 # Configuration classes
+│   ├── FilterConfig           # Global config
 │   ├── CachePolicy            # Cache configuration
-│   └── ProjectionPolicy       # Projection behavior
-├── utils/                      # Utility classes
+│   ├── ProjectionPolicy       # Projection behavior
+│   ├── DslPolicy              # DSL configuration
+│   ├── PatternConfig          # Pattern configuration
+│   ├── DslReservedSymbol      # Reserved symbols
+│   ├── EnumMatchMode          # Enum matching mode
+│   ├── NullValuePolicy        # Null handling policy
+│   └── StringCaseStrategy     # Case sensitivity strategy
+├── utils/                  # Utility classes
 │   ├── OperatorValidationUtils # Operator validation
 │   ├── TypeConversionUtils    # Type compatibility
 │   ├── ClassUtils             # Reflection utilities
-│   └── ProjectionFieldParser  # Field path parsing
-│   └── OperatorUtils          # Operator constants
+│   ├── ProjectionFieldParser  # Field path parsing
+│   ├── OperatorUtils          # Operator constants
+│   ├── FilterConfigUtils      # Config utilities
+│   └── ValidationResult       # Validation result object
 ├── exception/                  # Exception hierarchy
 │   ├── DSLSyntaxException     # DSL parsing errors
 │   ├── FilterValidationException # Validation failures
-│   └── FilterDefinitionException # Definition errors
+│   ├── FilterDefinitionException # Definition errors
+│   └── ProjectionDefinitionException # Projection errors
 └── FilterQueryFactory          # Main factory facade
 ```
 
@@ -847,34 +857,34 @@ DslParser parser = new BasicDslParser(DslPolicy.defaults(), cachePolicy);
 
 #### 1. Implement FilterContext
 
+#### 1. Implement FilterContext
+
 ```java
-public class MyBackendFilterContext implements FilterContext {
+public class MyBackendFilterContext implements FilterContext<MyExecutionContext> {
     
     @Override
-    public Condition toCondition(String argKey, Enum<?> propertyRef, String op) {
+    public <P extends Enum<P> & PropertyReference> Condition toCondition(String argKey, P propertyRef, String op) {
         // Validate property and operator compatibility
-        PropertyReference ref = (PropertyReference) propertyRef;
         Op operator = Op.fromString(op);
         
         // Check if standard operator
         if (operator != null && operator != Op.CUSTOM) {
-            ref.validateOperator(operator);
+            propertyRef.validateOperator(operator);
         }
         // Custom operators are handled by PredicateResolverMapping in JpaFilterContext
         
         // Return deferred condition (no value yet)
-        return new MyBackendCondition(argKey, ref, op);
+        return new MyBackendCondition(argKey, propertyRef, op);
     }
     
     @Override
-    public <E> ConditionResolver<E> toResolver(
-            Class<E> entityClass,
+    public ConditionResolver<MyExecutionContext, ?> toResolver(
             Condition condition,
             QueryExecutionParams params) {
         
         // Convert abstract Condition tree to backend-specific predicate
         MyBackendCondition backendCondition = (MyBackendCondition) condition;
-        Map<String, Object> arguments = params.argumentRegistry();
+        Map<String, Object> arguments = params.getArgumentRegistry();
         
         // Bind values from argument registry
         Object value = arguments.get(backendCondition.getArgKey());
@@ -898,14 +908,14 @@ public class MyCustomStrategy<R> implements ExecutionStrategy<R> {
     @Override
     public <Context> R execute(
             Context ctx,
-            ConditionResolver<?> resolver,
+            ConditionResolver<Context, ?> resolver,
             QueryExecutionParams params) {
         
         // Cast context to your specific type
         MyExecutionContext executionContext = (MyExecutionContext) ctx;
         
         // Access execution parameters
-        List<String> projection = params.projection();
+        ProjectionPolicy policy = params.projectionPolicy();
         Pagination pagination = params.pagination();
         
         // Build and execute query using resolver
@@ -929,14 +939,14 @@ public class MyCustomStrategy<R> implements ExecutionStrategy<R> {
 @Test
 void testCustomAdapter() {
     // Setup
-    FilterContext context = new MyBackendFilterContext();
+    FilterContext<MyExecutionContext> context = new MyBackendFilterContext();
     FilterQuery<MyExecutionContext> filterQuery = FilterQueryFactory.of(context);
     
     // Build request
-    FilterRequest<UserPropertyRef> request = FilterRequest.<UserPropertyRef>builder()
-        .filter("f1", UserPropertyRef.USERNAME, Op.EQ, "john")
-        .combineWith("f1")
-        .build();
+    FilterRequest<UserPropertyRef> request = new FilterRequest<>(
+        Map.of("f1", new FilterDefinition<>(UserPropertyRef.USERNAME, Op.EQ, "john")),
+        "f1"
+    );
     
     // Resolve
     ConditionResolver<MyExecutionContext, ?> resolver = filterQuery.toResolver(request);
@@ -1139,7 +1149,7 @@ FilterQuery<MyExecutionContext> query = FilterQueryFactory.of(context, parser);
 <dependency>
     <groupId>io.github.cyfko</groupId>
     <artifactId>filterql-core</artifactId>
-    <version>4.0.0</version>
+    <version>4.0.1</version>
 </dependency>
 ```
 

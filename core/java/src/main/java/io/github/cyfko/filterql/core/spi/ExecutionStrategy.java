@@ -51,10 +51,10 @@ import io.github.cyfko.filterql.core.model.QueryExecutionParams;
  * ExecutionStrategy<List<UserDto>> strategy = new MultiQueryExecutionStrategy<>();
  *
  * // 2. Get executor from FilterQuery
- * QueryExecutor<EntityManager> executor = filterQuery.toExecutor(request);
+ * QueryExecutor<MyContext> executor = filterQuery.toExecutor(request);
  *
  * // 3. Execute
- * List<UserDto> results = executor.executeWith(entityManager, strategy);
+ * List<UserDto> results = executor.executeWith(context, strategy);
  * }</pre>
  *
  * <h3>Custom Strategy Example:</h3>
@@ -109,7 +109,8 @@ public interface ExecutionStrategy<R> {
      * <p>
      * This method receives all necessary components to build and execute the query:
      * <ul>
-     * <li>The implementation-specific execution management context (e.g., EntityManager for JPA)</li>
+     * <li>The implementation-specific execution management context (e.g.,
+     * PersistenceContext)</li>
      * <li>The {@link ConditionResolver} for constructing filter predicates</li>
      * <li>The {@link QueryExecutionParams} with projection, pagination, sorting,
      * etc.</li>
@@ -132,25 +133,27 @@ public interface ExecutionStrategy<R> {
      * <pre>{@code
      * public List<R> execute(Object ctx, ConditionResolver<?, ?> resolver, QueryExecutionParams params) {
      *     // Cast context to backend-specific type
-     *     EntityManager em = (EntityManager) ctx;
-     *     PredicateResolver<?> pr = PredicateResolver.from(resolver);
+     *     MyContext context = (MyContext) ctx;
+     * 
+     *     // Resolve predicate from resolver
+     *     MyPredicate predicate = resolver.resolve(context.getEntityClass(), context);
      *
-     *     // Use PredicateResolver.from() to extract JPA-specific resolver
-     *     CriteriaBundle detail = pr.resolve(entityClass, em);
+     *     // Build query using context and predicate
+     *     var query = context.createQuery();
+     *     query.where(predicate);
      *
-     *     // Apply filters using returned detail
-     *     detail.query().where(detail.predicate());
-     *
-     *     // Execute with pagination
-     *     return em.createQuery(detail.query()).getResultList();
+     *     // Execute and return results
+     *     return query.list();
      * }
      * }</pre>
      *
-     * @param <Context> the type of execution context (e.g., EntityManager for JPA)
-     * @param ctx       the implementation-specific execution management context used to build and execute the query.
+     * @param <Context> the type of execution context (e.g., PersistenceContext)
+     * @param ctx       the implementation-specific execution management context
+     *                  used to build and execute the query.
      *                  Must not be null.
      * @param resolver  the {@link ConditionResolver} responsible for building
-     *                  filter predicates from the FilterQL request. Must not be null.
+     *                  filter predicates from the FilterQL request. Must not be
+     *                  null.
      * @param params    execution parameters including projection, pagination,
      *                  sorting, etc. Must not be null.
      * @return Result of type {@code R} as defined by this strategy implementation

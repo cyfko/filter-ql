@@ -24,10 +24,10 @@ package io.github.cyfko.filterql.core.spi;
  * </ul>
  *
  * @param <Em> Execution management context type - implementation-specific
- *             (e.g., EntityManager)
+ *             (e.g., DatabaseSession)
  * @param <R>  Result type - backend-specific predicate type
- *             (e.g., jakarta.persistence.criteria.Predicate for JPA,
- *             org.bson.conversions.Bson for MongoDB)
+ *             (e.g., javax.persistence.criteria.Predicate,
+ *             org.bson.conversions.Bson)
  *
  * @author Frank KOSSI
  * @since 5.0.0
@@ -65,7 +65,8 @@ public interface ConditionResolver<Em, R> {
      * </ul>
      *
      * @param subject the entity class being queried (e.g., User.class)
-     * @param em      implementation-specific execution management context containing
+     * @param em      implementation-specific execution management context
+     *                containing
      *                necessary components
      * @param <E>     entity type
      * @return backend-specific predicate ready for query execution

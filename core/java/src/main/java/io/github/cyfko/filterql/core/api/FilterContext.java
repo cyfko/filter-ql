@@ -172,7 +172,7 @@ public interface FilterContext<Ex> {
      *         "ageArg", 25));
      *
      * // Phase 3: Resolve to entity query
-     * ConditionResolver<User> resolver = context.toResolver(combined, params);
+     * ConditionResolver<MyContext, ?> resolver = context.toResolver(combined, params);
      *
      * // Phase 4: Execute with backend-specific context
      * // (implementation-defined)
@@ -191,7 +191,7 @@ public interface FilterContext<Ex> {
      * );
      *
      * // Phase 3: Resolve to tuple query (mean that query result MUST ONLY return projected parts)
-     * ConditionResolver<User> resolver = context.toResolver(condition, params);
+     * ConditionResolver<MyContext, ?> resolver = context.toResolver(condition, params);
      *
      * // Phase 4: Execute and get tuples (partial data)
      * }</pre>
@@ -229,5 +229,6 @@ public interface FilterContext<Ex> {
      *                                       supported by this implementation
      * @since 4.0.0
      */
-    ConditionResolver<Ex, ?> toResolver(Condition condition, QueryExecutionParams params) throws FilterDefinitionException;
+    ConditionResolver<Ex, ?> toResolver(Condition condition, QueryExecutionParams params)
+            throws FilterDefinitionException;
 }

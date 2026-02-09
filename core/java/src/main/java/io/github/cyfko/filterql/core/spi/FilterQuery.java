@@ -62,7 +62,7 @@ import io.github.cyfko.filterql.core.api.PropertyReference;
  *         .sort(UserProperty.NAME, "ASC")
  *         .build();
  *
- * // For JPA, context would be an EntityManager
+ * // Context provides the execution environment
  * List<UserDto> users = filterQuery.execute(
  *         request,
  *         context,
@@ -76,7 +76,7 @@ import io.github.cyfko.filterql.core.api.PropertyReference;
  *
  * QueryExecutor<UserDto> executor = filterQuery.toExecutor(request);
  *
- * // Execute with different strategies (context is adapter-specific, e.g., EntityManager for JPA)
+ * // Execute with different strategies (context is adapter-specific)
  * List<UserDto> list = executor.executeWith(context, new SingleQueryExecutionStrategy<>());
  * Page<UserDto> page = executor.executeWith(context, new PagedExecutionStrategy<>());
  * Long count = executor.executeWith(context, new CountExecutionStrategy<>());
@@ -90,7 +90,7 @@ import io.github.cyfko.filterql.core.api.PropertyReference;
  * ConditionResolver<Em, ?> resolver = filterQuery.toResolver(request);
  *
  * // Implementation-specific usage:
- * resolver.resolve(User.class, em); // The result of this call can be handled differently
+ * resolver.resolve(User.class, context); // The result of this call can be handled differently
  * }</pre>
  *
  * <h3>Design Considerations:</h3>
@@ -111,10 +111,10 @@ import io.github.cyfko.filterql.core.api.PropertyReference;
  * across multiple
  * requests. However, the context instances passed to execution methods must be
  * managed per-thread according to the underlying adapter's best practices
- * (e.g., EntityManager for JPA must be managed per-thread).
+ * (e.g., PersistenceContext).
  * </p>
  *
- * @param <Em> The execution management context (e.g EntityManager for JPA).
+ * @param <Em> The execution management context (e.g., PersistenceContext).
  *
  * @see FilterRequest
  * @see ConditionResolver
@@ -209,7 +209,7 @@ public interface FilterQuery<Em> {
      *
      * @param request  FilterQL request to execute
      * @param ctx      the execution context used for query execution (e.g.,
-     *                 EntityManager for JPA).
+     *                 PersistenceContext).
      *                 Must not be null.
      * @param strategy Execution strategy defining how to execute and what to
      *                 return.
@@ -220,7 +220,8 @@ public interface FilterQuery<Em> {
      * @return Result of type {@code T} as defined by the strategy
      * @throws IllegalArgumentException if any parameter is null
      */
-    default <P extends Enum<P> & PropertyReference, T> T execute(FilterRequest<P> request, Em ctx, ExecutionStrategy<T> strategy) {
+    default <P extends Enum<P> & PropertyReference, T> T execute(FilterRequest<P> request, Em ctx,
+            ExecutionStrategy<T> strategy) {
         QueryExecutor<Em> executor = this.toExecutor(request);
         return executor.executeWith(ctx, strategy);
     }
