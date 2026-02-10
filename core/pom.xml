@@ -146,7 +146,7 @@
                 <version>${maven-release-plugin.version}</version>
                 <configuration>
                     <!-- Créer des tags du style v1.0.0 au lieu de project-1.0.0 -->
-                    <tagNameFormat>v@{project.version}</tagNameFormat>
+                    <tagNameFormat>filterql-core-v@{project.version}</tagNameFormat>
                     <!-- Important: Activer le profil 'release' lors de l'exécution (perform) -->
                     <!-- Cela garantit que GPG et le Central Publishing plugin s'exécutent -->
                     <releaseProfiles>release</releaseProfiles>
