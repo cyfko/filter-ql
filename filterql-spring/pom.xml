@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.cyfko</groupId>
     <artifactId>filterql-spring</artifactId>
-    <version>4.0.0</version>
+    <version>4.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>FilterQL Spring Boot Starter</name>
@@ -34,7 +34,7 @@
     <scm>
         <connection>scm:git:git://github.com/cyfko/filter-ql</connection>
         <developerConnection>scm:git:ssh://github.com:cyfko/filter-ql.git</developerConnection>
-        <url>https://github.com/cyfko/filter-ql/tree/main/adapters/java/filterql-spring-boot-starter</url>
+        <url>https://github.com/cyfko/filter-ql/tree/main/filterql-spring</url>
     </scm>
 
     <parent>
@@ -52,10 +52,20 @@
         <auto-service.version>1.1.1</auto-service.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
+        <!-- Plugin Versions -->
+        <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+        <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
+        <maven-javadoc-plugin.version>3.10.1</maven-javadoc-plugin.version>
+        <maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
+        <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
+        <maven-release-plugin.version>3.1.1</maven-release-plugin.version>
+        <central-publishing-plugin.version>0.7.0</central-publishing-plugin.version>
+
         <!-- Dependencies Versions -->
         <compile-testing.version>0.21.0</compile-testing.version>
         <filterql-jpa.version>2.0.0-SNAPSHOT</filterql-jpa.version>
         <jpa-processor.version>1.0.0</jpa-processor.version>
+        <google-auto-service.version>1.1.1</google-auto-service.version>
     </properties>
 
     <dependencies>
@@ -64,7 +74,6 @@
             <groupId>io.github.cyfko</groupId>
             <artifactId>filterql-core</artifactId>
             <version>4.0.2-SNAPSHOT</version>
-            <scope>provided</scope>
         </dependency>
 
         <!-- FilterQL JPA -->
@@ -72,15 +81,6 @@
             <groupId>io.github.cyfko</groupId>
             <artifactId>filterql-adapter-jpa</artifactId>
             <version>${filterql-jpa.version}</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- Projection processor -->
-        <dependency>
-            <groupId>io.github.cyfko</groupId>
-            <artifactId>jpa-metamodel-processor</artifactId>
-            <version>${jpa-processor.version}</version>
-            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -157,28 +157,37 @@
     </dependencies>
     <build>
         <plugins>
+            <!-- Compilation Java -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
+                <version>${maven-compiler-plugin.version}</version>
                 <configuration>
-                    <source>21</source>
-                    <target>21</target>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <compilerArgs>
+                        <arg>-parameters</arg>
+                    </compilerArgs>
                     <annotationProcessorPaths>
+                        <path>
+                            <groupId>io.github.cyfko</groupId>
+                            <artifactId>jpa-metamodel-processor</artifactId>
+                            <version>${jpa-processor.version}</version>
+                        </path>
                         <path>
                             <groupId>com.google.auto.service</groupId>
                             <artifactId>auto-service</artifactId>
-                            <version>${auto-service.version}</version>
+                            <version>${google-auto-service.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
 
-            <!-- Source plugin pour attacher les sources -->
+            <!-- Source Plugin (attach sources) -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <version>3.3.1</version>
+                <version>${maven-source-plugin.version}</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -189,42 +198,22 @@
                 </executions>
             </plugin>
 
-            <!-- Central Publishing Plugin -->
-            <plugin>
-                <groupId>org.sonatype.central</groupId>
-                <artifactId>central-publishing-maven-plugin</artifactId>
-                <version>0.7.0</version>
-                <extensions>true</extensions>
-                <configuration>
-                    <publishingServerId>central</publishingServerId>
-                </configuration>
-            </plugin>
-
-            <!-- GPG signing -->
+            <!-- Surefire Plugin (for running tests) -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-gpg-plugin</artifactId>
-                <version>3.2.7</version>
-                <executions>
-                    <execution>
-                        <id>sign-artifacts</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>sign</goal>
-                        </goals>
-                    </execution>
-                </executions>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
             </plugin>
 
-            <!-- Javadoc plugin -->
+            <!-- Javadoc Plugin (attach javadocs) -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.10.1</version>
+                <version>${maven-javadoc-plugin.version}</version>
                 <configuration>
-                    <additionalJOptions>
-                        <additionalJOption>-Xdoclint:none</additionalJOption>
-                    </additionalJOptions>
+                    <source>${java.version}</source>
+                    <doclint>none</doclint>
+                    <quiet>true</quiet>
                 </configuration>
                 <executions>
                     <execution>
@@ -235,6 +224,81 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- Configuration du Maven Release Plugin -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>${maven-release-plugin.version}</version>
+                <configuration>
+                    <!-- Créer des tags du style v1.0.0 au lieu de project-xxx-1.0.0 -->
+                    <tagNameFormat>filterql-spring-v@{project.version}</tagNameFormat>
+                    <!-- Important: Activer le profil 'release' lors de l'exécution (perform) -->
+                    <!-- Cela garantit que GPG et le Central Publishing plugin s'exécutent -->
+                    <releaseProfiles>release</releaseProfiles>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
+
+    <!-- Profile for releasing to Maven Central -->
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <!-- Central Publishing Plugin -->
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.7.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <!-- Publier automatiquement si la validation passe -->
+                            <autoPublish>true</autoPublish>
+                            <waitUntil>published</waitUntil>
+                        </configuration>
+                    </plugin>
+
+                    <!-- GPG signing -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>${maven-gpg-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+<!--                                <configuration>-->
+<!--                                    &lt;!&ndash; Évite le prompt de passphrase si gpg-agent est configuré &ndash;&gt;-->
+<!--                                    <gpgArguments>-->
+<!--                                        <arg>&#45;&#45;pinentry-mode</arg>-->
+<!--                                        <arg>loopback</arg>-->
+<!--                                    </gpgArguments>-->
+<!--                                </configuration>-->
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <!-- Distribution Management (for deploying) -->
+    <distributionManagement>
+        <snapshotRepository>
+            <id>ossrh</id>
+            <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+        <!-- Note: Avec central-publishing-maven-plugin, le repository 'releases' ci-dessous
+             n'est techniquement pas utilisé pour l'upload final vers le nouveau portail,
+             mais il est bon de le laisser pour la compatibilité Maven standard. -->
+        <repository>
+            <id>ossrh</id>
+            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
 </project>
