@@ -62,11 +62,8 @@
         <central-publishing-plugin.version>0.7.0</central-publishing-plugin.version>
 
         <!-- Dependencies Versions -->
-        <compile-testing.version>0.21.0</compile-testing.version>
         <filterql-core.version>4.0.2-SNAPSHOT</filterql-core.version>
         <filterql-jpa.version>2.0.0-SNAPSHOT</filterql-jpa.version>
-        <jpa-processor.version>1.0.0</jpa-processor.version>
-        <google-auto-service.version>1.1.1</google-auto-service.version>
     </properties>
 
     <dependencies>
