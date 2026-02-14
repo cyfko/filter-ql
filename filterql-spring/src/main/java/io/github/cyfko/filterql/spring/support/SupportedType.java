@@ -1,4 +1,4 @@
-package io.github.cyfko.filterql.spring.processor.model;
+package io.github.cyfko.filterql.spring.support;
 
 import javax.lang.model.type.TypeMirror;
 import java.util.Set;

@@ -1,7 +1,6 @@
 package io.github.cyfko.filterql.spring.support;
 
 import io.github.cyfko.filterql.core.api.Op;
-import io.github.cyfko.filterql.spring.processor.model.SupportedType;
 
 /**
  * Provides the default mapping between supported field types and allowed FilterQL operators.
