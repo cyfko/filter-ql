@@ -78,6 +78,7 @@
             <groupId>io.github.cyfko</groupId>
             <artifactId>filterql-core</artifactId>
             <version>${filterql-core.version}</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- Dépendance vers le métamodèle de projection JPA -->
@@ -85,7 +86,6 @@
             <groupId>io.github.cyfko</groupId>
             <artifactId>jpa-projection-metamodel</artifactId>
             <version>${jpa-metamodel.version}</version>
-            <scope>provided</scope>
         </dependency>
 
         <!-- Jakarta dependency -->
@@ -93,6 +93,7 @@
             <groupId>jakarta.persistence</groupId>
             <artifactId>jakarta.persistence-api</artifactId>
             <version>${jakarta-persistence.version}</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- Hibernate (JPA implementation) -->
