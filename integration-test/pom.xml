@@ -24,9 +24,14 @@
 
     <properties>
         <java.version>21</java.version>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <jpa-projection-metamodel.version>1.0.0</jpa-projection-metamodel.version>
+        <filterql-spring.version>4.0.0-SNAPSHOT</filterql-spring.version>
+        <filterql-spring-processor.version>1.0.0-SNAPSHOT</filterql-spring-processor.version>
 
         <!-- This module should NEVER be deployed -->
         <maven.deploy.skip>true</maven.deploy.skip>
@@ -39,19 +44,7 @@
         <dependency>
             <groupId>io.github.cyfko</groupId>
             <artifactId>filterql-spring</artifactId>
-            <version>4.0.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.github.cyfko</groupId>
-            <artifactId>filterql-adapter-jpa</artifactId>
-            <version>2.0.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.github.cyfko</groupId>
-            <artifactId>jpa-metamodel-processor</artifactId>
-            <version>1.0.0</version>
+            <version>${filterql-spring.version}</version>
         </dependency>
 
         <dependency>
@@ -113,19 +106,14 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
                 <configuration>
-                    <source>17</source>
-                    <target>17</target>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
                     <annotationProcessorPaths>
-<!--                        <path>-->
-<!--                            <groupId>io.github.cyfko</groupId>-->
-<!--                            <artifactId>projection-metamodel-processor</artifactId>-->
-<!--                            <version>1.0.0</version>-->
-<!--                        </path>-->
-<!--                        <path>-->
-<!--                            <groupId>io.github.cyfko</groupId>-->
-<!--                            <artifactId>filterql-spring</artifactId>-->
-<!--                            <version>4.0.0</version>-->
-<!--                        </path>-->
+                        <path>
+                            <groupId>io.github.cyfko</groupId>
+                            <artifactId>filterql-spring-processor</artifactId>
+                            <version>${filterql-spring-processor.version}</version>
+                        </path>
                     </annotationProcessorPaths>
                     <!-- Show detailed output for debugging -->
                     <showWarnings>true</showWarnings>
