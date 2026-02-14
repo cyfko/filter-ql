@@ -1,5 +1,6 @@
 module io.github.cyfko.filterql.jpa {
     requires io.github.cyfko.filterql.core;
+    requires transitive io.github.cyfko.projection;
     requires io.github.cyfko.jpametamodel;
     requires jakarta.persistence;
 

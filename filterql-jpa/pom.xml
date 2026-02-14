@@ -57,11 +57,11 @@
         <central-publishing-plugin.version>0.7.0</central-publishing-plugin.version>
 
         <!-- Dependencies Versions -->
+        <filterql-core.version>4.0.2-SNAPSHOT</filterql-core.version>
+        <projection-spec.version>2.0.0-SNAPSHOT</projection-spec.version>
+        <jpa-metamodel.version>1.0.1-SNAPSHOT</jpa-metamodel.version>
+        <jpa-processor.version>1.0.4-SNAPSHOT</jpa-processor.version>
         <jakarta-persistence.version>3.1.0</jakarta-persistence.version>
-        <filterql-core.version>4.0.0</filterql-core.version>
-        <projection-spec.version>1.0.0</projection-spec.version>
-        <jpa-metamodel.version>1.0.0</jpa-metamodel.version>
-        <jpa-processor.version>1.0.3</jpa-processor.version>
         <hibernate.version>6.6.8.Final</hibernate.version>
         <h2database.version>2.3.232</h2database.version>
 
@@ -79,6 +79,13 @@
             <artifactId>filterql-core</artifactId>
             <version>${filterql-core.version}</version>
             <scope>provided</scope>
+        </dependency>
+
+        <!-- Dépendance vers la spécification de projections -->
+        <dependency>
+            <groupId>io.github.cyfko</groupId>
+            <artifactId>projection-spec</artifactId>
+            <version>${projection-spec.version}</version>
         </dependency>
 
         <!-- Dépendance vers le métamodèle de projection JPA -->
