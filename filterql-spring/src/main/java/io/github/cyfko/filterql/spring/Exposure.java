@@ -53,7 +53,7 @@ public @interface Exposure {
      *   <li>CUSTOM: User-defined signature</li>
      * </ul>
      */
-    Strategy strategy() default Strategy.PAGINATED;
+    Strategy strategy() default Strategy.PROJECTED;
 
     /**
      * Pipeline of filter transformations applied before the handler execution.
@@ -75,24 +75,44 @@ public @interface Exposure {
      * FilterRequest → Pipe1 → Pipe2 → Pipe3 → Handler
      * </pre>
      *
-     * <h2>Convention over Configuration</h2>
+     * <h2>Method Name Requirement</h2>
+     * <p>
+     * <strong>IMPORTANT:</strong> Unlike other uses of {@code @Method}, the {@code value}
+     * attribute (method name) is <strong>REQUIRED</strong> for pipes, whether {@code type}
+     * is specified or not.
+     * </p>
+     * <p>
+     * <strong>Rationale:</strong> Pipes are generic transformations without inherent context
+     * to derive a conventional name. Each pipe represents a specific transformation intent
+     * (tenant filtering, sanitization, validation, etc.) that must be explicitly named.
+     * </p>
      *
-     * <h3>Single Pipe with Default Name</h3>
      * <pre>{@code
+     * // ✅ CORRECT - Method name always specified
      * @Exposure(
      *   value = "users",
-     *   pipes = @Method()  // Looks for filterPipe() method
-     * )
-     * public class UserDTO {
-     *
-     *   public static FilterRequest filterPipe(FilterRequest filter) {
-     *     // Add tenant filter
-     *     return filter.and("tenantId", SecurityContext.getTenantId());
+     *   pipes = {
+     *     @Method("applyTenantFilter"),
+     *     @Method(type = FilterPipes.class, value = "sanitize")
      *   }
-     * }
+     * )
+     *
+     * // ❌ INCORRECT - Missing method name will cause compilation error
+     * @Exposure(
+     *   value = "users",
+     *   pipes = @Method()  // Error: method name required for pipes
+     * )
+     *
+     * // ❌ INCORRECT - Type alone is not sufficient
+     * @Exposure(
+     *   value = "users",
+     *   pipes = @Method(type = FilterPipes.class)  // Error: which method?
+     * )
      * }</pre>
      *
-     * <h3>Multiple Named Pipes</h3>
+     * <h2>Usage Examples</h2>
+     *
+     * <h3>Inline Pipes (Current Class)</h3>
      * <pre>{@code
      * @Exposure(
      *   value = "orders",
@@ -104,10 +124,12 @@ public @interface Exposure {
      * )
      * public class OrderDTO {
      *
+     *   // Applies tenant isolation
      *   public static FilterRequest applyTenantFilter(FilterRequest filter) {
      *     return filter.and("tenantId", CurrentTenant.getId());
      *   }
      *
+     *   // Applies security-based filtering
      *   public static FilterRequest applySecurityFilter(FilterRequest filter) {
      *     User user = SecurityContext.getCurrentUser();
      *     if (!user.isAdmin()) {
@@ -116,8 +138,8 @@ public @interface Exposure {
      *     return filter;
      *   }
      *
+     *   // Validates and limits filter parameters
      *   public static FilterRequest validateFilter(FilterRequest filter) {
-     *     // Limit results to prevent abuse
      *     if (filter.getLimit() > 1000) {
      *       filter.setLimit(1000);
      *     }
@@ -131,27 +153,31 @@ public @interface Exposure {
      * // Shared filter transformations
      * public class FilterPipes {
      *
+     *   // Applies tenant isolation to the filter.
+     *   // Can be used in any context where tenant filtering is needed.
      *   public static FilterRequest tenantIsolation(FilterRequest filter) {
      *     return filter.and("tenantId", SecurityContext.getTenantId());
      *   }
      *
+     *   // Filters out soft-deleted entities
      *   public static FilterRequest softDeleteFilter(FilterRequest filter) {
      *     return filter.and("deleted", false);
      *   }
      *
+     *   // Removes potentially dangerous or sensitive filters
      *   public static FilterRequest sanitizeInput(FilterRequest filter) {
-     *     // Remove potentially dangerous filters
-     *     filter.removeFiltersOn("password", "internalId");
+     *     filter.removeFiltersOn("password", "internalId", "secret");
      *     return filter;
      *   }
      *
+     *   // Logs filter access for auditing purposes
      *   public static FilterRequest auditLog(FilterRequest filter) {
      *     AuditService.log("Filter applied: " + filter);
      *     return filter;
      *   }
      * }
      *
-     * // Usage
+     * // Usage - Method name ALWAYS required
      * @Exposure(
      *   value = "users",
      *   pipes = {
@@ -180,16 +206,37 @@ public @interface Exposure {
      *
      * <h3>Pipe Requirements</h3>
      * <ul>
-     *   <li>Must be static</li>
+     *   <li>Must be public static</li>
      *   <li>Must return {@code FilterRequest}</li>
      *   <li>First parameter must be {@code FilterRequest}</li>
      *   <li>Can declare additional parameters for dependency injection</li>
-     *   <li>Should be pure functions (no side effects preferred, except logging/auditing)</li>
+     *   <li>Should be pure functions when possible (no side effects preferred, except logging/auditing)</li>
+     *   <li><strong>Method name must be explicitly specified in @Method annotation</strong></li>
      * </ul>
      *
-     * <h3>Default Pipe Name Convention</h3>
-     * When {@code @Method()} is used without parameters, the processor
-     * searches for a method named {@code filterPipe} in the annotated class.
+     * <h3>Reusability Beyond @Exposure</h3>
+     * <p>
+     * Pipe methods are regular public static methods that can be invoked directly
+     * from any part of your application:
+     * </p>
+     * <pre>{@code
+     * // Direct usage in service layer
+     * public class OrderService {
+     *     public List<Order> getOrders(FilterRequest filter) {
+     *         filter = FilterPipes.tenantIsolation(filter);
+     *         filter = FilterPipes.softDeleteFilter(filter);
+     *         return repository.findAll(filter.toSpecification());
+     *     }
+     * }
+     *
+     * // Composition in tests
+     * @Test
+     * void testSecureFiltering() {
+     *     FilterRequest filter = new FilterRequest();
+     *     filter = FilterPipes.tenantIsolation(filter);
+     *     assertThat(filter.hasFilter("tenantId")).isTrue();
+     * }
+     * }</pre>
      *
      * @return array of method references for filter transformation pipeline
      */
@@ -337,7 +384,16 @@ public @interface Exposure {
     public enum Strategy {
 
         /**
-         * Returns {@code PaginatedData<T>} with pagination metadata.
+         * Returns {@code PaginatedData<Map<String,Object>>} with pagination metadata.
+         * <p>
+         * Handler signature: {@code PaginatedData<T> method(FilterRequest filter)}
+         * </p>
+         */
+        PROJECTED,
+
+        /**
+         * Returns {@code PaginatedData<T>} with pagination metadata. {@code T} is the class
+         * on which the current annotation apply.
          * <p>
          * Handler signature: {@code PaginatedData<T> method(FilterRequest filter)}
          * </p>
@@ -345,28 +401,13 @@ public @interface Exposure {
         PAGINATED,
 
         /**
-         * Returns {@code List<T>} with all matching results.
+         * Returns {@code List<T>} with all matching results. {@code T} is the class
+         * on which the current annotation apply.
          * <p>
          * Handler signature: {@code List<T> method(FilterRequest filter)}
          * </p>
          */
         LIST,
-
-        /**
-         * Returns {@code long} count of matching results.
-         * <p>
-         * Handler signature: {@code long method(FilterRequest filter)}
-         * </p>
-         */
-        COUNT,
-
-        /**
-         * Returns {@code Optional<T>} for single result queries.
-         * <p>
-         * Handler signature: {@code Optional<T> method(FilterRequest filter)}
-         * </p>
-         */
-        SINGLE,
 
         /**
          * Custom strategy - handler must define return type.
