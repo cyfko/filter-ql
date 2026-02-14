@@ -38,7 +38,7 @@ import io.github.cyfko.filterql.core.api.Op;
  * </ul>
  *
  * @see io.github.cyfko.projection.Projected
- * @see io.github.cyfko.filterql.core.spi.PredicateResolver
+ * @see io.github.cyfko.filterql.jpa.spi.PredicateResolver
  */
 @Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.SOURCE)

@@ -63,6 +63,7 @@
 
         <!-- Dependencies Versions -->
         <compile-testing.version>0.21.0</compile-testing.version>
+        <filterql-core.version>4.0.2-SNAPSHOT</filterql-core.version>
         <filterql-jpa.version>2.0.0-SNAPSHOT</filterql-jpa.version>
         <jpa-processor.version>1.0.0</jpa-processor.version>
         <google-auto-service.version>1.1.1</google-auto-service.version>
@@ -73,7 +74,7 @@
         <dependency>
             <groupId>io.github.cyfko</groupId>
             <artifactId>filterql-core</artifactId>
-            <version>4.0.2-SNAPSHOT</version>
+            <version>${filterql-core.version}</version>
         </dependency>
 
         <!-- FilterQL JPA -->
@@ -83,31 +84,10 @@
             <version>${filterql-jpa.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>com.google.auto.service</groupId>
-            <artifactId>auto-service</artifactId>
-            <version>1.1.1</version>
-            <optional>true</optional>
-        </dependency>
-
         <!-- ⚙️ Contexte Spring (ApplicationContext, @Configuration, etc.) -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- 🗄️ JPA Repository (pour @Entity, @Repository, JpaRepository...) -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- 🌐 RestController (pour @RestController, @RequestMapping, etc.) -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
             <scope>provided</scope>
         </dependency>
 
@@ -127,27 +107,6 @@
         </dependency>
 
         <!-- Testing -->
-        <!-- Dépendances de test -->
-        <dependency>
-            <groupId>com.google.testing.compile</groupId>
-            <artifactId>compile-testing</artifactId>
-            <version>${compile-testing.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security</artifactId>
-            <version>3.4.3</version>
-            <scope>test</scope>
-        </dependency>
-
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -168,18 +127,6 @@
                     <compilerArgs>
                         <arg>-parameters</arg>
                     </compilerArgs>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>io.github.cyfko</groupId>
-                            <artifactId>jpa-metamodel-processor</artifactId>
-                            <version>${jpa-processor.version}</version>
-                        </path>
-                        <path>
-                            <groupId>com.google.auto.service</groupId>
-                            <artifactId>auto-service</artifactId>
-                            <version>${google-auto-service.version}</version>
-                        </path>
-                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
 

@@ -1,7 +1,5 @@
 package io.github.cyfko.filterql.spring.pagination;
 
-import org.springframework.data.domain.Page;
-
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -30,7 +28,6 @@ import java.util.stream.Stream;
  * <p>
  * Supports transformation of contained data elements using the {@link #map(Function)} method,
  * returning a new {@code PaginatedData} instance with mapped data but the same pagination info.
- * Use the static {@link #of(Page, Function)} method for converting and mapping simultaneously.
  * </p>
  *
  * @param <T> the type of data contained in the page
@@ -61,16 +58,6 @@ public record PaginatedData<T>(
     }
 
     /**
-     * Creates a paginated data instance from a Spring Data {@link Page}.
-     * Extracts content and pagination metadata automatically.
-     *
-     * @param page the Spring Data page to convert
-     */
-    public PaginatedData(Page<T> page) {
-        this(page.getContent(), PaginationInfo.from(page));
-    }
-
-    /**
      * Transforms the content data to another type applying the given mapper function,
      * preserving the pagination metadata.
      *
@@ -80,18 +67,5 @@ public record PaginatedData<T>(
      */
     public <R> PaginatedData<R> map(Function<T, R> mapper) {
         return new PaginatedData<>(data.stream().map(mapper), pagination);
-    }
-
-    /**
-     * Convenience factory method combining page extraction and mapping in one step.
-     *
-     * @param <U>    the source element type in the page
-     * @param <R>    the target element type after mapping
-     * @param page   the Spring Data page instance to convert and map
-     * @param mapper the function to convert elements from U to R
-     * @return a new {@code PaginatedData} with mapped content and pagination info
-     */
-    public static <U, R> PaginatedData<R> of(Page<U> page, Function<U, R> mapper) {
-        return new PaginatedData<>(page.getContent().stream().map(mapper).collect(Collectors.toList()), PaginationInfo.from(page));
     }
 }
