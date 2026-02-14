@@ -30,7 +30,7 @@
     <scm>
         <connection>scm:git:git://github.com/cyfko/filter-ql</connection>
         <developerConnection>scm:git:git@github.com:cyfko/filter-ql.git</developerConnection>
-        <url>https://github.com/cyfko/filter-ql/tree/main/core/java</url>
+        <url>https://github.com/cyfko/filter-ql/tree/main/core</url>
       <tag>HEAD</tag>
   </scm>
 
