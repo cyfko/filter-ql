@@ -52,9 +52,9 @@ class MultiEntityIntegrationTest {
     void shouldGenerateCorrectAddressPropertyRefConstants() throws Exception {
         Class<?> AddressDTO_ = Class.forName("io.github.cyfko.AddressDTO_");
         Object[] constants = AddressDTO_.getEnumConstants();
-        assertEquals(5, constants.length);
+        assertEquals(6, constants.length);
         for (String name : List.of("ID", "STREET", "CITY", "ZIP_CODE", "COUNTRY")) {
-            assertDoesNotThrow(() -> Enum.valueOf((Class<Enum>) AddressDTO_, name));
+            assertDoesNotThrow(() -> Enum.valueOf(AddressDTO_.class, name));
         }
     }
 
@@ -80,9 +80,9 @@ class MultiEntityIntegrationTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<Map<String, Object>> result = postSearch("/api/v1/search/users", request, (Class<Map<String, Object>>) (Class<?>) Map.class);
+        PaginatedData<PersonDTO> result = postSearch("/api/v1/search/users", request, new ParameterizedTypeReference<PaginatedData<PersonDTO>>() {});
         assertEquals(1, result.data().size());
-        assertEquals("john", result.data().get(0).get("username"));
+        assertEquals("john", result.data().getFirst().getUsername());
     }
 
     @Test
@@ -95,9 +95,9 @@ class MultiEntityIntegrationTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<Map<String,Object>> result = postSearch("/api/v1/search/addresses", request, (Class<Map<String, Object>>) (Class<?>) Map.class);
+        PaginatedData<AddressDTO> result = postSearch("/api/v1/search/addresses", request, new ParameterizedTypeReference<PaginatedData<AddressDTO>>() {});
         assertEquals(1, result.data().size());
-        assertEquals("Paris", result.data().get(0).get("city"));
+        assertEquals("Paris", result.data().getFirst().getCity());
     }
 
     @Test
@@ -105,8 +105,8 @@ class MultiEntityIntegrationTest {
         createTestPerson("john", "john@example.com", "John", "Doe", 30);
         createTestAddress("123 Main St", "Paris", "75001", "France");
 
-        PaginatedData<PersonDTO> personPage = postSearch("/api/v1/search/users", FilterRequest.builder().build(), PersonDTO.class);
-        PaginatedData<AddressDTO> addressPage = postSearch("/api/v1/search/addresses", FilterRequest.builder().build(), AddressDTO.class);
+        PaginatedData<PersonDTO> personPage = postSearch("/api/v1/search/users", FilterRequest.builder().build(), new ParameterizedTypeReference<PaginatedData<PersonDTO>>() {});
+        PaginatedData<AddressDTO> addressPage = postSearch("/api/v1/search/addresses", FilterRequest.builder().build(), new ParameterizedTypeReference<PaginatedData<AddressDTO>>() {});
 
         assertEquals(1, personPage.data().size());
         assertEquals(1, addressPage.data().size());
@@ -123,10 +123,10 @@ class MultiEntityIntegrationTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<Map<String, Object>> result = postSearch("/api/v1/search/addresses", request, (Class<Map<String, Object>>) (Class<?>) Map.class);
+        PaginatedData<AddressDTO> result = postSearch("/api/v1/search/addresses", request, new ParameterizedTypeReference<PaginatedData<AddressDTO>>() {});
         assertEquals(2, result.data().size());
-        assertTrue(result.data().stream().anyMatch(a -> a.get("city").equals("Paris")));
-        assertTrue(result.data().stream().anyMatch(a -> a.get("city").equals("London")));
+        assertTrue(result.data().stream().anyMatch(a -> a.getCity().equals("Paris")));
+        assertTrue(result.data().stream().anyMatch(a -> a.getCity().equals("London")));
     }
 
     @Test
@@ -140,19 +140,21 @@ class MultiEntityIntegrationTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<AddressDTO> result = postSearch("/api/v1/search/addresses", request, AddressDTO.class);
+        PaginatedData<AddressDTO> result = postSearch("/api/v1/search/addresses", request, new ParameterizedTypeReference<PaginatedData<AddressDTO>>() {});
         assertEquals(2, result.data().size());
     }
 
     // Helper: generic POST search
-    private <T, E extends Enum<E> & PropertyReference> PaginatedData<T> postSearch(String url, FilterRequest<E> request, Class<T> dtoClass) {
+    private <T, E extends Enum<E> & PropertyReference> PaginatedData<T> postSearch(String url,
+                                                                                   FilterRequest<E> request,
+                                                                                   ParameterizedTypeReference<PaginatedData<T>> pmr) {
         ResponseEntity<PaginatedData<T>> response = restTemplate.exchange(
                 url,
                 HttpMethod.POST,
                 new HttpEntity<>(request, new HttpHeaders() {{
                     setContentType(MediaType.APPLICATION_JSON);
                 }}),
-                new ParameterizedTypeReference<>() {}
+                pmr
         );
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());

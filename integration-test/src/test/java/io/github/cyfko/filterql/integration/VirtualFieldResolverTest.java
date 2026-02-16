@@ -39,7 +39,7 @@ class VirtualFieldResolverTest {
     private FilterQlService filterQlService;
 
     @Autowired
-    private UserTenancyService userTenancyService;
+    private VirtualFieldsExtension userTenancyService;
 
     private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
 

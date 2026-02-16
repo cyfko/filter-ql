@@ -44,8 +44,6 @@ class PersonQueryExecutionTest {
     @Autowired
     private FilterQlService filterQlService;
 
-    private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
-
     @BeforeEach
     void setUp() {
         personRepository.deleteAll();
@@ -65,10 +63,10 @@ class PersonQueryExecutionTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<PersonDTO> result = filterQlService.search(PersonDTO.class, request, v -> mapper.convertValue(v, PersonDTO.class));
+        PaginatedData<PersonDTO> result = filterQlService.searchAs(PersonDTO.class, request);
 
         assertEquals(1, result.pagination().totalElements());
-        assertEquals("john", result.data().get(0).getUsername());
+        assertEquals("john", result.data().getFirst().getUsername());
     }
 
     @Test
@@ -83,7 +81,7 @@ class PersonQueryExecutionTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<PersonDTO> result = filterQlService.search(PersonDTO.class, request, v -> mapper.convertValue(v, PersonDTO.class));
+        PaginatedData<PersonDTO> result = filterQlService.searchAs(PersonDTO.class, request);
 
         assertEquals(2, result.pagination().totalElements());
         assertTrue(result.data().stream().noneMatch(p -> p.getUsername().equals("john")));
@@ -101,7 +99,7 @@ class PersonQueryExecutionTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<PersonDTO> result = filterQlService.search(PersonDTO.class, request, v -> mapper.convertValue(v, PersonDTO.class));
+        PaginatedData<PersonDTO> result = filterQlService.searchAs(PersonDTO.class, request);
 
         assertEquals(2, result.pagination().totalElements());
         assertTrue(result.data().stream().allMatch(p -> p.getAge() > 25));
@@ -119,7 +117,7 @@ class PersonQueryExecutionTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<PersonDTO> result = filterQlService.search(PersonDTO.class, request, v -> mapper.convertValue(v, PersonDTO.class));
+        PaginatedData<PersonDTO> result = filterQlService.searchAs(PersonDTO.class, request);
 
         assertEquals(2, result.pagination().totalElements());
         assertTrue(result.data().stream().allMatch(p -> p.getAge() < 35));
@@ -137,7 +135,7 @@ class PersonQueryExecutionTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<PersonDTO> result = filterQlService.search(PersonDTO.class, request, v -> mapper.convertValue(v, PersonDTO.class));
+        PaginatedData<PersonDTO> result = filterQlService.searchAs(PersonDTO.class, request);
 
         assertEquals(2, result.pagination().totalElements());
         assertTrue(result.data().stream().allMatch(p -> p.getAge() >= 30));
@@ -155,7 +153,7 @@ class PersonQueryExecutionTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<PersonDTO> result = filterQlService.search(PersonDTO.class, request, v -> mapper.convertValue(v, PersonDTO.class));
+        PaginatedData<PersonDTO> result = filterQlService.searchAs(PersonDTO.class, request);
 
         assertEquals(2, result.pagination().totalElements());
         assertTrue(result.data().stream().allMatch(p -> p.getAge() <= 30));
@@ -174,7 +172,7 @@ class PersonQueryExecutionTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<PersonDTO> result = filterQlService.search(PersonDTO.class, request, v -> mapper.convertValue(v, PersonDTO.class));
+        PaginatedData<PersonDTO> result = filterQlService.searchAs(PersonDTO.class, request);
 
         assertEquals(2, result.pagination().totalElements());
         assertTrue(result.data().stream().allMatch(p -> p.getAge() >= 25 && p.getAge() <= 45));
@@ -192,7 +190,7 @@ class PersonQueryExecutionTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<PersonDTO> result = filterQlService.search(PersonDTO.class, request, v -> mapper.convertValue(v, PersonDTO.class));
+        PaginatedData<PersonDTO> result = filterQlService.searchAs(PersonDTO.class, request);
 
         assertEquals(2, result.pagination().totalElements());
         assertTrue(result.data().stream().allMatch(p -> p.getEmail().contains("gmail")));
@@ -210,7 +208,7 @@ class PersonQueryExecutionTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<PersonDTO> result = filterQlService.search(PersonDTO.class, request, v -> mapper.convertValue(v, PersonDTO.class));
+        PaginatedData<PersonDTO> result = filterQlService.searchAs(PersonDTO.class, request);
 
         assertEquals(2, result.pagination().totalElements());
         assertTrue(result.data().stream().allMatch(
@@ -231,10 +229,10 @@ class PersonQueryExecutionTest {
                 .combineWith("a & b")
                 .build();
 
-        PaginatedData<PersonDTO> result = filterQlService.search(PersonDTO.class, request, v -> mapper.convertValue(v, PersonDTO.class));
+        PaginatedData<PersonDTO> result = filterQlService.searchAs(PersonDTO.class, request);
 
         assertEquals(1, result.pagination().totalElements());
-        assertEquals("john", result.data().get(0).getUsername());
+        assertEquals("john", result.data().getFirst().getUsername());
     }
 
     @Test
@@ -254,10 +252,10 @@ class PersonQueryExecutionTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<PersonDTO> result = filterQlService.search(PersonDTO.class, request, v -> mapper.convertValue(v, PersonDTO.class));
+        PaginatedData<PersonDTO> result = filterQlService.searchAs(PersonDTO.class, request);
 
         assertEquals(1, result.pagination().totalElements());
-        assertTrue(result.data().get(0).getActive());
+        assertTrue(result.data().getFirst().isActive());
     }
 
     @Test
@@ -281,26 +279,11 @@ class PersonQueryExecutionTest {
                 .combineWith("f")
                 .build();
 
-        PaginatedData<PersonDTO> result = filterQlService.search(PersonDTO.class, request, v -> mapper.convertValue(v, PersonDTO.class));
+        PaginatedData<PersonDTO> result = filterQlService.searchAs(PersonDTO.class, request);
 
         assertEquals(1, result.pagination().totalElements());
-        assertEquals("p2", result.data().get(0).getUsername());
+        assertEquals("p2", result.data().getFirst().getUsername());
     }
-
-//    @Test
-//    void shouldSupportPagination() {
-//        for (int i = 0; i < 10; i++) {
-//            createAndPersistPerson("user" + i, "user" + i + "@example.com", "User", "Test" + i, 20 + i);
-//        }
-//        entityManager.flush();
-//
-//        Page<Person> result = filterQlService.search(Person.class, null, PageRequest.of(1, 3), personRepository);
-//
-//        assertEquals(10, result.pagination().totalElements());
-//        assertEquals(4, result.getTotalPages());
-//        assertEquals(3, result.data().size());
-//        assertEquals(1, result.getNumber());
-//    }
 
     private Person createAndPersistPerson(String username, String email, String firstName, String lastName, Integer age) {
         Person person = new Person();

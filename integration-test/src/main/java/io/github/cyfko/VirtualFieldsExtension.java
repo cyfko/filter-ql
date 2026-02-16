@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
  * UserTenancyService - Service providing instance-based virtual field resolvers
  */
 @Component
-public class UserTenancyService {
+public class VirtualFieldsExtension {
 
     /**
      * Virtual field to filter users by organization membership
