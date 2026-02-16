@@ -73,84 +73,158 @@ This module provides:
 #### @Exposure
 
 Marks a projection class for REST controller generation.
+This annotation triggers the generation of a Spring `@RestController` that handles search requests.
 
 ```java
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.SOURCE)
 public @interface Exposure {
     /**
-     * REST resource name (kebab-case)
-     * Example: "users" generates /api/v1/users/search
+     * REST resource name (kebab-case).
+     * <p>
+     * Usage determines the endpoint URL: {@code [base-path]/[value]/search}
+     * Defaults to the kebab-case form of the entity class name if empty.
+     * </p>
      */
     String value() default "";
-    
+
     /**
-     * URI path prefix
-     * Default: "/api/v1"
+     * Optional URI path prefix for the REST endpoints.
+     * <p>
+     * Default depends on global configuration (often "/api").
+     * </p>
      */
     String basePath() default "";
-    
+
     /**
-     * Optional method reference for endpoint annotations
-     * (e.g., @PreAuthorize, @Cacheable)
+     * Strategy determining the endpoint return type and behavior.
+     * <p>
+     * Available strategies:
+     * <ul>
+     *   <li>{@code PAGINATED} (default) - Returns {@code PaginatedData<T>}</li>
+     *   <li>{@code LIST} - Returns {@code List<T>}</li>
+     *   <li>{@code CUSTOM} - Requires a manual handler method definition</li>
+     * </ul>
+     * </p>
      */
-    MethodReference annotationsFrom() default @MethodReference();
+    Strategy strategy() default Strategy.PAGINATED;
+
+    /**
+     * Pipeline of filter transformations applied before the handler execution.
+     * <p>
+     * Pipes are static methods that intercept and modify the {@link io.github.cyfko.filterql.core.model.FilterRequest}
+     * before it reaches the query execution phase. They are useful for:
+     * <ul>
+     *     <li>Tenant isolation (forcing tenantId filter)</li>
+     *     <li>Security constraints (filtering by ownership)</li>
+     *     <li>Input sanitization</li>
+     * </ul>
+     * Execution order matches the array order.
+     * </p>
+     */
+    Method[] pipes() default {};
+
+    /**
+     * Reference to a custom handler method.
+     * <p>
+     * Allows overriding the default controller logic entirely.
+     * The referenced method must match the signature expected by the chosen {@code strategy}.
+     * </p>
+     */
+    Method handler() default @Method();
+
+    /**
+     * Custom name for the generated endpoint method.
+     * Defaults to "search[EntityName]".
+     */
+    String endpointName() default "";
 }
 ```
 
 **Usage:**
+
 ```java
 import io.github.cyfko.filterql.spring.annotation.Exposure;
+import io.github.cyfko.projection.Method;
 
 @Projection(from = User.class)
-@Exposure(value = "users", basePath = "/api/v1")
+@Exposure(
+    value = "users",
+    basePath = "/api/v1",
+    pipes = {
+        @Method(type = SecurityFilters.class, value = "isolateTenant"),
+        @Method("removeDeleted")
+    }
+)
 public interface UserDTO {
-    String getUsername();
-    Integer getAge();
+    // ...
 }
 ```
 
 #### @ExposedAs
 
-Customizes field exposure in generated PropertyRef enum.
+Customizes how a field is exposed in the filter request criteria or defines a virtual filter property.
+
+This annotation has two primary use cases:
+
+1.  **Projection Customization** (on Getter methods)
+    Overrides the symbolic name and restricts allowed operators for a field that is already projected.
+
+2.  **Virtual Field Definition** (on Provider methods)
+    Defines a purely virtual filter property that translates to a complex JPA predicate (e.g., "fullName" mapping to `firstName` + `lastName`).
 
 ```java
-@Target({ElementType.FIELD, ElementType.METHOD})
+@Target(ElementType.METHOD)
 @Retention(RetentionPolicy.SOURCE)
 public @interface ExposedAs {
     /**
-     * Symbolic name in generated enum
+     * Symbolic name in generated enum or filter request.
      */
     String value();
-    
+
     /**
-     * Supported filter operators
+     * Whitelist of supported filter operators.
+     * If empty, all operators applicable to the type are allowed.
      */
     Op[] operators() default {};
-    
+
     /**
-     * Whether field is exposed for filtering
+     * Whether this field is exposed in the generated metamodel.
+     * Default: true.
      */
     boolean exposed() default true;
 }
 ```
 
-**Usage:**
-```java
-import io.github.cyfko.filterql.spring.annotation.ExposedAs;
-import io.github.cyfko.filterql.core.api.Op;
+**Usage Case 1: Projection Customization**
 
+```java
 @Projection(from = User.class)
-@Exposure("users")
 public interface UserDTO {
     
     @Projected
-    @ExposedAs(value = "USERNAME", operators = {Op.EQ, Op.MATCHES, Op.IN})
+    @ExposedAs(value = "USERNAME", operators = {Op.EQ, Op.MATCHES})
     String getUsername();
+}
+```
+
+**Usage Case 2: Virtual Field Definition**
+
+To define a virtual field, add a static method in a registered `@Provider` class:
+
+```java
+public class UserFilters {
     
-    @Projected
-    @ExposedAs(value = "AGE", operators = {Op.GT, Op.LT, Op.GTE, Op.LTE})
-    Integer getAge();
+    @ExposedAs(value = "FULL_NAME", operators = {Op.MATCHES})
+    public static PredicateResolver<User> fullNameSearch(String op, Object[] args) {
+        return (root, query, cb) -> {
+            String pattern = "%" + args[0] + "%";
+            return cb.or(
+                cb.like(root.get("firstName"), pattern),
+                cb.like(root.get("lastName"), pattern)
+            );
+        };
+    }
 }
 ```
 
@@ -162,53 +236,56 @@ Main service interface for executing filtered queries.
 
 ```java
 public interface FilterQlService {
-    
+
     /**
-     * Execute filter query and return paginated results as Map
+     * Execute filter query and return paginated results as Map.
      */
-    <P extends Enum<P> & PropertyReference> 
+    <P extends Enum<P> & PropertyReference>
     PaginatedData<Map<String, Object>> search(
-        Class<P> refClass, 
+        Class<P> refClass,
         FilterRequest<P> filterRequest
     );
-    
+
     /**
-     * Execute filter query with custom result mapper
+     * Execute filter query with custom result mapper.
      */
-    <R, P extends Enum<P> & PropertyReference> 
+    <R, P extends Enum<P> & PropertyReference>
     PaginatedData<R> search(
-        Class<R> projectionClass, 
-        FilterRequest<P> filterRequest, 
+        Class<R> projectionClass,
+        FilterRequest<P> filterRequest,
         ResultMapper<R> resultMapper
     );
-    
+
     /**
      * Execute filter query and return typed proxy implementations.
-     * <p>Uses JDK dynamic proxies to implement the projection interface,
-     * backed by the raw query result maps. Recommended for interface-based DTOs.</p>
+     * <p>
+     * Uses JDK dynamic proxies to implement the projection interface,
+     * backed by the raw query result maps. Recommended for interface-based DTOs.
+     * </p>
      */
-    <T, P extends Enum<P> & PropertyReference> 
+    <T, P extends Enum<P> & PropertyReference>
     PaginatedData<T> searchAs(
-        Class<T> projectionInterface, 
+        Class<T> projectionInterface,
         FilterRequest<P> filterRequest
     );
 }
 ```
 
 **Usage:**
+
 ```java
 @RestController
 @RequestMapping("/api")
 public class UserController {
-    
+
     @Autowired
     private FilterQlService filterQlService;
-    
+
     @PostMapping("/users/search")
     public ResponseEntity<PaginatedData<Map<String, Object>>> searchUsers(
         @RequestBody FilterRequest<UserDTO_> request
     ) {
-        PaginatedData<Map<String, Object>> results = 
+        PaginatedData<Map<String, Object>> results =
             filterQlService.search(UserDTO_.class, request);
         return ResponseEntity.ok(results);
     }
@@ -226,25 +303,6 @@ public interface ResultMapper<R> {
 }
 ```
 
-**Usage:**
-```java
-public record UserSummary(String username, String email) {}
-
-@PostMapping("/users/summary")
-public PaginatedData<UserSummary> getUserSummaries(
-    @RequestBody FilterRequest<UserDTO_> request
-) {
-    return filterQlService.search(
-        UserSummary.class,
-        request,
-        row -> new UserSummary(
-            (String) row.get("username"),
-            (String) row.get("email")
-        )
-    );
-}
-```
-
 ### 3. Pagination
 
 #### PaginatedData
@@ -256,158 +314,33 @@ public record PaginatedData<T>(
     List<T> data,
     PaginationInfo pagination
 ) {
-    public PaginatedData(List<T> data, PaginationInfo pagination) {
-        this.data = List.copyOf(data);
-        this.pagination = pagination;
-    }
-    
-    /**
-     * Transform data with mapper function
-     */
-    public <R> PaginatedData<R> map(Function<T, R> mapper) {
-        return new PaginatedData<>(
-            data.stream().map(mapper).collect(Collectors.toList()),
-            pagination
-        );
-    }
+    // ...
 }
 ```
 
 #### PaginationInfo
 
-Pagination metadata.
-
-```java
-public record PaginationInfo(
-    int currentPage,
-    int pageSize,
-    long totalElements
-) {
-    public int totalPages() {
-        return (int) Math.ceil((double) totalElements / pageSize);
-    }
-    
-    public static PaginationInfo from(Page<?> page) {
-        return new PaginationInfo(
-            page.getNumber(),
-            page.getSize(),
-            page.getTotalElements()
-        );
-    }
-}
-```
-
-**Response Example:**
-```json
-{
-  "data": [
-    {"id": 1, "username": "john", "email": "john@example.com"}
-  ],
-  "pagination": {
-    "currentPage": 0,
-    "pageSize": 20,
-    "totalElements": 1,
-    "totalPages": 1
-  }
-}
-```
+Pagination metadata (page number, size, total elements).
 
 ### 4. Support Components
 
 #### FilterContextRegistry
 
-Central registry for managing `JpaFilterContext` beans.
+Central registry for managing `JpaFilterContext` beans. Automatically populated with all `@Projection` entities detected at startup.
 
-```java
-@Component
-public class FilterContextRegistry {
-    
-    private final Map<Class<?>, JpaFilterContext<?>> contextByEnum;
-    
-    public FilterContextRegistry(List<JpaFilterContext<?>> contexts) {
-        this.contextByEnum = new HashMap<>();
-        for (JpaFilterContext<?> context : contexts) {
-            contextByEnum.put(context.getPropertyRefClass(), context);
-        }
-    }
-    
-    /**
-     * Get FilterContext for PropertyRef enum
-     */
-    public <P extends Enum<P> & PropertyReference> 
-    JpaFilterContext<?> getContext(Class<P> enumClass) {
-        JpaFilterContext<?> context = contextByEnum.get(enumClass);
-        if (context == null) {
-            throw new IllegalArgumentException(
-                "No JpaFilterContext found for reference " + enumClass.getName()
-            );
-        }
-        return context;
-    }
-}
-```
+Location: `io.github.cyfko.filterql.spring.support`
 
 #### SpringProviderResolver
 
-Resolves computation providers from Spring ApplicationContext.
+Bridge between FilterQL and Spring IOC.
+Allows using Spring Beans as `@Provider` for virtual fields and custom computations.
+
+Location: `io.github.cyfko.filterql.spring.service.impl`
 
 ```java
 @Component
-public class SpringProviderResolver implements InstanceResolver {
-    
-    private final ApplicationContext applicationContext;
-    
-    public SpringProviderResolver(ApplicationContext applicationContext) {
-        this.applicationContext = applicationContext;
-    }
-    
-    @Override
-    public <T> T resolve(Class<T> providerClass) {
-        return applicationContext.getBean(providerClass);
-    }
-}
-```
-
-**Usage:**
-```java
-@Service
-public class UserComputations {
-    
-    @Autowired
-    private DateTimeFormatter formatter;
-    
-    public String getFullName(String firstName, String lastName) {
-        return firstName + " " + lastName;
-    }
-}
-```
-
-### 5. Auto-Configuration
-
-#### FilterQlAutoConfiguration
-
-Automatic Spring Boot configuration.
-
-```java
-@AutoConfiguration
-@ComponentScan(basePackages = "io.github.cyfko.filterql.spring")
-@ConditionalOnClass(JpaFilterContext.class)
-@EnableConfigurationProperties(FilterQlProperties.class)
-public class FilterQlAutoConfiguration {
-    
-    @Bean
-    @ConditionalOnMissingBean
-    public FilterContextRegistry filterContextRegistry(
-        List<JpaFilterContext<?>> contexts
-    ) {
-        return new FilterContextRegistry(contexts);
-    }
-    
-    @Bean
-    @ConditionalOnMissingBean(ProjectionJacksonModule.class)
-    public com.fasterxml.jackson.databind.Module filterQlProjectionJacksonModule() {
-        return new ProjectionJacksonModule();
-    }
+public class SpringProviderResolver implements InstanceResolver, ApplicationContextAware {
+    // Resolves providers from Spring ApplicationContext
 }
 ```
 
@@ -583,42 +516,6 @@ public class CustomFilterQlConfig {
         return new CustomFilterQlServiceImpl(em, registry, resolver);
     }
 }
-```
-
-## 📦 Module Integration
-
-This module is designed to work with:
-
-- **filterql-spring-processor**: Code generation (PropertyRef enums, controllers)
-- **filterql-adapter-jpa**: JPA Criteria API integration
-- **projection-metamodel-processor**: DTO projection metadata
-
-**Typical dependency setup:**
-
-```xml
-<dependencies>
-    <!-- Runtime API -->
-    <dependency>
-        <groupId>io.github.cyfko</groupId>
-        <artifactId>filterql-spring-api</artifactId>
-        <version>4.0.0</version>
-    </dependency>
-    
-    <!-- Compile-time processor -->
-    <dependency>
-        <groupId>io.github.cyfko</groupId>
-        <artifactId>filterql-spring-processor</artifactId>
-        <version>4.0.0</version>
-        <scope>provided</scope>
-    </dependency>
-    
-    <!-- JPA adapter -->
-    <dependency>
-        <groupId>io.github.cyfko</groupId>
-        <artifactId>filterql-adapter-jpa</artifactId>
-        <version>2.0.0</version>
-    </dependency>
-</dependencies>
 ```
 
 ## ⚠️ Notes

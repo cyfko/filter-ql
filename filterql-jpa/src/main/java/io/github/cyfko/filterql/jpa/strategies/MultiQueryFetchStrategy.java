@@ -292,7 +292,7 @@ public class MultiQueryFetchStrategy extends AbstractMultiQueryFetchStrategy {
 
                 try {
                     if (!computeMethods.containsKey(dtoField)) {
-                        var method = ProjectionUtils.resolveComputeMethod(instanceResolver, dtoClass, dtoField, params);
+                        var method = ProjectionUtils.resolveComputeMethod(instanceResolver, dtoClass, dtoField);
                         computeMethods.put(dtoField, method);
                     }
                     Object computed = computeMethods.get(dtoField).apply(params);

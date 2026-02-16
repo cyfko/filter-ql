@@ -16,7 +16,7 @@ public interface DtoUserD {
     @Projected(from = "orders")
     List<DtoOrderD> getOrders();
 
-    @Computed(dependsOn = {"id", "name"})
+    @Computed(dependsOn = {"id", "name"}, then = @Method("keyAsString"))
     String getKeyIdentifier(); // Old API identifier
 
     @Computed(dependsOn = {"id"})

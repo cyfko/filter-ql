@@ -1,12 +1,14 @@
 package io.github.cyfko.filterql.jpa.utils;
 
 import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
+import io.github.cyfko.jpametamodel.PersistenceRegistry;
 import io.github.cyfko.jpametamodel.ProjectionRegistry;
 import io.github.cyfko.jpametamodel.api.ComputationProvider;
 import io.github.cyfko.jpametamodel.api.ComputedField;
 import io.github.cyfko.jpametamodel.api.ProjectionMetadata;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
@@ -166,62 +168,15 @@ public abstract class ProjectionUtils {
                                       Class<?> projectionClazz,
                                       String field,
                                       Object... dependencies) throws Exception {
-
-        final ProjectionMetadata metadata = ProjectionRegistry.getMetadataFor(projectionClazz);
-
-        if (metadata == null) {
-            throw new IllegalArgumentException("The supposed projection class is not a projection nor an entity: " + projectionClazz.getSimpleName());
-        }
-
-        Optional<ComputedField> computedField = metadata.getComputedField(field, true);
-        if (computedField.isEmpty()) {
-            throw new IllegalArgumentException("No computed field found with the given name: " + field);
-        }
-
-        ComputedField.MethodReference methodReference = computedField.get().methodReference();
-        String methodName = methodReference != null && methodReference.methodName() != null ?
-                methodReference.methodName() :
-                "get" + capitalize(computedField.get().dtoField());
-
-        if (methodReference != null && methodReference.targetClass() != null) {
-            String beanName = Arrays.stream(metadata.computers())
-                    .filter(p -> methodReference.targetClass().equals(p.clazz()))
-                    .findFirst()
-                    .map(ComputationProvider::bean)
-                    .orElse(null);
-            try {
-                return invoke(instanceResolver, methodReference.targetClass(), beanName, methodName, dependencies);
-            } catch (UnsupportedOperationException e) {
-                // Nothing to do! just continue;
-            }
-        } else {
-            for (var cp : metadata.computers()) {
-                try {
-                    return invoke(instanceResolver, cp.clazz(), cp.bean(), methodName, dependencies);
-                } catch (UnsupportedOperationException e) {
-                    // Nothing to do! just continue;
-                }
-            }
-        }
-
-
-        // No provider had a matching method
-        throw new IllegalStateException(
-                String.format("No provider method found for computed field '%s'. " +
-                                "Expected method: %s %s(%s) in one of the registered providers: %s",
-                        field,
-                        "Object", // Return type (unknown at runtime)
-                        methodName,
-                        formatArgumentTypes(dependencies),
-                        formatProviderList(metadata.computers()))
-        );
+        return resolveComputeMethod(instanceResolver, projectionClazz, field)
+                .apply(dependencies);
     }
 
     public static Function<Object[], Object> resolveComputeMethod(
             InstanceResolver instanceResolver,
             Class<?> projectionClazz,
-            String field,
-            Object... dependencies) throws Exception {
+            String field) throws Exception {
+
         Objects.requireNonNull(instanceResolver,  "providerResolver is null");
         final ProjectionMetadata metadata = ProjectionRegistry.getMetadataFor(projectionClazz);
 
@@ -229,67 +184,59 @@ public abstract class ProjectionUtils {
             throw new IllegalArgumentException("The supposed projection class is not a projection nor an entity: " + projectionClazz.getSimpleName());
         }
 
-        Optional<ComputedField> computedField = metadata.getComputedField(field, true);
-        if (computedField.isEmpty()) {
-            throw new IllegalArgumentException("No computed field found with the given name: " + field);
-        }
+        final ComputedField computedField = metadata.getComputedField(field, true)
+                .orElseThrow(() -> new IllegalArgumentException("No computed field found with the given name: " + field));
 
-        Method method = null;
-        Object computerInstance = null;
+        final ComputedField.MethodReference computedBy = computedField.computedBy();
 
-        ComputedField.MethodReference methodReference = computedField.get().methodReference();
-        String methodName = methodReference != null && methodReference.methodName() != null ?
-                methodReference.methodName() :
-                "to" + capitalize(computedField.get().dtoField());
+        // Lookup method immediately
+        final Class<?>[] parameterTypes = getParameterTypes(computedField.dependencies(), metadata.entityClass());
+        final Method method = computedBy.owner().getMethod(computedBy.methodName(), parameterTypes);
 
-        if (methodReference != null && methodReference.targetClass() != null) {
-            Class<?> methodRefClass = methodReference.targetClass();
+        // resolve instance if method is not static
+        Object computerInstance;
+        if (method.getModifiers() != Modifier.STATIC) {
             String beanName = Arrays.stream(metadata.computers())
-                    .filter(p -> methodRefClass.equals(p.clazz()))
+                    .filter(p -> computedBy.owner().equals(p.clazz()))
                     .findFirst()
                     .map(ComputationProvider::bean)
                     .orElse(null);
 
-            method = ReflectionUtils.findMethod(methodRefClass, methodName, dependencies);
-            computerInstance = instanceResolver.resolve(methodRefClass, beanName);
+            computerInstance = instanceResolver.resolve(computedBy.owner(), beanName);
         } else {
-            for (var cp : metadata.computers()) {
-                method = ReflectionUtils.findMethod(cp.clazz(), methodName, dependencies);
-                if (method != null) {
-                    computerInstance = instanceResolver.resolve(cp.clazz(), cp.bean());
-                    break;
+            computerInstance = null;
+        }
+
+        // If transformation is not needed return this handler
+        ComputedField.MethodReference transformer = computedField.transformer();
+        if (transformer == null){
+            return (args) -> {
+                try {
+                    return method.invoke(computerInstance, args);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
                 }
-            }
+            };
         }
 
-        if (method == null) {
-            // No provider had a matching method
-            throw new IllegalStateException(
-                    String.format("No provider method found for computed field '%s'. " +
-                                    "Expected method: %s %s(%s) in one of the registered providers: %s",
-                            field,
-                            "Object", // Return type (unknown at runtime)
-                            methodName,
-                            formatArgumentTypes(dependencies),
-                            formatProviderList(metadata.computers()))
-            );
-        }
-
-        final Method effectiveMethod = method;
-        final Object effectiveInstance = computerInstance;
+        // Obtain transformer and apply transformation
+        final Method transformM = transformer.owner().getMethod(transformer.methodName(), method.getReturnType());
         return (args) -> {
             try {
-                if (effectiveInstance == null) {
-                    // Static invocation
-                    return effectiveMethod.invoke(null, args);
-                } else {
-                    // Instance invocation
-                    return effectiveMethod.invoke(effectiveInstance, args);
-                }
+                Object result = method.invoke(computerInstance, args);
+                return transformM.invoke(null, result);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         };
+    }
+
+    private static Class<?>[] getParameterTypes(String[] paramNames, Class<?> targetEntity) {
+        final Class<?>[] parameterTypes = new Class<?>[paramNames.length];
+        for (int i=0; i < paramNames.length; i++) {
+            parameterTypes[i] = PersistenceRegistry.getFieldType(targetEntity, paramNames[i]);
+        }
+        return parameterTypes;
     }
 
     /**
