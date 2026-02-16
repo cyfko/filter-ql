@@ -117,35 +117,35 @@ public class Person {
     value = "users",
     basePath = "/api/v1"
 )
-public class PersonDTO {
+public interface PersonDTO {
     
     @ExposedAs(value = "USERNAME", operators = {Op.EQ, Op.MATCHES, Op.NE, Op.IN})
-    private String username;
+    String getUsername();
     
     @ExposedAs(value = "EMAIL", operators = {Op.EQ, Op.MATCHES, Op.NE})
-    private String email;
+    String getEmail();
     
     @ExposedAs(value = "AGE", operators = {Op.EQ, Op.GT, Op.LT, Op.GTE, Op.LTE, Op.RANGE})
-    private Integer age;
+    Integer getAge();
     
     @ExposedAs(value = "FIRST_NAME", operators = {Op.EQ, Op.MATCHES, Op.IN})
-    private String firstName;
+    String getFirstName();
     
     @ExposedAs(value = "LAST_NAME", operators = {Op.EQ, Op.MATCHES, Op.IN, Op.IS_NULL})
-    private String lastName;
+    String getLastName();
     
     @ExposedAs(value = "ACTIVE", operators = {Op.EQ})
-    private Boolean active;
+    Boolean getActive();
     
     @ExposedAs(value = "REGISTERED_AT", operators = {Op.EQ, Op.GT, Op.LT, Op.GTE, Op.LTE, Op.RANGE})
-    private LocalDateTime registeredAt;
+    LocalDateTime getRegisteredAt();
     
     @ExposedAs(value = "BIRTH_DATE", operators = {Op.EQ, Op.GT, Op.LT, Op.GTE, Op.LTE, Op.RANGE})
-    private LocalDate birthDate;
+    LocalDate getBirthDate();
     
     // Virtual field: static method returning PredicateResolverMapping
     @ExposedAs(value = "FULL_NAME", operators = {Op.MATCHES})
-    public static PredicateResolverMapping<Person> fullNameMatches() {
+    static PredicateResolverMapping<Person> fullNameMatches() {
         return (op, args) -> (root, query, cb) -> {
             String searchTerm = (String) args[0];
             String pattern = "%" + searchTerm + "%";
@@ -158,7 +158,7 @@ public class PersonDTO {
     // Endpoint annotations
     @PreAuthorize("hasAuthority('USER')")
     @Cacheable(value = "userSearchCache", key = "#req.hashCode()")
-    public void searchEndpoint() {}
+    default void searchEndpoint() {}
 }
 ```
 
@@ -641,9 +641,9 @@ cat target/generated-sources/annotations/io/github/cyfko/filterql/spring/control
 ## See Also
 
 **FilterQL Modules:**
-- [FilterQL Spring Documentation](../adapters/java/filterql-spring/README.md)
-- [FilterQL JPA Adapter Documentation](../adapters/java/filterql-jpa/README.md)
-- [FilterQL Core Documentation](../core/java/README.md)
+- [FilterQL Spring Documentation](../filterql-spring/README.md)
+- [FilterQL JPA Adapter Documentation](../filterql-jpa/README.md)
+- [FilterQL Core Documentation](../core/README.md)
 - [Main README](../README.md)
 
 **External Dependencies:**

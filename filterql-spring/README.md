@@ -104,8 +104,9 @@ import io.github.cyfko.filterql.spring.annotation.Exposure;
 
 @Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api/v1")
-public class UserDTO {
-    // Fields...
+public interface UserDTO {
+    String getUsername();
+    Integer getAge();
 }
 ```
 
@@ -141,15 +142,15 @@ import io.github.cyfko.filterql.core.api.Op;
 
 @Projection(from = User.class)
 @Exposure("users")
-public class UserDTO {
+public interface UserDTO {
     
     @Projected
     @ExposedAs(value = "USERNAME", operators = {Op.EQ, Op.MATCHES, Op.IN})
-    private String username;
+    String getUsername();
     
     @Projected
     @ExposedAs(value = "AGE", operators = {Op.GT, Op.LT, Op.GTE, Op.LTE})
-    private Integer age;
+    Integer getAge();
 }
 ```
 
@@ -179,6 +180,17 @@ public interface FilterQlService {
         Class<R> projectionClass, 
         FilterRequest<P> filterRequest, 
         ResultMapper<R> resultMapper
+    );
+    
+    /**
+     * Execute filter query and return typed proxy implementations.
+     * <p>Uses JDK dynamic proxies to implement the projection interface,
+     * backed by the raw query result maps. Recommended for interface-based DTOs.</p>
+     */
+    <T, P extends Enum<P> & PropertyReference> 
+    PaginatedData<T> searchAs(
+        Class<T> projectionInterface, 
+        FilterRequest<P> filterRequest
     );
 }
 ```
@@ -377,7 +389,8 @@ public class UserComputations {
 Automatic Spring Boot configuration.
 
 ```java
-@Configuration
+@AutoConfiguration
+@ComponentScan(basePackages = "io.github.cyfko.filterql.spring")
 @ConditionalOnClass(JpaFilterContext.class)
 @EnableConfigurationProperties(FilterQlProperties.class)
 public class FilterQlAutoConfiguration {
@@ -391,24 +404,56 @@ public class FilterQlAutoConfiguration {
     }
     
     @Bean
-    @ConditionalOnMissingBean
-    public FilterQlService filterQlService(
-        EntityManager em,
-        FilterContextRegistry contextRegistry,
-        InstanceResolver instanceResolver
-    ) {
-        return new FilterQlServiceImpl(em, contextRegistry, instanceResolver);
-    }
-    
-    @Bean
-    @ConditionalOnMissingBean
-    public InstanceResolver instanceResolver(ApplicationContext context) {
-        return new SpringProviderResolver(context);
+    @ConditionalOnMissingBean(ProjectionJacksonModule.class)
+    public com.fasterxml.jackson.databind.Module filterQlProjectionJacksonModule() {
+        return new ProjectionJacksonModule();
     }
 }
 ```
 
 This configuration is automatically loaded via Spring Boot's auto-configuration mechanism.
+
+### 6. Projection Proxy System
+
+For interface-based DTOs, FilterQL provides a dynamic proxy system that eliminates
+the need for concrete DTO implementations.
+
+#### Core Components
+
+- **`ProjectionProxyFactory`** — creates JDK `Proxy` instances that implement
+  the projection interface, backed by a `Map<String, Object>` from the query result.
+- **`ProjectionProxySerializer`** — custom Jackson serializer that only emits
+  projected fields, preventing `FieldNotProjectedException` during serialization.
+- **`ProjectionJacksonModule`** — Jackson module auto-registered by
+  `FilterQlAutoConfiguration` that hooks up the serializer.
+
+#### Usage
+
+```java
+// Define a projection interface (no implementation needed)
+@Projection(from = User.class)
+public interface UserDTO {
+    Long getId();
+    String getUsername();
+    String getEmail();
+}
+
+// Query with searchAs — returns proxy implementations
+PaginatedData<UserDTO> results = filterQlService.searchAs(UserDTO.class, request);
+
+// Each item is a JDK Proxy implementing UserDTO.
+// Calling a getter for a non-projected field throws FieldNotProjectedException.
+// Jackson serialization works correctly via ProjectionJacksonModule.
+```
+
+#### Edge Cases
+
+| Scenario | Behavior |
+|----------|----------|
+| Getter for projected field with `null` value | Returns `null` |
+| Getter for non-projected field | Throws `FieldNotProjectedException` |
+| `toString()` / `equals()` / `hashCode()` | Delegated to data map |
+| Serialization without `ProjectionJacksonModule` | Jackson tries all getters → `FieldNotProjectedException` |
 
 ## 💡 Use Cases
 
@@ -598,6 +643,6 @@ This project is licensed under the MIT License. See the [LICENSE](../../../LICEN
 
 - [GitHub Repository](https://github.com/cyfko/filterql)
 - [Maven Central](https://search.maven.org/artifact/io.github.cyfko/filterql-spring)
-- [FilterQL Core](../../core/java/README.md)
+- [FilterQL Core](../core/README.md)
 - [FilterQL JPA Adapter](../filterql-jpa/README.md)
-- [FilterQL Spring Processor](../filterql-spring-processor/README.md)
+- [FilterQL Spring Processor](https://github.com/cyfko/filterql-spring-processor)

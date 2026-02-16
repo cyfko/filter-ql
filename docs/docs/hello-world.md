@@ -28,11 +28,11 @@ Add FilterQL to your Spring Boot project.
 
 ```xml
 <dependencies>
-    <!-- FilterQL Spring Starter -->
+    <!-- FilterQL Spring -->
     <dependency>
         <groupId>io.github.cyfko</groupId>
-        <artifactId>filterql-spring-starter</artifactId>
-        <version>1.0.0</version>
+        <artifactId>filterql-spring</artifactId>
+        <version>4.0.0</version>
     </dependency>
     
     <!-- Your existing Spring dependencies -->
@@ -45,13 +45,33 @@ Add FilterQL to your Spring Boot project.
         <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
 </dependencies>
+
+<!-- Annotation processor configuration -->
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+                <annotationProcessorPaths>
+                    <path>
+                        <groupId>io.github.cyfko</groupId>
+                        <artifactId>filterql-spring-processor</artifactId>
+                        <version>4.0.0</version>
+                    </path>
+                </annotationProcessorPaths>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
 ```
 
 **Gradle** (`build.gradle.kts`):
 
 ```kotlin
 dependencies {
-    implementation("io.github.cyfko:filterql-spring-starter:1.0.0")
+    implementation("io.github.cyfko:filterql-spring:4.0.0")
+    annotationProcessor("io.github.cyfko:filterql-spring-processor:4.0.0")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-web")
 }
@@ -107,28 +127,21 @@ import com.example.demo.entity.User;
 
 @Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api")
-public class UserDTO {
+public interface UserDTO {
 
-    private Long id;
+    Long getId();
 
     @ExposedAs(value = "NAME", operators = {Op.EQ, Op.NE, Op.MATCHES, Op.IN})
-    private String name;
+    String getName();
 
     @ExposedAs(value = "EMAIL", operators = {Op.EQ, Op.NE, Op.MATCHES})
-    private String email;
+    String getEmail();
 
     @ExposedAs(value = "AGE", operators = {Op.EQ, Op.GT, Op.GTE, Op.LT, Op.LTE, Op.RANGE})
-    private Integer age;
+    Integer getAge();
 
     @ExposedAs(value = "STATUS", operators = {Op.EQ, Op.NE, Op.IN})
-    private String status;
-
-    // Getters...
-    public Long getId() { return id; }
-    public String getName() { return name; }
-    public String getEmail() { return email; }
-    public Integer getAge() { return age; }
-    public String getStatus() { return status; }
+    String getStatus();
 }
 ```
 

@@ -15,7 +15,7 @@ Historique complet des versions et changements du projet FilterQL.
 | `filterql-core` | 4.0.0 |
 | `filterql-adapter-jpa` | 2.0.0 |
 | `filterql-spring` | 4.0.0 |
-| `filterql-spring-starter` | 1.0.0 |
+| `filterql-spring-processor` | 4.0.0 |
 
 ---
 
@@ -54,7 +54,7 @@ Les artefacts sont publiés sur Maven Central :
 - [filterql-core](https://central.sonatype.com/artifact/io.github.cyfko/filterql-core)
 - [filterql-adapter-jpa](https://central.sonatype.com/artifact/io.github.cyfko/filterql-adapter-jpa)
 - [filterql-spring](https://central.sonatype.com/artifact/io.github.cyfko/filterql-spring)
-- [filterql-spring-starter](https://central.sonatype.com/artifact/io.github.cyfko/filterql-spring-starter)
+- [filterql-spring-processor](https://central.sonatype.com/artifact/io.github.cyfko/filterql-spring-processor)
 
 ---
 

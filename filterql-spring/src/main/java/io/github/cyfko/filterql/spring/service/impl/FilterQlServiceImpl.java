@@ -21,6 +21,48 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Default JPA-based implementation of {@link FilterQlService}.
+ * <p>
+ * This service is auto-registered as a Spring {@code @Service} bean and
+ * provides
+ * three query methods:
+ * </p>
+ * <ul>
+ * <li>{@link #search(Class, FilterRequest)} — returns raw
+ * {@code Map<String, Object>} results</li>
+ * <li>{@link #search(Class, FilterRequest, ResultMapper)} — returns
+ * custom-mapped DTOs</li>
+ * <li>{@link #searchAs(Class, FilterRequest)} — returns JDK proxy
+ * implementations
+ * of the given projection interface, created via
+ * {@link ProjectionProxyFactory}</li>
+ * </ul>
+ *
+ * <p>
+ * <strong>Enum ↔ Projection class convention:</strong> FilterQL relies on a
+ * naming
+ * convention where the generated PropertyRef enum is named
+ * {@code {ProjectionClass}_}
+ * (e.g., {@code UserDTO_} for {@code UserDTO}). The private helper methods
+ * {@code toProjectionClass} and {@code toEnumClass} use this convention to
+ * navigate
+ * between the two.
+ * </p>
+ *
+ * <p>
+ * <strong>Thread safety:</strong> This bean is a Spring singleton. The
+ * {@link jakarta.persistence.EntityManager} is injected via
+ * {@code @PersistenceContext},
+ * which provides a thread-bound proxy — safe for concurrent use.
+ * </p>
+ *
+ * @see FilterQlService
+ * @see ProjectionProxyFactory
+ * @see FilterContextRegistry
+ * @author Frank KOSSI
+ * @since 4.0.0
+ */
 @Service
 public class FilterQlServiceImpl implements FilterQlService {
     @PersistenceContext

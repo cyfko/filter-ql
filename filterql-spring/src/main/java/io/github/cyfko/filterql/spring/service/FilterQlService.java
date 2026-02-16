@@ -37,31 +37,66 @@ import java.util.Map;
  * @since 1.0
  */
 public interface FilterQlService {
-    <P extends Enum<P> & PropertyReference> PaginatedData<Map<String, Object>> search(Class<P> refClass,
-            FilterRequest<P> filterRequest);
+        /**
+         * Searches entities using the given property reference enum and filter request,
+         * returning paginated results as raw key-value maps.
+         *
+         * <p>
+         * Each result row is a {@code Map<String, Object>} where keys are the
+         * projection
+         * field names and values are the projected data.
+         * </p>
+         *
+         * @param refClass      the generated property reference enum class
+         *                      (e.g., {@code UserDTO_.class})
+         * @param filterRequest the filter request containing filters, pagination, and
+         *                      DSL
+         * @param <P>           the property reference enum type
+         * @return paginated results as maps of field name to value
+         */
+        <P extends Enum<P> & PropertyReference> PaginatedData<Map<String, Object>> search(Class<P> refClass,
+                        FilterRequest<P> filterRequest);
 
-    <R, P extends Enum<P> & PropertyReference> PaginatedData<R> search(Class<R> projectionClass,
-            FilterRequest<P> filterRequest, ResultMapper<R> resultMapper);
+        /**
+         * Searches entities and maps each result row using the given
+         * {@link ResultMapper}.
+         *
+         * <p>
+         * This overload allows transforming raw projection maps into typed DTOs or
+         * other
+         * custom representations.
+         * </p>
+         *
+         * @param projectionClass the projection interface class
+         * @param filterRequest   the filter request
+         * @param resultMapper    mapper to transform each {@code Map<String, Object>}
+         *                        result
+         * @param <R>             the target result type
+         * @param <P>             the property reference enum type
+         * @return paginated results mapped by the given mapper
+         */
+        <R, P extends Enum<P> & PropertyReference> PaginatedData<R> search(Class<R> projectionClass,
+                        FilterRequest<P> filterRequest, ResultMapper<R> resultMapper);
 
-    /**
-     * Searches and returns results as typed projection interface instances.
-     *
-     * <p>
-     * The returned objects are dynamic proxies implementing
-     * {@code projectionInterface}.
-     * Non-projected fields throw
-     * {@link io.github.cyfko.filterql.spring.projection.FieldNotProjectedException}
-     * on access. Jackson serialization includes only projected fields.
-     * </p>
-     *
-     * @param projectionInterface the projection interface (annotated with
-     *                            {@code @Projection})
-     * @param filterRequest       the filter request
-     * @param <T>                 the projection interface type
-     * @param <P>                 the property reference enum type
-     * @return paginated results as dynamic proxy implementations of the projection
-     *         interface
-     */
-    <T, P extends Enum<P> & PropertyReference> PaginatedData<T> searchAs(Class<T> projectionInterface,
-            FilterRequest<P> filterRequest);
+        /**
+         * Searches and returns results as typed projection interface instances.
+         *
+         * <p>
+         * The returned objects are dynamic proxies implementing
+         * {@code projectionInterface}.
+         * Non-projected fields throw
+         * {@link io.github.cyfko.filterql.spring.projection.FieldNotProjectedException}
+         * on access. Jackson serialization includes only projected fields.
+         * </p>
+         *
+         * @param projectionInterface the projection interface (annotated with
+         *                            {@code @Projection})
+         * @param filterRequest       the filter request
+         * @param <T>                 the projection interface type
+         * @param <P>                 the property reference enum type
+         * @return paginated results as dynamic proxy implementations of the projection
+         *         interface
+         */
+        <T, P extends Enum<P> & PropertyReference> PaginatedData<T> searchAs(Class<T> projectionInterface,
+                        FilterRequest<P> filterRequest);
 }

@@ -3,6 +3,38 @@ package io.github.cyfko.filterql.spring.support;
 import javax.lang.model.type.TypeMirror;
 import java.util.Set;
 
+/**
+ * Enumeration of Java types recognized by the FilterQL annotation processor and
+ * runtime for operator compatibility validation and code generation.
+ * <p>
+ * Each constant maps to one or more Java classes (including both boxed and
+ * primitive
+ * forms where applicable). The special constants {@link #ENUM} and
+ * {@link #UNKNOWN}
+ * serve as fallback categories:
+ * </p>
+ * <ul>
+ * <li>{@link #ENUM} — matched when the type is a Java enum (detected at runtime
+ * via {@code Class.isEnum()})</li>
+ * <li>{@link #UNKNOWN} — returned when no other category matches; operators
+ * restricted to basic equality</li>
+ * </ul>
+ *
+ * <p>
+ * <strong>Resolution methods:</strong>
+ * </p>
+ * <ul>
+ * <li>{@link #fromClass(Class)} — runtime resolution from a
+ * {@code Class<?>}</li>
+ * <li>{@link #fromTypeMirror(javax.lang.model.type.TypeMirror)} — compile-time
+ * resolution during annotation processing</li>
+ * <li>{@link #fromTypeName(String)} — string-based resolution from type
+ * names</li>
+ * </ul>
+ *
+ * @author Frank KOSSI
+ * @since 4.0.0
+ */
 public enum SupportedType {
     STRING(String.class),
     INTEGER(Integer.class, int.class),
@@ -72,7 +104,7 @@ public enum SupportedType {
             default ->
                 // Pour les autres types, on retourne UNKNOWN
                 // La détection des enums se fait au niveau du TypeMirror
-                    UNKNOWN;
+                UNKNOWN;
         };
     }
 

@@ -16,14 +16,28 @@ Documentation de référence complète pour le module `filterql-adapter-jpa` (ve
     <artifactId>filterql-adapter-jpa</artifactId>
     <version>2.0.0</version>
 </dependency>
+```
 
-<!-- Dépendance externe requise -->
-<dependency>
-    <groupId>io.github.cyfko</groupId>
-    <artifactId>projection-metamodel-processor</artifactId>
-    <version>1.0.0</version>
-    <scope>provided</scope>
-</dependency>
+Configurez le processeur d'annotations dans le plugin du compilateur :
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+                <annotationProcessorPaths>
+                    <path>
+                        <groupId>io.github.cyfko</groupId>
+                        <artifactId>jpa-metamodel-processor</artifactId>
+                        <version>1.0.4</version>
+                    </path>
+                </annotationProcessorPaths>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
 ```
 
 ---
@@ -482,7 +496,7 @@ public final class PathResolverUtils {
 ## Annotations Externes
 
 :::note Dépendances Externes
-Les annotations suivantes proviennent de [projection-spec](https://github.com/cyfko/projection-spec) et sont implémentées par [projection-metamodel-processor](https://github.com/cyfko/jpa-metamodel-processor).
+Les annotations suivantes proviennent de [projection-spec](https://github.com/cyfko/projection-spec) et sont implémentées par [jpa-metamodel-processor](https://github.com/cyfko/jpa-metamodel-processor).
 :::
 
 ### @Projection

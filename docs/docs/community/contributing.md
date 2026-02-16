@@ -105,7 +105,7 @@ filter-ql/
 ├── adapters/java/
 │   ├── filterql-jpa/        # JPA adapter
 │   ├── filterql-spring/     # Spring integration
-│   └── filterql-spring-starter/  # Auto-configuration
+│   └── filterql-spring-processor/  # Annotation processor
 ├── integration-test/        # Integration tests
 └── docs/                    # Docusaurus documentation
 ```

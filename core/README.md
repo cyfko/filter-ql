@@ -761,7 +761,7 @@ if ("NEAR".equals(op)) {
 }
 ```
 
-See the [Custom Operators Guide](../../docs/docs/guides/custom-operators.md) for implementation details.
+See the [Custom Operators Guide](../docs/docs/guides/custom-operators.md) for implementation details.
 
 ### Usage
 
@@ -1159,7 +1159,6 @@ FilterQuery<MyExecutionContext> query = FilterQueryFactory.of(context, parser);
 
 - **[JPA Adapter](../adapters/java/filterql-jpa/README.md)**: JPA Criteria API integration, projection strategies, custom predicates
 - **[Spring Integration](../adapters/java/filterql-spring/README.md)**: Annotation processor, FilterQlService, REST controllers
-- **[Spring Starter](../adapters/java/filterql-spring-starter/README.md)**: Convenience dependency aggregator
 
 ---
 

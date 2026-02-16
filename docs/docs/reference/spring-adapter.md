@@ -11,27 +11,40 @@ Complete reference documentation for the `filterql-spring` module (version 4.0.0
 ## Maven Coordinates
 
 ```xml
-<!-- Option 1: Starter (recommended) -->
-<dependency>
-    <groupId>io.github.cyfko</groupId>
-    <artifactId>filterql-spring-starter</artifactId>
-    <version>1.0.0</version>
-</dependency>
 
-<!-- Option 2: Module only -->
+<!-- Dependency -->
 <dependency>
     <groupId>io.github.cyfko</groupId>
     <artifactId>filterql-spring</artifactId>
     <version>4.0.0</version>
 </dependency>
+```
 
-<!-- Required external dependency -->
-<dependency>
-    <groupId>io.github.cyfko</groupId>
-    <artifactId>projection-metamodel-processor</artifactId>
-    <version>1.0.0</version>
-    <scope>provided</scope>
-</dependency>
+Configure annotation processors in the compiler plugin:
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+                <annotationProcessorPaths>
+                    <path>
+                        <groupId>io.github.cyfko</groupId>
+                        <artifactId>filterql-spring-processor</artifactId>
+                        <version>1.0.0</version>
+                    </path>
+                    <path>
+                        <groupId>io.github.cyfko</groupId>
+                        <artifactId>jpa-metamodel-processor</artifactId>
+                        <version>1.0.4</version>
+                    </path>
+                </annotationProcessorPaths>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
 ```
 
 ---

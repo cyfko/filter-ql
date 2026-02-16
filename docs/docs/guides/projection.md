@@ -184,7 +184,7 @@ public class Book {
 ### Définition de DTO avec @Projection
 
 :::note Dépendance Externe
-L'annotation `@Projection` provient de [projection-spec](https://github.com/cyfko/projection-spec), implémentée par [projection-metamodel-processor](https://github.com/cyfko/jpa-metamodel-processor).
+The `@Projection` annotation comes from [projection-spec](https://github.com/cyfko/projection-spec), implemented by [jpa-metamodel-processor](https://github.com/cyfko/jpa-metamodel-processor).
 :::
 
 ```java
@@ -192,22 +192,22 @@ import io.github.cyfko.projection.Projection;
 import io.github.cyfko.projection.Projected;
 
 @Projection(from = Author.class)
-public class AuthorDTO {
-    private Long id;
-    private String name;
+public interface AuthorDTO {
+    Long getId();
+    String getName();
     
     @Projected(from = "books")
-    private List<BookSummaryDTO> books;
+    List<BookSummaryDTO> getBooks();
     
     @Projected(from = "awards")
-    private Set<AwardDTO> awards;
+    Set<AwardDTO> getAwards();
 }
 
 @Projection(from = Book.class)
-public class BookSummaryDTO {
-    private Long id;
-    private String title;
-    private Integer year;
+public interface BookSummaryDTO {
+    Long getId();
+    String getTitle();
+    Integer getYear();
 }
 ```
 

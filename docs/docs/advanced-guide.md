@@ -28,19 +28,17 @@ public class Order {
 
 @Projection(from = Order.class)
 @Exposure(value = "orders", basePath = "/api")
-public class OrderDTO {
+public interface OrderDTO {
 
     @Projected(from = "id")
-    private Long id;
+    Long getId();
 
     @Projected(from = "orderNumber")  // Maps orderNumber → number
     @ExposedAs(value = "ORDER_NUMBER", operators = {Op.EQ, Op.MATCHES})
-    private String number;
+    String getNumber();
 
     @Projected(from = "items")  // Maps items → orderItems
-    private List<OrderItemDTO> orderItems;
-
-    // Getters...
+    List<OrderItemDTO> getOrderItems();
 }
 ```
 
@@ -56,37 +54,31 @@ For fields that don't exist in the entity but are calculated from other properti
 ```java
 @Projection(from = User.class, providers = @Provider(UserUtils.class))
 @Exposure(value = "users", basePath = "/api")
-public class UserDTO {
+public interface UserDTO {
 
     @Projected(from = "id")
-    private Long id;
+    Long getId();
 
     @Projected(from = "name")
-    private String name;
+    String getName();
 
     @Projected(from = "orders")
-    private List<OrderDTO> orders;
+    List<OrderDTO> getOrders();
 
     /**
      * Field calculated from id and name.
      * The calculation method is in UserUtils.
      */
     @Computed(dependsOn = {"id", "name"})
-    private String keyIdentifier;
+    String getKeyIdentifier();
 
     /**
      * Complex calculated field returning an object.
      */
     @Computed(dependsOn = {"id"})
-    private UserHistory lastHistory;
+    UserHistory getLastHistory();
 
-    // Getters...
-
-    public static class UserHistory {
-        private String year;
-        private String[] comments;
-        // ...
-    }
+    record UserHistory(String year, String[] comments) {}
 }
 ```
 
@@ -221,14 +213,14 @@ public class Employee {
 ```java
 @Projection(from = Company.class, providers = @Provider(CompanyUtils.class))
 @Exposure(value = "companies", basePath = "/api")
-public class CompanyDTO {
+public interface CompanyDTO {
     
     @Projected(from = "id")
-    private Long id;
+    Long getId();
     
     @Projected(from = "name")
     @ExposedAs(value = "NAME", operators = {Op.EQ, Op.MATCHES})
-    private String name;
+    String getName();
     
     /**
      * Total salary across all departments and employees.
@@ -238,7 +230,7 @@ public class CompanyDTO {
         dependsOn = {"departments.employees.salary"},
         reducers = {Reduce.SUM}
     )
-    private BigDecimal totalSalaries;
+    BigDecimal getTotalSalaries();
     
     /**
      * Total budget across all departments.
@@ -248,7 +240,7 @@ public class CompanyDTO {
         dependsOn = {"departments.budget"},
         reducers = {Reduce.SUM}
     )
-    private BigDecimal totalBudget;
+    BigDecimal getTotalBudget();
     
     /**
      * Number of employees across all departments.
@@ -258,9 +250,7 @@ public class CompanyDTO {
         dependsOn = {"departments.employees.id"},
         reducers = {Reduce.COUNT}
     )
-    private Long employeeCount;
-    
-    // Getters...
+    Long getEmployeeCount();
 }
 ```
 
@@ -297,7 +287,7 @@ You can mix scalar dependencies and collection dependencies. Only collection pat
     //          scalar   collection→SUM               collection→AVG
     reducers = {Reduce.SUM, Reduce.AVG}
 )
-private String summary;
+String getSummary();
 
 // Provider receives: (String name, BigDecimal salarySum, BigDecimal budgetAvg)
 public static String getSummary(String name, BigDecimal salarySum, BigDecimal budgetAvg) {
@@ -347,22 +337,22 @@ public class Address {
 ```java
 @Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api")
-public class UserDTO {
+public interface UserDTO {
 
     @ExposedAs(value = "NAME", operators = {Op.EQ, Op.MATCHES})
-    private String name;
+    String getName();
 
-    private AddressDTO address;  // Nested DTO
+    AddressDTO getAddress();  // Nested DTO
 }
 
 @Projection(from = Address.class)
-public class AddressDTO {
+public interface AddressDTO {
 
     @ExposedAs(value = "CITY", operators = {Op.EQ, Op.MATCHES, Op.IN})
-    private String city;
+    String getCity();
 
     @ExposedAs(value = "COUNTRY", operators = {Op.EQ, Op.IN})
-    private String country;
+    String getCountry();
 }
 ```
 
@@ -549,7 +539,7 @@ List<RowBuffer> result = executor.executeWith(em, new MultiQueryFetchStrategy(Us
 ```java
 @Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api/v2")
-public class UserDTO {
+public interface UserDTO {
     // ...
 }
 ```
@@ -563,18 +553,18 @@ To customize how a property is exposed:
 ```java
 @Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api")
-public class UserDTO {
+public interface UserDTO {
 
     @ExposedAs(value = "USERNAME", operators = {Op.EQ, Op.MATCHES})
-    private String name;
+    String getName();
     
     @ExposedAs(exposed = false)  // Not exposed to API (not filterable)
-    private String internalId;
+    String getInternalId();
     
     @ExposedAs(value = "EMAIL", operators = {Op.EQ, Op.MATCHES})
-    private String email;
+    String getEmail();
     
-    private Integer age;  // Without @ExposedAs = not filterable but returned in projection
+    Integer getAge();  // Without @ExposedAs = not filterable but returned in projection
 }
 ```
 
@@ -623,13 +613,13 @@ Static methods are ideal for **pure predicate logic** that doesn't require exter
 ```java
 @Projection(from = Person.class)
 @Exposure(value = "persons", basePath = "/api")
-public class PersonDTO {
+public interface PersonDTO {
 
     @ExposedAs(value = "FIRST_NAME", operators = {Op.EQ, Op.MATCHES})
-    private String firstName;
+    String getFirstName();
 
     @ExposedAs(value = "LAST_NAME", operators = {Op.EQ, Op.MATCHES})
-    private String lastName;
+    String getLastName();
 
     /**
      * Virtual field: searches in firstName OR lastName.
@@ -683,10 +673,10 @@ public class VirtualResolverConfig {
 
 // Register as provider in the DTO
 @Projection(
-    entity = Person.class,
+    from = Person.class,
     providers = @Provider(VirtualResolverConfig.class)
 )
-public class PersonDTO { /* ... */ }
+public interface PersonDTO { /* ... */ }
 ```
 
 **Usage:**
@@ -735,10 +725,10 @@ public class UserTenancyService {
 
 // Register as provider in the DTO
 @Projection(
-    entity = Person.class,
+    from = Person.class,
     providers = @Provider(UserTenancyService.class)
 )
-public class PersonDTO { /* ... */ }
+public interface PersonDTO { /* ... */ }
 ```
 
 **Usage:**
@@ -864,24 +854,23 @@ Virtual fields work seamlessly with regular fields in filter expressions:
 
 ### Provider Registration
 
-Virtual field methods can be defined in:
+Virtual field methods are resolved exclusively through `@Provider` definitions in the `@Projection` annotation. The provider classes can be:
 
-1. **The DTO class itself** (for tightly coupled logic)
-2. **Dedicated resolver classes** (for reusable logic)
-3. **Spring beans** (for context-aware logic)
+1. **Dedicated resolver classes** — contain `public static` methods (for stateless, reusable logic)
+2. **Spring beans** — contain instance methods resolved by the Spring IoC container (for context-aware logic requiring injected dependencies)
 
 Register them using `@Provider`:
 
 ```java
 @Projection(
-    entity = Person.class,
+    from = Person.class,
     providers = {
         @Provider(VirtualResolverConfig.class),  // Static methods
         @Provider(UserTenancyService.class)      // Spring bean (instance methods)
     }
 )
 @Exposure(value = "persons", basePath = "/api")
-public class PersonDTO {
+public interface PersonDTO {
     // ...
 }
 ```

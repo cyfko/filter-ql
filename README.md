@@ -19,10 +19,9 @@ FilterQL is organized into multiple modules, each with comprehensive documentati
 
 ### Core & Adapters
 
-- **[FilterQL Core](core/java/README.md)** - Core DSL parsing, validation, SPI contracts, operator registry, and caching system
-- **[FilterQL JPA Adapter](adapters/java/filterql-jpa/README.md)** - JPA Criteria API integration, DTO projection, custom predicates, and computed fields
-- **[FilterQL Spring Adapter](adapters/java/filterql-spring/README.md)** - Spring Boot integration, annotation processor, PropertyRef generation, REST controller scaffolding
-- **[FilterQL Spring Starter](adapters/java/filterql-spring-starter/README.md)** - Convenience dependency aggregator for Spring Boot projects
+- **[FilterQL Core](core/README.md)** - Core DSL parsing, validation, SPI contracts, operator registry, and caching system
+- **[FilterQL JPA Adapter](filterql-jpa/README.md)** - JPA Criteria API integration, DTO projection, custom predicates, and computed fields
+- **[FilterQL Spring Adapter](filterql-spring/README.md)** - Spring Boot integration, annotation processor, PropertyRef generation, REST controller scaffolding, and projection proxy system
 
 ### Testing & Examples
 
@@ -111,6 +110,7 @@ FilterQL follows a layered architecture with clear separation of concerns:
 - **FilterQlService:** High-level service for executing filter queries with automatic context resolution
 - **REST Controller Generation:** Auto-generates filter endpoints with search, count, and schema introspection
 - **Custom Result Mapping:** `PaginatedData<T>` wrapper with `ResultMapper` support for DTO transformation
+- **Projection Proxy System:** `searchAs` method returns dynamic JDK proxy implementations of projection interfaces, with automatic Jackson serialization support
 - **Virtual Fields:** Supports computed fields via annotation-driven provider resolution
 - **Spring IoC Integration:** Automatic bean wiring for `FilterContext` and `InstanceResolver`
 
@@ -422,12 +422,11 @@ List<RowBuffer> products = executor.executeWith(em, new FullEntityFetchStrategy(
 ### Advanced: DTO Projection
 
 ```java
-// Define DTO
-public class ProductDto {
-    private Long id;
-    private String name;
-    private BigDecimal price;
-    // getters, setters
+// Define projection interface (no implementation class needed)
+public interface ProductDto {
+    Long getId();
+    String getName();
+    BigDecimal getPrice();
 }
 
 // Request with projection
@@ -485,6 +484,15 @@ var soundexFilter = new FilterDefinition<>(
 ### Spring Boot Integration
 
 ```java
+// Projection interface — no implementation class required
+public interface UserDto {
+    Long getId();
+    String getUsername();
+    String getEmail();
+}
+```
+
+```java
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
@@ -492,8 +500,17 @@ public class UserController {
     @Autowired
     private FilterQlService filterQlService;
     
+    // Option 1: searchAs — automatic proxy-based mapping (recommended for interfaces)
     @PostMapping("/search")
     public PaginatedData<UserDto> searchUsers(
+        @RequestBody FilterRequest<UserPropertyRef> request
+    ) {
+        return filterQlService.searchAs(UserDto.class, request);
+    }
+    
+    // Option 2: search with ResultMapper — custom mapping logic
+    @PostMapping("/search-custom")
+    public PaginatedData<UserDto> searchUsersCustom(
         @RequestBody FilterRequest<UserPropertyRef> request
     ) {
         return filterQlService.search(

@@ -8,39 +8,46 @@ import java.util.*;
 /**
  * Ultra-fast DSL to postfix converter with minimal validation.
  * <p>
- * This class focuses on <strong>speed over safety</strong>, performing only essential DoS protection:
+ * This class focuses on <strong>speed over safety</strong>, performing only
+ * essential DoS protection:
  * </p>
  * <ul>
- *   <li>Expression length size (prevents memory exhaustion)</li>
- *   <li>Basic parentheses balancing (prevents stack overflow)</li>
- *   <li>No identifier validation (deferred to simplification phase)</li>
- *   <li>No syntax transition validation (deferred to simplification phase)</li>
+ * <li>Expression length size (prevents memory exhaustion)</li>
+ * <li>Basic parentheses balancing (prevents stack overflow)</li>
+ * <li>No identifier validation (deferred to simplification phase)</li>
+ * <li>No syntax transition validation (deferred to simplification phase)</li>
  * </ul>
  *
- * <p><strong>Design philosophy:</strong></p>
+ * <p>
+ * <strong>Design philosophy:</strong>
+ * </p>
+ * 
  * <pre>
  * Phase 1 (this class): Fast postfix conversion + DoS protection only
  * Phase 2 (BooleanSimplifier): Simplification + full validation
  * </pre>
  *
- * <p><strong>Performance characteristics:</strong></p>
+ * <p>
+ * <strong>Performance characteristics:</strong>
+ * </p>
  * <ul>
- *   <li>Time: O(n) where n = expression length</li>
- *   <li>Space: O(n) for output list + O(log n) for operator stack (typically)</li>
- *   <li>No regex matching</li>
- *   <li>No object allocation except for output list</li>
- *   <li>Single pass tokenization + conversion</li>
+ * <li>Time: O(n) where n = expression length</li>
+ * <li>Space: O(n) for output list + O(log n) for operator stack
+ * (typically)</li>
+ * <li>No regex matching</li>
+ * <li>No object allocation except for output list</li>
+ * <li>Single pass tokenization + conversion</li>
  * </ul>
  *
  * <h2>Usage Example</h2>
+ * 
  * <pre>{@code
  * int maxLength = 1000;
  *
  * try {
  *     List<String> postfix = FastPostfixConverter.toPostfix(
- *         "(filter1 & filter2) | !filter3",
- *         maxLength
- *     );
+ *             "(filter1 & filter2) | !filter3",
+ *             maxLength);
  *     // Result: ["filter1", "filter2", "&", "filter3", "!", "|"]
  *
  *     // Pass to simplifier for validation + optimization
@@ -58,7 +65,8 @@ public final class FastPostfixConverter {
 
     private static final Map<String, Integer> PRECEDENCE = Map.of("!", 3, "&", 2, "|", 1);
 
-    private FastPostfixConverter() {}
+    private FastPostfixConverter() {
+    }
 
     public static List<String> toPostfix(String expression, DslPolicy dslPolicy) {
         if (expression == null || expression.isBlank()) {
@@ -71,8 +79,7 @@ public final class FastPostfixConverter {
         if (trimmed.length() > dslPolicy.maxExpressionLength()) {
             throw new DSLSyntaxException(String.format(
                     "Expression too long (%d characters, max: %d). Policy applied: %s",
-                    trimmed.length(), dslPolicy.maxExpressionLength(), dslPolicy.policyName()
-            ));
+                    trimmed.length(), dslPolicy.maxExpressionLength(), dslPolicy.policyName()));
         }
 
         char first = trimmed.charAt(0);
@@ -81,13 +88,19 @@ public final class FastPostfixConverter {
         if (first == '&' || first == '|' || last == '&' || last == '|' || last == '!') {
             throw new DSLSyntaxException(String.format(
                     "Malformed expression: %s",
-                    (first == '&' || first == '|') ? "starts with '" + first + "'" : "ends with '" + last + "'"
-            ));
+                    (first == '&' || first == '|') ? "starts with '" + first + "'" : "ends with '" + last + "'"));
         }
 
         return convertToPostfix(trimmed, dslPolicy);
     }
 
+    /**
+     * Converts an infix expression to postfix notation.
+     *
+     * @param expression the infix expression
+     * @param dslPolicy  the DSL policy
+     * @return the list of tokens in postfix order
+     */
     private static List<String> convertToPostfix(String expression, DslPolicy dslPolicy) {
 
         List<String> output = new ArrayList<>(expression.length());
@@ -172,8 +185,17 @@ public final class FastPostfixConverter {
         return output;
     }
 
+    /**
+     * Flushes the current token buffer to the output list.
+     *
+     * @param currentToken the buffer
+     * @param output       the output list
+     * @param multiplicity map to track token frequency
+     * @return 1 if token is repeated, 0 otherwise
+     */
     private static int flushToken(StringBuilder currentToken, List<String> output, Map<String, Boolean> multiplicity) {
-        if (currentToken.isEmpty()) return 0;
+        if (currentToken.isEmpty())
+            return 0;
         String token = currentToken.toString();
         output.add(token);
         currentToken.setLength(0);
@@ -183,25 +205,37 @@ public final class FastPostfixConverter {
         return repeated ? 1 : 0;
     }
 
+    /**
+     * Checks if a character is an operator or parenthesis.
+     */
     private static boolean isOperatorChar(char c) {
         return c == '&' || c == '|' || c == '!' || c == '(' || c == ')';
     }
 
+    /**
+     * Compares operator precedence.
+     */
     private static boolean isHigherOrEqualPrecedence(String stackOp, String token) {
-        if ("(".equals(stackOp)) return false;
+        if ("(".equals(stackOp))
+            return false;
         return PRECEDENCE.getOrDefault(stackOp, 0) >= PRECEDENCE.getOrDefault(token, 0);
     }
 
+    /**
+     * Optimizes expressions containing only one type of operator (e.g. A | B | C).
+     */
     private static List<String> optimizeHomogeneousOpsRecursive(String op, Map<String, Boolean> multiplicity) {
         List<String> uniqueTokens = new ArrayList<>(multiplicity.size());
         Set<String> seen = new HashSet<>(multiplicity.size());
 
         for (String token : multiplicity.keySet()) {
-            if (seen.add(token)) uniqueTokens.add(token);
+            if (seen.add(token))
+                uniqueTokens.add(token);
         }
 
         int opCount = uniqueTokens.size() - 1;
-        for (int i = 0; i < opCount; i++) uniqueTokens.add(op);
+        for (int i = 0; i < opCount; i++)
+            uniqueTokens.add(op);
 
         return uniqueTokens;
     }

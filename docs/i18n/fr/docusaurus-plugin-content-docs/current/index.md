@@ -95,21 +95,19 @@ Content-Type: application/json
 ```java
 @Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api")
-public class UserDTO {
+public interface UserDTO {
 
     @ExposedAs(value = "NAME", operators = {Op.EQ, Op.MATCHES})
-    private String name;
+    String getName();
 
     @ExposedAs(value = "EMAIL", operators = {Op.EQ, Op.MATCHES})
-    private String email;
+    String getEmail();
 
     @ExposedAs(value = "AGE", operators = {Op.EQ, Op.GT, Op.GTE, Op.LT, Op.LTE})
-    private Integer age;
+    Integer getAge();
 
     @ExposedAs(value = "STATUS", operators = {Op.EQ, Op.IN})
-    private String status;
-
-    // Getters...
+    String getStatus();
 }
 ```
 
@@ -157,15 +155,38 @@ public class UserDTO {
 ```xml
 <dependency>
     <groupId>io.github.cyfko</groupId>
-    <artifactId>filterql-spring-starter</artifactId>
-    <version>1.0.0</version>
+    <artifactId>filterql-spring</artifactId>
+    <version>4.0.0</version>
 </dependency>
+```
+
+Configurez le processeur d'annotations dans le plugin du compilateur :
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+                <annotationProcessorPaths>
+                    <path>
+                        <groupId>io.github.cyfko</groupId>
+                        <artifactId>filterql-spring-processor</artifactId>
+                        <version>4.0.0</version>
+                    </path>
+                </annotationProcessorPaths>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
 ```
 
 **Gradle** :
 
 ```kotlin
-implementation("io.github.cyfko:filterql-spring-starter:1.0.0")
+implementation("io.github.cyfko:filterql-spring:4.0.0")
+annotationProcessor("io.github.cyfko:filterql-spring-processor:4.0.0")
 ```
 
 C'est tout ce qu'il faut pour commencer. [→ Passons au Hello World](./hello-world)

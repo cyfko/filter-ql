@@ -246,26 +246,24 @@ With Spring Boot, use annotations directly on your DTO:
 ```java
 @Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api")
-public class UserDTO {
+public interface UserDTO {
 
-    private Long id;
+    Long getId();
 
     @ExposedAs(value = "NAME", operators = {Op.EQ, Op.NE, Op.MATCHES, Op.IN})
-    private String name;
+    String getName();
 
     @ExposedAs(value = "EMAIL", operators = {Op.EQ, Op.NE, Op.MATCHES})
-    private String email;
+    String getEmail();
 
     @ExposedAs(value = "AGE", operators = {Op.EQ, Op.GT, Op.GTE, Op.LT, Op.LTE, Op.RANGE})
-    private Integer age;
+    Integer getAge();
 
     @ExposedAs(value = "STATUS", operators = {Op.EQ, Op.NE, Op.IN})
-    private String status;
+    String getStatus();
 
     @ExposedAs(value = "CREATED_AT", operators = {Op.GT, Op.GTE, Op.LT, Op.LTE, Op.RANGE})
-    private LocalDateTime createdAt;
-
-    // Getters...
+    LocalDateTime getCreatedAt();
 }
 ```
 

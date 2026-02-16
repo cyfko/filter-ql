@@ -11,27 +11,40 @@ Documentation de référence complète pour le module `filterql-spring` (version
 ## Coordonnées Maven
 
 ```xml
-<!-- Option 1 : Starter (recommandé) -->
-<dependency>
-    <groupId>io.github.cyfko</groupId>
-    <artifactId>filterql-spring-starter</artifactId>
-    <version>1.0.0</version>
-</dependency>
 
-<!-- Option 2 : Module seul -->
+<!-- Dépendance -->
 <dependency>
     <groupId>io.github.cyfko</groupId>
     <artifactId>filterql-spring</artifactId>
     <version>4.0.0</version>
 </dependency>
+```
 
-<!-- Dépendance externe requise -->
-<dependency>
-    <groupId>io.github.cyfko</groupId>
-    <artifactId>projection-metamodel-processor</artifactId>
-    <version>1.0.0</version>
-    <scope>provided</scope>
-</dependency>
+Configurez les processeurs d'annotations dans le plugin du compilateur :
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+                <annotationProcessorPaths>
+                    <path>
+                        <groupId>io.github.cyfko</groupId>
+                        <artifactId>filterql-spring-processor</artifactId>
+                        <version>1.0.0</version>
+                    </path>
+                    <path>
+                        <groupId>io.github.cyfko</groupId>
+                        <artifactId>jpa-metamodel-processor</artifactId>
+                        <version>1.0.4</version>
+                    </path>
+                </annotationProcessorPaths>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
 ```
 
 ---
@@ -103,10 +116,10 @@ import io.github.cyfko.filterql.spring.Exposure;
 
 @Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api/v1")
-public class UserDTO {
-    private Long id;
-    private String username;
-    private String email;
+public interface UserDTO {
+    Long getId();
+    String getUsername();
+    String getEmail();
 }
 ```
 
@@ -119,12 +132,12 @@ Pour appliquer des annotations (sécurité, cache, etc.) aux endpoints généré
 ```java
 @Projection(from = User.class)
 @Exposure(value = "users")
-public class UserDTO {
+public interface UserDTO {
     
     // Méthode template pour les annotations
     @PreAuthorize("hasRole('ADMIN')")
     @Cacheable("userCache")
-    private static void exposureEndpoint() {}
+    static void exposureEndpoint() {}
 }
 ```
 
@@ -153,7 +166,7 @@ public class SecurityTemplates {
         method = "adminEndpoint"
     )
 )
-public class UserDTO { }
+public interface UserDTO { }
 ```
 
 ---
@@ -191,18 +204,18 @@ public @interface ExposedAs {
 ```java
 @Projection(from = User.class)
 @Exposure(value = "users")
-public class UserDTO {
+public interface UserDTO {
     
-    private Long id;
+    Long getId();
     
     @ExposedAs(value = "USERNAME", operators = {Op.EQ, Op.MATCHES, Op.IN})
-    private String username;
+    String getUsername();
     
     @ExposedAs(value = "USER_EMAIL", operators = {Op.EQ, Op.MATCHES})
-    private String email;
+    String getEmail();
     
     @ExposedAs(exposed = false)  // Exclure du filtrage
-    private String internalField;
+    String getInternalField();
 }
 ```
 
@@ -666,31 +679,31 @@ import org.springframework.security.access.prepost.PreAuthorize;
 
 @Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api/v1")
-public class UserDTO {
+public interface UserDTO {
     
-    private Long id;
+    Long getId();
     
     @ExposedAs(value = "USERNAME", operators = {Op.EQ, Op.MATCHES, Op.IN})
-    private String username;
+    String getUsername();
     
     @Projected(from = "email")
     @ExposedAs(value = "EMAIL", operators = {Op.EQ, Op.MATCHES})
-    private String userEmail;
+    String getUserEmail();
     
     @Projected(from = "address.city.name")
     @ExposedAs(value = "CITY", operators = {Op.EQ, Op.IN})
-    private String cityName;
+    String getCityName();
     
     @Computed(provider = AgeCalculator.class, method = "calculateAge")
     @ExposedAs(exposed = false)  // Non filtrable
-    private Integer age;
+    Integer getAge();
     
     @Projected(from = "orders")
-    private List<OrderSummaryDTO> orders;
+    List<OrderSummaryDTO> getOrders();
     
     // Template d'annotations pour l'endpoint généré
     @PreAuthorize("hasRole('USER')")
-    private static void exposureEndpoint() {}
+    static void exposureEndpoint() {}
 }
 ```
 

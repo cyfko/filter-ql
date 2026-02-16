@@ -184,7 +184,7 @@ public class Book {
 ### Définition de DTO avec @Projection
 
 :::note Dépendance Externe
-L'annotation `@Projection` provient de [projection-spec](https://github.com/cyfko/projection-spec), implémentée par [projection-metamodel-processor](https://github.com/cyfko/jpa-metamodel-processor).
+L'annotation `@Projection` provient de [projection-spec](https://github.com/cyfko/projection-spec), implémentée par [jpa-metamodel-processor](https://github.com/cyfko/jpa-metamodel-processor).
 :::
 
 ```java

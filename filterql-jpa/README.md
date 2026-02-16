@@ -223,12 +223,10 @@ specification implemented by the dependency [jpa-metamodel-processor](https://gi
 import io.github.cyfko.projection.Projection;  // External dependency
 
 @Projection(from = User.class)
-public class UserDTO {
-    private Long id;
-    private String username;
-    private String email;
-    
-    // Getters/setters...
+public interface UserDTO {
+    Long getId();
+    String getUsername();
+    String getEmail();
 }
 ```
 
@@ -304,23 +302,23 @@ import io.github.cyfko.projection.Projection;
 import io.github.cyfko.projection.Projected;
 
 @Projection(from = Author.class)
-public class AuthorDTO {
-    private Long id;
-    private String name;
+public interface AuthorDTO {
+    Long getId();
+    String getName();
     
     // Collection projection with nested DTO
     @Projected(from = "books")
-    private List<BookSummaryDTO> books;
+    List<BookSummaryDTO> getBooks();
     
     @Projected(from = "awards")
-    private Set<AwardDTO> awards;
+    Set<AwardDTO> getAwards();
 }
 
 @Projection(from = Book.class)
-public class BookSummaryDTO {
-    private Long id;
-    private String title;
-    private Integer year;
+public interface BookSummaryDTO {
+    Long getId();
+    String getTitle();
+    Integer getYear();
 }
 ```
 
@@ -543,10 +541,9 @@ public enum AuthorPropertyRef implements PropertyReference {
 ## Next Steps
 
 **FilterQL Modules:**
-- **[Core Module](../../core/java/README.md)**: Framework-agnostic filtering infrastructure
+- **[Core Module](../core/README.md)**: Framework-agnostic filtering infrastructure
 - **[Spring Integration](../filterql-spring/README.md)**: Spring Boot integration with annotation processor
-- **[Spring Starter](../filterql-spring-starter/README.md)**: Dependency aggregator for Spring Boot projects
-- **[Main README](../../../README.md)**: Project overview
+- **[Main README](../README.md)**: Project overview
 
 **External Dependencies (for DTO projections):**
 - [Projection Specification](https://github.com/cyfko/projection-spec) - Annotation specification

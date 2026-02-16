@@ -16,14 +16,28 @@ Complete reference documentation for the `filterql-adapter-jpa` module (version 
     <artifactId>filterql-adapter-jpa</artifactId>
     <version>2.0.0</version>
 </dependency>
+```
 
-<!-- Required external dependency -->
-<dependency>
-    <groupId>io.github.cyfko</groupId>
-    <artifactId>projection-metamodel-processor</artifactId>
-    <version>1.0.0</version>
-    <scope>provided</scope>
-</dependency>
+Configure the annotation processor in the compiler plugin:
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+                <annotationProcessorPaths>
+                    <path>
+                        <groupId>io.github.cyfko</groupId>
+                        <artifactId>jpa-metamodel-processor</artifactId>
+                        <version>1.0.4</version>
+                    </path>
+                </annotationProcessorPaths>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
 ```
 
 ---
@@ -508,9 +522,9 @@ Defines a DTO class with mapping to a JPA entity.
 import io.github.cyfko.projection.Projection;
 
 @Projection(from = User.class)
-public class UserDTO {
-    private Long id;
-    private String username;
+public interface UserDTO {
+    Long getId();
+    String getUsername();
     // ...
 }
 ```
@@ -523,13 +537,13 @@ Customizes the mapping of a DTO field.
 import io.github.cyfko.projection.Projected;
 
 @Projection(from = User.class)
-public class UserDTO {
+public interface UserDTO {
     
     @Projected(from = "firstName")  // Explicit mapping
-    private String name;
+    String getName();
     
     @Projected(from = "address.city.name")  // Nested path
-    private String cityName;
+    String getCityName();
 }
 ```
 
@@ -541,10 +555,10 @@ Defines a dynamically computed field.
 import io.github.cyfko.projection.Computed;
 
 @Projection(from = User.class)
-public class UserDTO {
+public interface UserDTO {
     
     @Computed(provider = AgeCalculator.class, method = "calculateAge")
-    private Integer age;
+    Integer getAge();
 }
 ```
 
