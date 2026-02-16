@@ -103,6 +103,13 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Jackson (for projection proxy serialization) -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

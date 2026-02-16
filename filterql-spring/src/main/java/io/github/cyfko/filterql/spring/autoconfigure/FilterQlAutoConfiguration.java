@@ -1,6 +1,7 @@
 package io.github.cyfko.filterql.spring.autoconfigure;
 
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
+import io.github.cyfko.filterql.spring.projection.ProjectionJacksonModule;
 import io.github.cyfko.filterql.spring.support.FilterContextRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -21,6 +22,12 @@ public class FilterQlAutoConfiguration {
     @ConditionalOnMissingBean
     public FilterContextRegistry filterContextRegistry(List<JpaFilterContext<?>> contexts) {
         return new FilterContextRegistry(contexts);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(ProjectionJacksonModule.class)
+    public com.fasterxml.jackson.databind.Module filterQlProjectionJacksonModule() {
+        return new ProjectionJacksonModule();
     }
 
 }

@@ -53,7 +53,7 @@ public @interface Exposure {
      *   <li>CUSTOM: User-defined signature</li>
      * </ul>
      */
-    Strategy strategy() default Strategy.PROJECTED;
+    Strategy strategy() default Strategy.PAGINATED;
 
     /**
      * Pipeline of filter transformations applied before the handler execution.
@@ -382,14 +382,6 @@ public @interface Exposure {
      * </p>
      */
     public enum Strategy {
-
-        /**
-         * Returns {@code PaginatedData<Map<String,Object>>} with pagination metadata.
-         * <p>
-         * Handler signature: {@code PaginatedData<T> method(FilterRequest filter)}
-         * </p>
-         */
-        PROJECTED,
 
         /**
          * Returns {@code PaginatedData<T>} with pagination metadata. {@code T} is the class

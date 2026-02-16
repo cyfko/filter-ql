@@ -11,6 +11,7 @@ import io.github.cyfko.filterql.jpa.strategies.helper.RowBuffer;
 import io.github.cyfko.filterql.spring.pagination.ResultMapper;
 import io.github.cyfko.filterql.spring.pagination.PaginatedData;
 import io.github.cyfko.filterql.spring.pagination.PaginationInfo;
+import io.github.cyfko.filterql.spring.projection.ProjectionProxyFactory;
 import io.github.cyfko.filterql.spring.service.FilterQlService;
 import io.github.cyfko.filterql.spring.support.FilterContextRegistry;
 import jakarta.persistence.EntityManager;
@@ -27,15 +28,15 @@ public class FilterQlServiceImpl implements FilterQlService {
 
     private final FilterContextRegistry contextRegistry;
     private final InstanceResolver instanceResolver;
-    
+
     public FilterQlServiceImpl(FilterContextRegistry contextRegistry, InstanceResolver instanceResolver) {
         this.contextRegistry = contextRegistry;
         this.instanceResolver = instanceResolver;
     }
 
     @Override
-    public <P extends Enum<P> & PropertyReference>
-    PaginatedData<Map<String,Object>> search(Class<P> refClass, FilterRequest<P> filterRequest) {
+    public <P extends Enum<P> & PropertyReference> PaginatedData<Map<String, Object>> search(Class<P> refClass,
+            FilterRequest<P> filterRequest) {
         // 0. Determiner la classe de projection utilisée.
         Class<?> projectionClass = toProjectionClass(refClass);
 
@@ -58,27 +59,36 @@ public class FilterQlServiceImpl implements FilterQlService {
     }
 
     @Override
-    public <R, P extends Enum<P> & PropertyReference>
-    PaginatedData<R> search(Class<R> projectionClass, FilterRequest<P> filterRequest, ResultMapper<R> resultMapper) {
+    public <R, P extends Enum<P> & PropertyReference> PaginatedData<R> search(Class<R> projectionClass,
+            FilterRequest<P> filterRequest, ResultMapper<R> resultMapper) {
         PaginatedData<Map<String, Object>> paginatedData = search(toEnumClass(projectionClass), filterRequest);
         return paginatedData.map(resultMapper::map);
     }
 
-    private static <P extends Enum<P> & PropertyReference> Class<?> toProjectionClass(Class<P> refClass){
+    @Override
+    public <T, P extends Enum<P> & PropertyReference> PaginatedData<T> searchAs(Class<T> projectionInterface,
+            FilterRequest<P> filterRequest) {
+        PaginatedData<Map<String, Object>> raw = search(toEnumClass(projectionInterface), filterRequest);
+        return raw.map(map -> ProjectionProxyFactory.create(projectionInterface, map));
+    }
+
+    private static <P extends Enum<P> & PropertyReference> Class<?> toProjectionClass(Class<P> refClass) {
         String fqcn = refClass.getCanonicalName();
         try {
             return Class.forName(fqcn.substring(0, fqcn.lastIndexOf('_')));
         } catch (ClassNotFoundException e) {
-            throw new IllegalArgumentException("Expected reference class has to be a Filter QL generated enum class: " + fqcn, e);
+            throw new IllegalArgumentException(
+                    "Expected reference class has to be a Filter QL generated enum class: " + fqcn, e);
         }
     }
 
-    private static <P extends Enum<P> & PropertyReference> Class<P> toEnumClass(Class<?> projectionClass){
+    private static <P extends Enum<P> & PropertyReference> Class<P> toEnumClass(Class<?> projectionClass) {
         try {
-            //noinspection unchecked
-            return (Class<P>) Class.forName(projectionClass.getCanonicalName() +  "_");
+            // noinspection unchecked
+            return (Class<P>) Class.forName(projectionClass.getCanonicalName() + "_");
         } catch (ClassNotFoundException | ClassCastException e) {
-            throw new IllegalArgumentException("Expected a projection class. found: " + projectionClass.getCanonicalName(), e);
+            throw new IllegalArgumentException(
+                    "Expected a projection class. found: " + projectionClass.getCanonicalName(), e);
         }
     }
 }
