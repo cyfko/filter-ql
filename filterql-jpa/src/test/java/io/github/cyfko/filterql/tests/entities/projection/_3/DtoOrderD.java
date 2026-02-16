@@ -6,38 +6,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Projection(from = OrderD.class)
-public class DtoOrderD {
+public interface DtoOrderD {
 
     @Projected(from = "id")
-    private Long id;
+    Long getId();
 
     @Projected(from = "orderNumber")
-    private String number;
+    String getNumber();
 
     @Projected(from = "items")
-    private List<DtoOrderItemD> orderItems = new ArrayList<>();
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getNumber() {
-        return number;
-    }
-
-    public void setNumber(String number) {
-        this.number = number;
-    }
-
-    public List<DtoOrderItemD> getOrderItems() {
-        return orderItems;
-    }
-
-    public void setOrderItems(List<DtoOrderItemD> orderItems) {
-        this.orderItems = orderItems;
-    }
+    List<DtoOrderItemD> getOrderItems();
 }

@@ -21,7 +21,7 @@ public class CompanyComputedProvider {
      *                      results)
      * @return summary string
      */
-    public static String getEmployeeSummary(Long id, String name, Long employeeCount) {
+    public static String toEmployeeSummary(Long id, String name, Long employeeCount) {
         long count = employeeCount != null ? employeeCount : 0L;
         return String.format("%d-%s[%d employees]", id, name, count);
     }
@@ -34,7 +34,7 @@ public class CompanyComputedProvider {
      * @param totalBudget aggregated SUM of departments.budget (may be null)
      * @return formatted budget string
      */
-    public static String getTotalBudgetInfo(Long id, Long totalBudget) {
+    public static String toTotalBudgetInfo(Long id, Long totalBudget) {
         long budget = totalBudget != null ? totalBudget : 0L;
         return String.format("Company#%d: budget=%d", id, budget);
     }

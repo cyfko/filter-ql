@@ -5,36 +5,24 @@ import io.github.cyfko.projection.*;
 import java.util.List;
 
 @Projection(from = UserD.class, providers = @Provider(OldApiUtils.class))
-public class DtoUserD {
+public interface DtoUserD {
 
     @Projected(from = "id")
-    private Long id;
+    Long getId();
 
     @Projected(from = "name")
-    private String name;
+    String getName();
 
     @Projected(from = "orders")
-    private List<DtoOrderD> orders;
+    List<DtoOrderD> getOrders();
 
     @Computed(dependsOn = {"id", "name"})
-    private String keyIdentifier; // Old API identifier
+    String getKeyIdentifier(); // Old API identifier
 
     @Computed(dependsOn = {"id"})
-    private History lastHistory;
+    History getLastHistory();
 
-    public List<DtoOrderD> getOrders() {
-        return orders;
-    }
-
-    public void setOrders(List<DtoOrderD> orders) {
-        this.orders = orders;
-    }
-
-    public String getKeyIdentifier() {
-        return keyIdentifier;
-    }
-
-    public static class History {
+    class History {
         private String year;
         private String[] comments;
 

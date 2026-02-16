@@ -7,50 +7,18 @@ import java.util.List;
  * DTO for Department - Level 1.
  */
 @Projection(from = Department.class)
-public class DepartmentDto {
+public interface DepartmentDto {
 
     @Projected(from = "id")
-    private Long id;
+    Long getId();
 
     @Projected(from = "name")
-    private String name;
+    String getName();
 
     @Projected(from = "budget")
-    private int budget;
+    int getBudget();
 
     // Level 2 nested collection
     @Projected(from = "teams")
-    private List<TeamDto> teams;
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public int getBudget() {
-        return budget;
-    }
-
-    public void setBudget(int budget) {
-        this.budget = budget;
-    }
-
-    public List<TeamDto> getTeams() {
-        return teams;
-    }
-
-    public void setTeams(List<TeamDto> teams) {
-        this.teams = teams;
-    }
+    List<TeamDto> getTeams();
 }

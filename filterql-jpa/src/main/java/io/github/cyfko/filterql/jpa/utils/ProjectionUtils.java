@@ -240,7 +240,7 @@ public abstract class ProjectionUtils {
         ComputedField.MethodReference methodReference = computedField.get().methodReference();
         String methodName = methodReference != null && methodReference.methodName() != null ?
                 methodReference.methodName() :
-                "get" + capitalize(computedField.get().dtoField());
+                "to" + capitalize(computedField.get().dtoField());
 
         if (methodReference != null && methodReference.targetClass() != null) {
             Class<?> methodRefClass = methodReference.targetClass();
