@@ -1,6 +1,9 @@
 package io.github.cyfko.filterql.spring.projection;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 
 /**
  * Jackson module registering the {@link ProjectionProxySerializer} for

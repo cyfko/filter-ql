@@ -2,7 +2,9 @@ package io.github.cyfko.filterql.spring.projection;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 
 import java.io.IOException;
 import java.util.Map;
