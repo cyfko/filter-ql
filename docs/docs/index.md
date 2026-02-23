@@ -178,7 +178,7 @@ Configure the annotation processor in the compiler plugin:
                     <path>
                         <groupId>io.github.cyfko</groupId>
                         <artifactId>filterql-spring-processor</artifactId>
-                        <version>4.0.0</version>
+                        <version>1.0.0</version>
                     </path>
                 </annotationProcessorPaths>
             </configuration>
@@ -191,7 +191,7 @@ Configure the annotation processor in the compiler plugin:
 
 ```kotlin
 implementation("io.github.cyfko:filterql-spring:4.0.0")
-annotationProcessor("io.github.cyfko:filterql-spring-processor:4.0.0")
+annotationProcessor("io.github.cyfko:filterql-spring-processor:1.0.0")
 ```
 
 That's all you need to get started. [→ Let's go to Hello World](./hello-world)

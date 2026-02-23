@@ -79,14 +79,16 @@ Content-Type: application/json
 
 ```json
 {
-  "content": [
+  "data": [
     { "name": "John Doe", "email": "john.doe@example.com" },
     { "name": "Johnny Smith", "email": "johnny@example.com" }
   ],
-  "page": 0,
-  "size": 20,
-  "totalElements": 2,
-  "totalPages": 1
+  "pagination": {
+    "currentPage": 0,
+    "pageSize": 20,
+    "totalElements": 2,
+    "totalPages": 1
+  }
 }
 ```
 
@@ -173,7 +175,7 @@ Configurez le processeur d'annotations dans le plugin du compilateur :
                     <path>
                         <groupId>io.github.cyfko</groupId>
                         <artifactId>filterql-spring-processor</artifactId>
-                        <version>4.0.0</version>
+                        <version>1.0.0</version>
                     </path>
                 </annotationProcessorPaths>
             </configuration>
@@ -186,7 +188,7 @@ Configurez le processeur d'annotations dans le plugin du compilateur :
 
 ```kotlin
 implementation("io.github.cyfko:filterql-spring:4.0.0")
-annotationProcessor("io.github.cyfko:filterql-spring-processor:4.0.0")
+annotationProcessor("io.github.cyfko:filterql-spring-processor:1.0.0")
 ```
 
 C'est tout ce qu'il faut pour commencer. [→ Passons au Hello World](./hello-world)
