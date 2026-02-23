@@ -58,7 +58,7 @@ Ajoutez FilterQL à votre projet Spring Boot.
                     <path>
                         <groupId>io.github.cyfko</groupId>
                         <artifactId>filterql-spring-processor</artifactId>
-                        <version>4.0.0</version>
+                        <version>1.0.0</version>
                     </path>
                 </annotationProcessorPaths>
             </configuration>
@@ -72,7 +72,7 @@ Ajoutez FilterQL à votre projet Spring Boot.
 ```kotlin
 dependencies {
     implementation("io.github.cyfko:filterql-spring:4.0.0")
-    annotationProcessor("io.github.cyfko:filterql-spring-processor:4.0.0")
+    annotationProcessor("io.github.cyfko:filterql-spring-processor:1.0.0")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-web")
 }
