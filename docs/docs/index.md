@@ -22,6 +22,7 @@ public class User {
 ```
 
 Your client (web app, mobile) wants to:
+
 - Search users whose name contains "john"
 - Filter those who are over 25 years old
 - Only retrieve `name` and `email` (not the whole object)
@@ -30,6 +31,7 @@ Your client (web app, mobile) wants to:
 ### What You Do Today
 
 **Option 1: Multiple endpoints**
+
 ```java
 @GetMapping("/users/by-name/{name}")
 @GetMapping("/users/by-age-greater-than/{age}")
@@ -38,6 +40,7 @@ Your client (web app, mobile) wants to:
 ```
 
 **Option 2: Query string parameters**
+
 ```java
 @GetMapping("/users")
 public List<User> search(
@@ -79,14 +82,16 @@ Content-Type: application/json
 
 ```json
 {
-  "content": [
+  "data": [
     { "name": "John Doe", "email": "john.doe@example.com" },
     { "name": "Johnny Smith", "email": "johnny@example.com" }
   ],
-  "page": 0,
-  "size": 20,
-  "totalElements": 2,
-  "totalPages": 1
+  "pagination": {
+    "currentPage": 0,
+    "pageSize": 20,
+    "totalElements": 2,
+    "totalPages": 1
+  }
 }
 ```
 
@@ -139,12 +144,12 @@ public interface UserDTO {
 
 ## Ready?
 
-| Your Goal | Start Here |
-|-----------|------------|
-| See a complete working example | [→ Hello World](./hello-world) |
-| Understand the basics quickly | [→ Essential Guide](./essential-guide) |
-| Advanced cases and customization | [→ Advanced Guide](./advanced-guide) |
-| Complete technical documentation | [→ API Reference](./reference/core) |
+| Your Goal                        | Start Here                             |
+| -------------------------------- | -------------------------------------- |
+| See a complete working example   | [→ Hello World](./hello-world)         |
+| Understand the basics quickly    | [→ Essential Guide](./essential-guide) |
+| Advanced cases and customization | [→ Advanced Guide](./advanced-guide)   |
+| Complete technical documentation | [→ API Reference](./reference/core)    |
 
 ---
 

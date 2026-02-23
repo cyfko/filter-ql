@@ -14,41 +14,41 @@ An operator defines **how** to compare a property to a value.
 
 ### Comparison Operators
 
-| Operator | Meaning | JSON Example | SQL Equivalent |
-|----------|---------|--------------|----------------|
-| `EQ` | Equal to | `{"ref": "STATUS", "op": "EQ", "value": "active"}` | `status = 'active'` |
-| `NE` | Not equal to | `{"ref": "STATUS", "op": "NE", "value": "deleted"}` | `status != 'deleted'` |
-| `GT` | Greater than | `{"ref": "AGE", "op": "GT", "value": 18}` | `age > 18` |
-| `GTE` | Greater or equal | `{"ref": "AGE", "op": "GTE", "value": 18}` | `age >= 18` |
-| `LT` | Less than | `{"ref": "PRICE", "op": "LT", "value": 100}` | `price < 100` |
-| `LTE` | Less or equal | `{"ref": "PRICE", "op": "LTE", "value": 100}` | `price <= 100` |
+| Operator | Meaning          | JSON Example                                        | SQL Equivalent        |
+| -------- | ---------------- | --------------------------------------------------- | --------------------- |
+| `EQ`     | Equal to         | `{"ref": "STATUS", "op": "EQ", "value": "active"}`  | `status = 'active'`   |
+| `NE`     | Not equal to     | `{"ref": "STATUS", "op": "NE", "value": "deleted"}` | `status != 'deleted'` |
+| `GT`     | Greater than     | `{"ref": "AGE", "op": "GT", "value": 18}`           | `age > 18`            |
+| `GTE`    | Greater or equal | `{"ref": "AGE", "op": "GTE", "value": 18}`          | `age >= 18`           |
+| `LT`     | Less than        | `{"ref": "PRICE", "op": "LT", "value": 100}`        | `price < 100`         |
+| `LTE`    | Less or equal    | `{"ref": "PRICE", "op": "LTE", "value": 100}`       | `price <= 100`        |
 
 ### Pattern Operators
 
-| Operator | Meaning | JSON Example | SQL Equivalent |
-|----------|---------|--------------|----------------|
-| `MATCHES` | Contains (case-insensitive) | `{"ref": "NAME", "op": "MATCHES", "value": "john"}` | `LOWER(name) LIKE '%john%'` |
-| `NOT_MATCHES` | Does not contain | `{"ref": "NAME", "op": "NOT_MATCHES", "value": "test"}` | `LOWER(name) NOT LIKE '%test%'` |
+| Operator      | Meaning                     | JSON Example                                            | SQL Equivalent                  |
+| ------------- | --------------------------- | ------------------------------------------------------- | ------------------------------- |
+| `MATCHES`     | Contains (case-insensitive) | `{"ref": "NAME", "op": "MATCHES", "value": "john"}`     | `LOWER(name) LIKE '%john%'`     |
+| `NOT_MATCHES` | Does not contain            | `{"ref": "NAME", "op": "NOT_MATCHES", "value": "test"}` | `LOWER(name) NOT LIKE '%test%'` |
 
 ### List Operators
 
-| Operator | Meaning | JSON Example | SQL Equivalent |
-|----------|---------|--------------|----------------|
-| `IN` | In the list | `{"ref": "STATUS", "op": "IN", "value": ["active", "pending"]}` | `status IN ('active', 'pending')` |
-| `NOT_IN` | Not in the list | `{"ref": "STATUS", "op": "NOT_IN", "value": ["deleted"]}` | `status NOT IN ('deleted')` |
+| Operator | Meaning         | JSON Example                                                    | SQL Equivalent                    |
+| -------- | --------------- | --------------------------------------------------------------- | --------------------------------- |
+| `IN`     | In the list     | `{"ref": "STATUS", "op": "IN", "value": ["active", "pending"]}` | `status IN ('active', 'pending')` |
+| `NOT_IN` | Not in the list | `{"ref": "STATUS", "op": "NOT_IN", "value": ["deleted"]}`       | `status NOT IN ('deleted')`       |
 
 ### Range Operators
 
-| Operator | Meaning | JSON Example | SQL Equivalent |
-|----------|---------|--------------|----------------|
-| `RANGE` | Between min and max (inclusive) | `{"ref": "AGE", "op": "RANGE", "value": [18, 65]}` | `age BETWEEN 18 AND 65` |
-| `NOT_RANGE` | Outside the range | `{"ref": "AGE", "op": "NOT_RANGE", "value": [18, 65]}` | `age NOT BETWEEN 18 AND 65` |
+| Operator    | Meaning                         | JSON Example                                           | SQL Equivalent              |
+| ----------- | ------------------------------- | ------------------------------------------------------ | --------------------------- |
+| `RANGE`     | Between min and max (inclusive) | `{"ref": "AGE", "op": "RANGE", "value": [18, 65]}`     | `age BETWEEN 18 AND 65`     |
+| `NOT_RANGE` | Outside the range               | `{"ref": "AGE", "op": "NOT_RANGE", "value": [18, 65]}` | `age NOT BETWEEN 18 AND 65` |
 
 ### Nullity Operators
 
-| Operator | Meaning | JSON Example | SQL Equivalent |
-|----------|---------|--------------|----------------|
-| `IS_NULL` | Is null | `{"ref": "EMAIL", "op": "IS_NULL", "value": null}` | `email IS NULL` |
+| Operator   | Meaning     | JSON Example                                        | SQL Equivalent      |
+| ---------- | ----------- | --------------------------------------------------- | ------------------- |
+| `IS_NULL`  | Is null     | `{"ref": "EMAIL", "op": "IS_NULL", "value": null}`  | `email IS NULL`     |
 | `NOT_NULL` | Is not null | `{"ref": "EMAIL", "op": "NOT_NULL", "value": null}` | `email IS NOT NULL` |
 
 ---
@@ -59,16 +59,17 @@ The `combineWith` field contains a boolean expression that combines your filters
 
 ### Boolean Operators
 
-| Symbol | Meaning | Priority |
-|--------|---------|----------|
-| `!` | NOT (negation) | Highest |
-| `&` | AND | Medium |
-| `\|` | OR | Lowest |
-| `( )` | Grouping | Overrides priority |
+| Symbol | Meaning        | Priority           |
+| ------ | -------------- | ------------------ |
+| `!`    | NOT (negation) | Highest            |
+| `&`    | AND            | Medium             |
+| `\|`   | OR             | Lowest             |
+| `( )`  | Grouping       | Overrides priority |
 
 ### Progressive Examples
 
 **Single filter:**
+
 ```json
 {
   "filters": {
@@ -79,6 +80,7 @@ The `combineWith` field contains a boolean expression that combines your filters
 ```
 
 **Two filters with AND:**
+
 ```json
 {
   "filters": {
@@ -88,9 +90,11 @@ The `combineWith` field contains a boolean expression that combines your filters
   "combineWith": "isActive & isAdult"
 }
 ```
-*Result: active AND adult users*
+
+_Result: active AND adult users_
 
 **With OR:**
+
 ```json
 {
   "filters": {
@@ -100,9 +104,11 @@ The `combineWith` field contains a boolean expression that combines your filters
   "combineWith": "isActive | isPending"
 }
 ```
-*Result: active OR pending users*
+
+_Result: active OR pending users_
 
 **With negation:**
+
 ```json
 {
   "filters": {
@@ -111,9 +117,11 @@ The `combineWith` field contains a boolean expression that combines your filters
   "combineWith": "!isDeleted"
 }
 ```
-*Result: NOT deleted users*
+
+_Result: NOT deleted users_
 
 **Complex expression:**
+
 ```json
 {
   "filters": {
@@ -125,11 +133,13 @@ The `combineWith` field contains a boolean expression that combines your filters
   "combineWith": "hasEmail & isAdult & (isVip | isAdmin)"
 }
 ```
-*Result: has email AND is adult AND (is VIP OR admin)*
+
+_Result: has email AND is adult AND (is VIP OR admin)_
 
 ### Practical Shortcuts
 
 To combine **all** filters:
+
 - `"AND"`: Combine all with AND
 - `"OR"`: Combine all with OR
 
@@ -143,7 +153,8 @@ To combine **all** filters:
   "combineWith": "AND"
 }
 ```
-*Equivalent to: `"f1 & f2 & f3"`*
+
+_Equivalent to: `"f1 & f2 & f3"`_
 
 ---
 
@@ -162,12 +173,19 @@ Choose exactly which fields to return. Less data = faster response.
 ```
 
 **Response:**
+
 ```json
 {
-  "content": [
+  "data": [
     { "name": "John", "email": "john@example.com", "age": 30 },
     { "name": "Jane", "email": "jane@example.com", "age": 25 }
-  ]
+  ],
+  "pagination": {
+    "currentPage": 0,
+    "pageSize": 10,
+    "totalElements": 2,
+    "totalPages": 1
+  }
 }
 ```
 
@@ -182,6 +200,7 @@ To access properties of related objects:
 ```
 
 **Compact syntax (equivalent):**
+
 ```json
 {
   "projection": ["name", "address.city,country"]
@@ -215,21 +234,23 @@ Control the amount of results and navigate through pages.
 }
 ```
 
-| Field | Description | Default |
-|-------|-------------|---------|
-| `page` | Page number (starts at 0) | 0 |
-| `size` | Number of elements per page | 10 |
-| `sort` | Sorting criteria | - |
+| Field  | Description                 | Default |
+| ------ | --------------------------- | ------- |
+| `page` | Page number (starts at 0)   | 0       |
+| `size` | Number of elements per page | 10      |
+| `sort` | Sorting criteria            | -       |
 
 ### Paginated Response
 
 ```json
 {
-  "content": [ ... ],
-  "page": 0,
-  "size": 20,
-  "totalElements": 156,
-  "totalPages": 8
+  "data": [ ... ],
+  "pagination": {
+    "currentPage": 0,
+    "pageSize": 20,
+    "totalElements": 156,
+    "totalPages": 8
+  }
 }
 ```
 
@@ -268,11 +289,13 @@ public interface UserDTO {
 ```
 
 **What this does:**
+
 - `@Projection(from = User.class)`: Links this DTO to the `User` JPA entity
 - `@Exposure(value = "users", basePath = "/api")`: Generates `POST /api/users/search`
 - `@ExposedAs(value = "NAME", operators = {...})`: Declares this field as filterable
 
 **What is auto-generated at compile time:**
+
 - The `UserDTO_ implements PropertyReference` enum (DTO name + underscore `_`)
 - The REST controller with the `/api/users/search` endpoint
 - All validation logic, DSL parsing, and JPA mapping
@@ -321,11 +344,11 @@ This approach then requires manually creating the endpoint and using `FilterQuer
 
 By default, FilterQL converts the enum name to a JPA property name:
 
-| Enum | JPA Property |
-|------|--------------|
-| `NAME` | `name` |
-| `EMAIL` | `email` |
-| `CREATED_AT` | `createdAt` |
+| Enum          | JPA Property |
+| ------------- | ------------ |
+| `NAME`        | `name`       |
+| `EMAIL`       | `email`      |
+| `CREATED_AT`  | `createdAt`  |
 | `USER_STATUS` | `userStatus` |
 
 The conversion follows the rule: `SCREAMING_SNAKE_CASE` → `camelCase`.
@@ -355,6 +378,7 @@ Here's a request using all features:
 ```
 
 **What this does:**
+
 1. Searches for users where (name contains "john" OR age is between 25 and 45)
 2. AND who have status "active" or "vip"
 3. AND who have a non-null email
@@ -367,9 +391,9 @@ Here's a request using all features:
 
 You now know 80% of FilterQL. For advanced cases:
 
-| Need | Guide |
-|------|-------|
-| Filter on relations (e.g., `user.address.city`) | [→ Advanced Guide](./advanced-guide#relations) |
-| Create custom operators | [→ Advanced Guide](./advanced-guide#custom-operators) |
-| Advanced JPA mapping | [→ Advanced Guide](./advanced-guide#jpa-mapping) |
-| Collections with inline pagination | [→ Advanced Guide](./advanced-guide#collections) |
+| Need                                            | Guide                                                 |
+| ----------------------------------------------- | ----------------------------------------------------- |
+| Filter on relations (e.g., `user.address.city`) | [→ Advanced Guide](./advanced-guide#relations)        |
+| Create custom operators                         | [→ Advanced Guide](./advanced-guide#custom-operators) |
+| Advanced JPA mapping                            | [→ Advanced Guide](./advanced-guide#jpa-mapping)      |
+| Collections with inline pagination              | [→ Advanced Guide](./advanced-guide#collections)      |

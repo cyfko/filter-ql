@@ -14,41 +14,41 @@ Un opérateur définit **comment** comparer une propriété à une valeur.
 
 ### Opérateurs de Comparaison
 
-| Opérateur | Signification | Exemple JSON | Équivalent SQL |
-|-----------|---------------|--------------|----------------|
-| `EQ` | Égal à | `{"ref": "STATUS", "op": "EQ", "value": "active"}` | `status = 'active'` |
-| `NE` | Différent de | `{"ref": "STATUS", "op": "NE", "value": "deleted"}` | `status != 'deleted'` |
-| `GT` | Supérieur à | `{"ref": "AGE", "op": "GT", "value": 18}` | `age > 18` |
-| `GTE` | Supérieur ou égal | `{"ref": "AGE", "op": "GTE", "value": 18}` | `age >= 18` |
-| `LT` | Inférieur à | `{"ref": "PRICE", "op": "LT", "value": 100}` | `price < 100` |
-| `LTE` | Inférieur ou égal | `{"ref": "PRICE", "op": "LTE", "value": 100}` | `price <= 100` |
+| Opérateur | Signification     | Exemple JSON                                        | Équivalent SQL        |
+| --------- | ----------------- | --------------------------------------------------- | --------------------- |
+| `EQ`      | Égal à            | `{"ref": "STATUS", "op": "EQ", "value": "active"}`  | `status = 'active'`   |
+| `NE`      | Différent de      | `{"ref": "STATUS", "op": "NE", "value": "deleted"}` | `status != 'deleted'` |
+| `GT`      | Supérieur à       | `{"ref": "AGE", "op": "GT", "value": 18}`           | `age > 18`            |
+| `GTE`     | Supérieur ou égal | `{"ref": "AGE", "op": "GTE", "value": 18}`          | `age >= 18`           |
+| `LT`      | Inférieur à       | `{"ref": "PRICE", "op": "LT", "value": 100}`        | `price < 100`         |
+| `LTE`     | Inférieur ou égal | `{"ref": "PRICE", "op": "LTE", "value": 100}`       | `price <= 100`        |
 
 ### Opérateurs de Pattern
 
-| Opérateur | Signification | Exemple JSON | Équivalent SQL |
-|-----------|---------------|--------------|----------------|
-| `MATCHES` | Contient (insensible à la casse) | `{"ref": "NAME", "op": "MATCHES", "value": "john"}` | `LOWER(name) LIKE '%john%'` |
-| `NOT_MATCHES` | Ne contient pas | `{"ref": "NAME", "op": "NOT_MATCHES", "value": "test"}` | `LOWER(name) NOT LIKE '%test%'` |
+| Opérateur     | Signification                    | Exemple JSON                                            | Équivalent SQL                  |
+| ------------- | -------------------------------- | ------------------------------------------------------- | ------------------------------- |
+| `MATCHES`     | Contient (insensible à la casse) | `{"ref": "NAME", "op": "MATCHES", "value": "john"}`     | `LOWER(name) LIKE '%john%'`     |
+| `NOT_MATCHES` | Ne contient pas                  | `{"ref": "NAME", "op": "NOT_MATCHES", "value": "test"}` | `LOWER(name) NOT LIKE '%test%'` |
 
 ### Opérateurs de Liste
 
-| Opérateur | Signification | Exemple JSON | Équivalent SQL |
-|-----------|---------------|--------------|----------------|
-| `IN` | Dans la liste | `{"ref": "STATUS", "op": "IN", "value": ["active", "pending"]}` | `status IN ('active', 'pending')` |
-| `NOT_IN` | Pas dans la liste | `{"ref": "STATUS", "op": "NOT_IN", "value": ["deleted"]}` | `status NOT IN ('deleted')` |
+| Opérateur | Signification     | Exemple JSON                                                    | Équivalent SQL                    |
+| --------- | ----------------- | --------------------------------------------------------------- | --------------------------------- |
+| `IN`      | Dans la liste     | `{"ref": "STATUS", "op": "IN", "value": ["active", "pending"]}` | `status IN ('active', 'pending')` |
+| `NOT_IN`  | Pas dans la liste | `{"ref": "STATUS", "op": "NOT_IN", "value": ["deleted"]}`       | `status NOT IN ('deleted')`       |
 
 ### Opérateurs de Plage
 
-| Opérateur | Signification | Exemple JSON | Équivalent SQL |
-|-----------|---------------|--------------|----------------|
-| `RANGE` | Entre min et max (inclusif) | `{"ref": "AGE", "op": "RANGE", "value": [18, 65]}` | `age BETWEEN 18 AND 65` |
-| `NOT_RANGE` | Hors de la plage | `{"ref": "AGE", "op": "NOT_RANGE", "value": [18, 65]}` | `age NOT BETWEEN 18 AND 65` |
+| Opérateur   | Signification               | Exemple JSON                                           | Équivalent SQL              |
+| ----------- | --------------------------- | ------------------------------------------------------ | --------------------------- |
+| `RANGE`     | Entre min et max (inclusif) | `{"ref": "AGE", "op": "RANGE", "value": [18, 65]}`     | `age BETWEEN 18 AND 65`     |
+| `NOT_RANGE` | Hors de la plage            | `{"ref": "AGE", "op": "NOT_RANGE", "value": [18, 65]}` | `age NOT BETWEEN 18 AND 65` |
 
 ### Opérateurs de Nullité
 
-| Opérateur | Signification | Exemple JSON | Équivalent SQL |
-|-----------|---------------|--------------|----------------|
-| `IS_NULL` | Est null | `{"ref": "EMAIL", "op": "IS_NULL", "value": null}` | `email IS NULL` |
+| Opérateur  | Signification  | Exemple JSON                                        | Équivalent SQL      |
+| ---------- | -------------- | --------------------------------------------------- | ------------------- |
+| `IS_NULL`  | Est null       | `{"ref": "EMAIL", "op": "IS_NULL", "value": null}`  | `email IS NULL`     |
 | `NOT_NULL` | N'est pas null | `{"ref": "EMAIL", "op": "NOT_NULL", "value": null}` | `email IS NOT NULL` |
 
 ---
@@ -59,16 +59,17 @@ Le champ `combineWith` contient une expression booléenne qui combine vos filtre
 
 ### Opérateurs Booléens
 
-| Symbole | Signification | Priorité |
-|---------|---------------|----------|
-| `!` | NON (négation) | Plus haute |
-| `&` | ET | Moyenne |
-| `\|` | OU | Plus basse |
-| `( )` | Groupement | Override la priorité |
+| Symbole | Signification  | Priorité             |
+| ------- | -------------- | -------------------- |
+| `!`     | NON (négation) | Plus haute           |
+| `&`     | ET             | Moyenne              |
+| `\|`    | OU             | Plus basse           |
+| `( )`   | Groupement     | Override la priorité |
 
 ### Exemples Progressifs
 
 **Un seul filtre :**
+
 ```json
 {
   "filters": {
@@ -79,6 +80,7 @@ Le champ `combineWith` contient une expression booléenne qui combine vos filtre
 ```
 
 **Deux filtres avec ET :**
+
 ```json
 {
   "filters": {
@@ -88,9 +90,11 @@ Le champ `combineWith` contient une expression booléenne qui combine vos filtre
   "combineWith": "isActive & isAdult"
 }
 ```
-*Résultat : utilisateurs actifs ET adultes*
+
+_Résultat : utilisateurs actifs ET adultes_
 
 **Avec OU :**
+
 ```json
 {
   "filters": {
@@ -100,9 +104,11 @@ Le champ `combineWith` contient une expression booléenne qui combine vos filtre
   "combineWith": "isActive | isPending"
 }
 ```
-*Résultat : utilisateurs actifs OU en attente*
+
+_Résultat : utilisateurs actifs OU en attente_
 
 **Avec négation :**
+
 ```json
 {
   "filters": {
@@ -111,9 +117,11 @@ Le champ `combineWith` contient une expression booléenne qui combine vos filtre
   "combineWith": "!isDeleted"
 }
 ```
-*Résultat : utilisateurs NON supprimés*
+
+_Résultat : utilisateurs NON supprimés_
 
 **Expression complexe :**
+
 ```json
 {
   "filters": {
@@ -125,11 +133,13 @@ Le champ `combineWith` contient une expression booléenne qui combine vos filtre
   "combineWith": "hasEmail & isAdult & (isVip | isAdmin)"
 }
 ```
-*Résultat : a un email ET est adulte ET (est VIP OU admin)*
+
+_Résultat : a un email ET est adulte ET (est VIP OU admin)_
 
 ### Raccourcis Pratiques
 
 Pour combiner **tous** les filtres :
+
 - `"AND"` : Combine tout avec ET
 - `"OR"` : Combine tout avec OU
 
@@ -143,7 +153,8 @@ Pour combiner **tous** les filtres :
   "combineWith": "AND"
 }
 ```
-*Équivalent à : `"f1 & f2 & f3"`*
+
+_Équivalent à : `"f1 & f2 & f3"`_
 
 ---
 
@@ -162,12 +173,19 @@ Choisir exactement quels champs retourner. Moins de données = réponse plus rap
 ```
 
 **Réponse :**
+
 ```json
 {
-  "content": [
+  "data": [
     { "name": "John", "email": "john@example.com", "age": 30 },
     { "name": "Jane", "email": "jane@example.com", "age": 25 }
-  ]
+  ],
+  "pagination": {
+    "currentPage": 0,
+    "pageSize": 10,
+    "totalElements": 2,
+    "totalPages": 1
+  }
 }
 ```
 
@@ -182,6 +200,7 @@ Pour accéder aux propriétés d'objets liés :
 ```
 
 **Syntaxe compacte (équivalent) :**
+
 ```json
 {
   "projection": ["name", "address.city,country"]
@@ -215,21 +234,23 @@ Contrôler la quantité de résultats et naviguer dans les pages.
 }
 ```
 
-| Champ | Description | Défaut |
-|-------|-------------|--------|
-| `page` | Numéro de page (commence à 0) | 0 |
-| `size` | Nombre d'éléments par page | 10 |
-| `sort` | Critères de tri | - |
+| Champ  | Description                   | Défaut |
+| ------ | ----------------------------- | ------ |
+| `page` | Numéro de page (commence à 0) | 0      |
+| `size` | Nombre d'éléments par page    | 10     |
+| `sort` | Critères de tri               | -      |
 
 ### Réponse Paginée
 
 ```json
 {
-  "content": [ ... ],
-  "page": 0,
-  "size": 20,
-  "totalElements": 156,
-  "totalPages": 8
+  "data": [ ... ],
+  "pagination": {
+    "currentPage": 0,
+    "pageSize": 20,
+    "totalElements": 156,
+    "totalPages": 8
+  }
 }
 ```
 
@@ -270,11 +291,13 @@ public class UserDTO {
 ```
 
 **Ce que cela fait :**
+
 - `@Projection(from = User.class)` : Lie ce DTO à l'entité JPA `User`
 - `@Exposure(value = "users", basePath = "/api")` : Génère `POST /api/users/search`
 - `@ExposedAs(value = "NAME", operators = {...})` : Déclare ce champ comme filtrable
 
 **Ce qui est généré automatiquement à la compilation :**
+
 - L'enum `UserDTO_ implements PropertyReference` (nom du DTO + underscore `_`)
 - Le controller REST avec l'endpoint `/api/users/search`
 - Toute la logique de validation, parsing DSL et mapping JPA
@@ -323,12 +346,12 @@ Cette approche nécessite ensuite de créer manuellement l'endpoint et d'utilise
 
 Par défaut, FilterQL convertit le nom de l'enum en nom de propriété JPA :
 
-| Enum | Propriété JPA |
-|------|---------------|
-| `NAME` | `name` |
-| `EMAIL` | `email` |
-| `CREATED_AT` | `createdAt` |
-| `USER_STATUS` | `userStatus` |
+| Enum          | Propriété JPA |
+| ------------- | ------------- |
+| `NAME`        | `name`        |
+| `EMAIL`       | `email`       |
+| `CREATED_AT`  | `createdAt`   |
+| `USER_STATUS` | `userStatus`  |
 
 La conversion suit la règle : `SCREAMING_SNAKE_CASE` → `camelCase`.
 
@@ -357,6 +380,7 @@ Voici une requête utilisant toutes les fonctionnalités :
 ```
 
 **Ce que ça fait :**
+
 1. Cherche les utilisateurs dont (le nom contient "john" OU l'âge est entre 25 et 45)
 2. ET qui ont un statut "active" ou "vip"
 3. ET qui ont un email non-null
@@ -369,9 +393,9 @@ Voici une requête utilisant toutes les fonctionnalités :
 
 Vous connaissez maintenant 80% de FilterQL. Pour les cas avancés :
 
-| Besoin | Guide |
-|--------|-------|
-| Filtrer sur des relations (ex: `user.address.city`) | [→ Guide Avancé](./advanced-guide#relations) |
-| Créer des opérateurs personnalisés | [→ Guide Avancé](./advanced-guide#custom-operators) |
-| Mapping JPA avancé | [→ Guide Avancé](./advanced-guide#jpa-mapping) |
-| Collections avec pagination inline | [→ Guide Avancé](./advanced-guide#collections) |
+| Besoin                                              | Guide                                               |
+| --------------------------------------------------- | --------------------------------------------------- |
+| Filtrer sur des relations (ex: `user.address.city`) | [→ Guide Avancé](./advanced-guide#relations)        |
+| Créer des opérateurs personnalisés                  | [→ Guide Avancé](./advanced-guide#custom-operators) |
+| Mapping JPA avancé                                  | [→ Guide Avancé](./advanced-guide#jpa-mapping)      |
+| Collections avec pagination inline                  | [→ Guide Avancé](./advanced-guide#collections)      |

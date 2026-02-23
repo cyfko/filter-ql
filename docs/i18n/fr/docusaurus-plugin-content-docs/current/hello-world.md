@@ -11,6 +11,7 @@ De zéro à une API de recherche fonctionnelle en 5 minutes.
 ## Ce Que Nous Allons Construire
 
 Une API REST qui permet de chercher des utilisateurs avec :
+
 - Filtrage dynamique (par nom, email, âge...)
 - Combinaison de critères (AND, OR, NOT)
 - Projection (choisir les champs retournés)
@@ -34,7 +35,7 @@ Ajoutez FilterQL à votre projet Spring Boot.
         <artifactId>filterql-spring</artifactId>
         <version>4.0.0</version>
     </dependency>
-    
+
     <!-- Vos dépendances Spring existantes -->
     <dependency>
         <groupId>org.springframework.boot</groupId>
@@ -91,19 +92,19 @@ import jakarta.persistence.*;
 @Entity
 @Table(name = "users")
 public class User {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     private String name;
-    
+
     private String email;
-    
+
     private Integer age;
-    
+
     private String status;
-    
+
     // Getters et setters...
 }
 ```
@@ -113,6 +114,7 @@ public class User {
 ## Étape 3 : Créer le DTO avec Exposition
 
 C'est **LA** partie FilterQL. Vous déclarez un DTO qui définit :
+
 - Quels champs sont retournés
 - Quels champs sont filtrables et avec quels opérateurs
 
@@ -146,16 +148,19 @@ public interface UserDTO {
 ```
 
 **Ce que cela signifie :**
+
 - `@Projection(from = User.class)` : Ce DTO représente l'entité `User`
 - `@Exposure(value = "users", basePath = "/api")` : Génère `POST /api/users/search`
 - `@ExposedAs(value = "NAME", operators = {...})` : Ce champ est filtrable avec ces opérateurs
 
 :::tip Mapping Personnalisé
-Si le nom du champ DTO diffère de l'entité, utilisez `@Projected` :
+Si le nom du champ DTO diffère du nom implicite de l'entité, utilisez `@Projected(from = "nomDuChamp")`. **Ceci est strictement requis** pour le `@Projection` au niveau de la classe si la convention de nommage ne correspond pas :
+
 ```java
 @Projected(from = "orderNumber")  // Entité: orderNumber → DTO: number
-private String number;
+String getNumber();
 ```
+
 Voir le [Guide Avancé](./advanced-guide#projections) pour plus de détails.
 :::
 
@@ -228,14 +233,16 @@ curl -X POST http://localhost:8080/api/users/search \
 
 ```json
 {
-  "content": [
+  "data": [
     { "name": "Alice Martin", "email": "alice@example.com" },
     { "name": "Bob Wilson", "email": "bob@example.com" }
   ],
-  "page": 0,
-  "size": 10,
-  "totalElements": 42,
-  "totalPages": 5
+  "pagination": {
+    "currentPage": 0,
+    "pageSize": 10,
+    "totalElements": 42,
+    "totalPages": 5
+  }
 }
 ```
 
@@ -243,26 +250,27 @@ curl -X POST http://localhost:8080/api/users/search \
 
 ## Récapitulatif
 
-| Ce que vous avez fait | Temps |
-|-----------------------|-------|
-| Ajouté une dépendance Maven | 30 sec |
-| Créé un DTO annoté (~20 lignes) | 2 min |
-| Lancé l'application | 30 sec |
+| Ce que vous avez fait           | Temps  |
+| ------------------------------- | ------ |
+| Ajouté une dépendance Maven     | 30 sec |
+| Créé un DTO annoté (~20 lignes) | 2 min  |
+| Lancé l'application             | 30 sec |
 
 **Ce qui est généré automatiquement à la compilation :**
+
 - L'enum `UserDTO_ implements PropertyReference` (nom du DTO + underscore `_`)
 - Le controller REST avec l'endpoint `/api/users/search`
 - La logique de validation des opérateurs
 - Le mapping JPA
 
-| Ce que vous avez obtenu |
-|-------------------------|
-| Endpoint de recherche REST |
+| Ce que vous avez obtenu             |
+| ----------------------------------- |
+| Endpoint de recherche REST          |
 | Filtrage dynamique sur 4 propriétés |
-| 7 opérateurs différents |
-| Combinaison booléenne arbitraire |
-| Projection des champs |
-| Pagination intégrée |
+| 7 opérateurs différents             |
+| Combinaison booléenne arbitraire    |
+| Projection des champs               |
+| Pagination intégrée                 |
 
 ---
 
@@ -270,8 +278,8 @@ curl -X POST http://localhost:8080/api/users/search \
 
 Vous maîtrisez maintenant le flux de base. Pour aller plus loin :
 
-| Objectif | Guide |
-|----------|-------|
+| Objectif                                                      | Guide                                  |
+| ------------------------------------------------------------- | -------------------------------------- |
 | Comprendre tous les opérateurs, la syntaxe DSL, la projection | [→ Guide Essentiel](./essential-guide) |
-| Relations, opérateurs custom, mapping JPA avancé | [→ Guide Avancé](./advanced-guide) |
-| Référence technique complète | [→ API Reference](./reference/core) |
+| Relations, opérateurs custom, mapping JPA avancé              | [→ Guide Avancé](./advanced-guide)     |
+| Référence technique complète                                  | [→ API Reference](./reference/core)    |

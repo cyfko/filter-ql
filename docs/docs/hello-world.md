@@ -11,6 +11,7 @@ From zero to a working search API in 5 minutes.
 ## What We're Building
 
 A REST API that lets you search users with:
+
 - Dynamic filtering (by name, email, age...)
 - Criteria combination (AND, OR, NOT)
 - Projection (choose which fields to return)
@@ -34,7 +35,7 @@ Add FilterQL to your Spring Boot project.
         <artifactId>filterql-spring</artifactId>
         <version>4.0.0</version>
     </dependency>
-    
+
     <!-- Your existing Spring dependencies -->
     <dependency>
         <groupId>org.springframework.boot</groupId>
@@ -91,19 +92,19 @@ import jakarta.persistence.*;
 @Entity
 @Table(name = "users")
 public class User {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     private String name;
-    
+
     private String email;
-    
+
     private Integer age;
-    
+
     private String status;
-    
+
     // Getters and setters...
 }
 ```
@@ -113,6 +114,7 @@ public class User {
 ## Step 3: Create the DTO with Exposure
 
 This is **THE** FilterQL part. You declare a DTO that defines:
+
 - Which fields are returned
 - Which fields are filterable and with which operators
 
@@ -146,16 +148,19 @@ public interface UserDTO {
 ```
 
 **What this means:**
+
 - `@Projection(from = User.class)`: This DTO represents the `User` entity
 - `@Exposure(value = "users", basePath = "/api")`: Generates `POST /api/users/search`
 - `@ExposedAs(value = "NAME", operators = {...})`: This field is filterable with these operators
 
 :::tip Custom Mapping
-If the DTO field name differs from the entity, use `@Projected`:
+If the DTO field name differs from the entity's implicitly mapped name, use `@Projected(from = "fieldName")`. **This is strictly required** for the class-level `@Projection` if the naming convention doesn't match:
+
 ```java
 @Projected(from = "orderNumber")  // Entity: orderNumber → DTO: number
-private String number;
+String getNumber();
 ```
+
 See the [Advanced Guide](./advanced-guide#projections) for more details.
 :::
 
@@ -228,14 +233,16 @@ curl -X POST http://localhost:8080/api/users/search \
 
 ```json
 {
-  "content": [
+  "data": [
     { "name": "Alice Martin", "email": "alice@example.com" },
     { "name": "Bob Wilson", "email": "bob@example.com" }
   ],
-  "page": 0,
-  "size": 10,
-  "totalElements": 42,
-  "totalPages": 5
+  "pagination": {
+    "currentPage": 0,
+    "pageSize": 10,
+    "totalElements": 42,
+    "totalPages": 5
+  }
 }
 ```
 
@@ -243,26 +250,27 @@ curl -X POST http://localhost:8080/api/users/search \
 
 ## Summary
 
-| What you did | Time |
-|--------------|------|
-| Added a Maven dependency | 30 sec |
-| Created an annotated DTO (~20 lines) | 2 min |
-| Ran the application | 30 sec |
+| What you did                         | Time   |
+| ------------------------------------ | ------ |
+| Added a Maven dependency             | 30 sec |
+| Created an annotated DTO (~20 lines) | 2 min  |
+| Ran the application                  | 30 sec |
 
 **What is auto-generated at compile time:**
+
 - The `UserDTO_ implements PropertyReference` enum (DTO name + underscore `_`)
 - The REST controller with the `/api/users/search` endpoint
 - The operator validation logic
 - The JPA mapping
 
-| What you got |
-|--------------|
-| REST search endpoint |
+| What you got                      |
+| --------------------------------- |
+| REST search endpoint              |
 | Dynamic filtering on 4 properties |
-| 7 different operators |
-| Arbitrary boolean combination |
-| Field projection |
-| Built-in pagination |
+| 7 different operators             |
+| Arbitrary boolean combination     |
+| Field projection                  |
+| Built-in pagination               |
 
 ---
 
@@ -270,8 +278,8 @@ curl -X POST http://localhost:8080/api/users/search \
 
 You now master the basic flow. To go further:
 
-| Goal | Guide |
-|------|-------|
-| Understand all operators, DSL syntax, projection | [→ Essential Guide](./essential-guide) |
-| Relations, custom operators, advanced JPA mapping | [→ Advanced Guide](./advanced-guide) |
-| Complete technical reference | [→ API Reference](./reference/core) |
+| Goal                                              | Guide                                  |
+| ------------------------------------------------- | -------------------------------------- |
+| Understand all operators, DSL syntax, projection  | [→ Essential Guide](./essential-guide) |
+| Relations, custom operators, advanced JPA mapping | [→ Advanced Guide](./advanced-guide)   |
+| Complete technical reference                      | [→ API Reference](./reference/core)    |

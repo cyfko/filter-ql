@@ -552,7 +552,7 @@ public class Book {
 
 ```json
 {
-  "content": [
+  "data": [
     {
       "name": "Victor Hugo",
       "books": [
@@ -560,7 +560,13 @@ public class Book {
         { "title": "Notre-Dame de Paris", "year": 1831 }
       ]
     }
-  ]
+  ],
+  "pagination": {
+    "currentPage": 0,
+    "pageSize": 20,
+    "totalElements": 1,
+    "totalPages": 1
+  }
 }
 ```
 
