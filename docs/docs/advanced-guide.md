@@ -21,7 +21,7 @@ When the DTO field name differs from the entity property name:
 public class Order {
     @Id private Long id;
     private String orderNumber;  // Name in entity
-    
+
     @OneToMany(mappedBy = "order")
     private List<OrderItem> items;
 }
@@ -43,6 +43,7 @@ public interface OrderDTO {
 ```
 
 **Use cases:**
+
 - Rename properties for the API (`orderNumber` → `number`)
 - Map collections to different names
 - Access nested properties (`@Projected(from = "department.name")`)
@@ -86,19 +87,19 @@ public interface UserDTO {
 
 ```java
 public class UserUtils {
-    
+
     /**
      * Called automatically to calculate keyIdentifier.
-     * Method name follows convention: get + FieldName
+     * Method name follows convention: to + FieldName
      */
-    public static String getKeyIdentifier(Long id, String name) {
+    public static String toKeyIdentifier(Long id, String name) {
         return id + "-" + name;
     }
 
     /**
      * Called automatically to calculate lastHistory.
      */
-    public static UserDTO.UserHistory getLastHistory(Long id) {
+    public static UserDTO.UserHistory toLastHistory(Long id) {
         // Logic to retrieve history...
         return new UserDTO.UserHistory("2024", new String[]{"Created", "Updated"});
     }
@@ -106,10 +107,90 @@ public class UserUtils {
 ```
 
 **Important rules:**
+
 - `@Provider`: Declares the class containing calculation methods
 - `dependsOn`: Lists entity fields required for calculation
-- Method must be `public static` and named `get<FieldName>`
+- Method must be `public static` and named `to<FieldName>`
 - Parameters correspond to fields listed in `dependsOn`
+
+### Explicit Method Reference with `computedBy`
+
+Instead of relying on convention-based method resolution, you can explicitly specify which method to call using `computedBy` with `@Method`:
+
+```java
+@Computed(
+    dependsOn = {"firstName", "lastName"},
+    computedBy = @Method(value = "buildDisplayName")
+)
+String getFullName();
+
+// Or target a specific provider class:
+@Computed(
+    dependsOn = "amount",
+    computedBy = @Method(type = ModernCalculator.class, value = "calculate")
+)
+BigDecimal getTotal();
+```
+
+#### @Method Resolution Strategy
+
+The `@Method` annotation supports flexible method resolution:
+
+| `type`    | `value`   | Resolution                                                          |
+| --------- | --------- | ------------------------------------------------------------------- |
+| Not set   | Not set   | Convention-based: search for `to<FieldName>` in DTO + all providers |
+| Not set   | Specified | Search for the method name in DTO + all providers                   |
+| Specified | Not set   | Search for `to<FieldName>` in the specified class only              |
+| Specified | Specified | Exact match: use the specified method in the specified class        |
+
+### Two-Stage Computation with `then` {#then}
+
+The `then` attribute enables a **two-stage computation pipeline**: the primary computation (`computedBy`) feeds its result into a post-processing step (`then`).
+
+```java
+@Projection(from = Product.class, providers = {
+    @Provider(PriceCalculator.class),
+    @Provider(Formatters.class)
+})
+public interface ProductDTO {
+
+    @Computed(
+        dependsOn = {"basePrice", "taxRate"},
+        computedBy = @Method(value = "toCalculateTotal"),
+        then = @Method(value = "toCurrency")  // Post-processes the result
+    )
+    String getFormattedPrice();
+}
+
+public class PriceCalculator {
+    public static BigDecimal toCalculateTotal(BigDecimal base, BigDecimal tax) {
+        return base.multiply(BigDecimal.ONE.add(tax));
+    }
+}
+
+public class Formatters {
+    public static String toCurrency(BigDecimal amount) {
+        return NumberFormat.getCurrencyInstance().format(amount);
+    }
+}
+```
+
+**Pipeline flow:** `basePrice, taxRate` → `toCalculateTotal()` → `BigDecimal` → `toCurrency()` → `String`
+
+:::tip When to Use `then`
+Use `then` for common post-processing patterns:
+
+- **Type conversion**: `Instant` → `String`
+- **Formatting**: `BigDecimal` → `"€12.34"`
+- **Wrapping**: `String` → `Optional<String>`
+- **Normalization**: `String` → `String.trim().toUpperCase()`
+  :::
+
+**Rules for `then` methods:**
+
+- Must be `public static` (pure functions, no IoC)
+- Takes exactly one parameter (the output of `computedBy`)
+- The `then` method is searched in: DTO interface → all registered providers
 
 ### Collection Aggregations with Reducers {#reducers}
 
@@ -117,14 +198,14 @@ When a `@Computed` field depends on a path that traverses a collection, you **mu
 
 #### Available Reducers
 
-| Reducer | Constant | Description |
-|---------|----------|-------------|
-| `SUM` | `Reduce.SUM` | Sum of numeric values |
-| `AVG` | `Reduce.AVG` | Average of numeric values |
-| `COUNT` | `Reduce.COUNT` | Count of elements |
+| Reducer          | Constant                | Description                |
+| ---------------- | ----------------------- | -------------------------- |
+| `SUM`            | `Reduce.SUM`            | Sum of numeric values      |
+| `AVG`            | `Reduce.AVG`            | Average of numeric values  |
+| `COUNT`          | `Reduce.COUNT`          | Count of elements          |
 | `COUNT_DISTINCT` | `Reduce.COUNT_DISTINCT` | Count of distinct elements |
-| `MIN` | `Reduce.MIN` | Minimum value |
-| `MAX` | `Reduce.MAX` | Maximum value |
+| `MIN`            | `Reduce.MIN`            | Minimum value              |
+| `MAX`            | `Reduce.MAX`            | Maximum value              |
 
 #### Positional Correspondence Rule
 
@@ -150,11 +231,11 @@ When a `@Computed` field depends on a path that traverses a collection, you **mu
 
 A dotted path is **not** necessarily a collection traversal:
 
-| Path | Type | Reducer needed? |
-|------|------|-----------------|
-| `address.city` | Nested scalar (`@Embedded`, `@ManyToOne`) | No |
-| `orders.total` | Collection (`@OneToMany`) | **Yes** |
-| `departments.teams.employees.salary` | Multiple collections | **Yes** |
+| Path                                 | Type                                      | Reducer needed? |
+| ------------------------------------ | ----------------------------------------- | --------------- |
+| `address.city`                       | Nested scalar (`@Embedded`, `@ManyToOne`) | No              |
+| `orders.total`                       | Collection (`@OneToMany`)                 | **Yes**         |
+| `departments.teams.employees.salary` | Multiple collections                      | **Yes**         |
 
 #### Collection Path Rule
 
@@ -179,7 +260,7 @@ Consider a Company → Departments → Employees hierarchy:
 public class Company {
     @Id private Long id;
     private String name;
-    
+
     @OneToMany(mappedBy = "company")
     private List<Department> departments;
 }
@@ -189,10 +270,10 @@ public class Department {
     @Id private Long id;
     private String name;
     private BigDecimal budget;
-    
+
     @ManyToOne
     private Company company;
-    
+
     @OneToMany(mappedBy = "department")
     private List<Employee> employees;
 }
@@ -202,7 +283,7 @@ public class Employee {
     @Id private Long id;
     private String name;
     private BigDecimal salary;
-    
+
     @ManyToOne
     private Department department;
 }
@@ -214,14 +295,14 @@ public class Employee {
 @Projection(from = Company.class, providers = @Provider(CompanyUtils.class))
 @Exposure(value = "companies", basePath = "/api")
 public interface CompanyDTO {
-    
+
     @Projected(from = "id")
     Long getId();
-    
+
     @Projected(from = "name")
     @ExposedAs(value = "NAME", operators = {Op.EQ, Op.MATCHES})
     String getName();
-    
+
     /**
      * Total salary across all departments and employees.
      * Path traverses: departments (collection) → employees (collection) → salary
@@ -231,7 +312,7 @@ public interface CompanyDTO {
         reducers = {Reduce.SUM}
     )
     BigDecimal getTotalSalaries();
-    
+
     /**
      * Total budget across all departments.
      * Path traverses: departments (collection) → budget
@@ -241,7 +322,7 @@ public interface CompanyDTO {
         reducers = {Reduce.SUM}
     )
     BigDecimal getTotalBudget();
-    
+
     /**
      * Number of employees across all departments.
      * Use COUNT on any field (here: id) from the collection.
@@ -258,7 +339,7 @@ public interface CompanyDTO {
 
 ```java
 public class CompanyUtils {
-    
+
     /**
      * Receives the aggregated SUM of all employee salaries.
      * The reducer has already performed the aggregation.
@@ -266,11 +347,11 @@ public class CompanyUtils {
     public static BigDecimal getTotalSalaries(BigDecimal salarySum) {
         return salarySum != null ? salarySum : BigDecimal.ZERO;
     }
-    
+
     public static BigDecimal getTotalBudget(BigDecimal budgetSum) {
         return budgetSum != null ? budgetSum : BigDecimal.ZERO;
     }
-    
+
     public static Long getEmployeeCount(Long count) {
         return count != null ? count : 0L;
     }
@@ -291,7 +372,7 @@ String getSummary();
 
 // Provider receives: (String name, BigDecimal salarySum, BigDecimal budgetAvg)
 public static String getSummary(String name, BigDecimal salarySum, BigDecimal budgetAvg) {
-    return String.format("%s: $%.2f total salaries, $%.2f avg budget", 
+    return String.format("%s: $%.2f total salaries, $%.2f avg budget",
         name, salarySum, budgetAvg);
 }
 ```
@@ -319,7 +400,7 @@ FilterQL can filter on relation properties (one-to-one, many-to-one, etc.).
 public class User {
     @Id private Long id;
     private String name;
-    
+
     @ManyToOne
     private Address address;
 }
@@ -402,7 +483,7 @@ Filter collection elements and paginate the result directly in the projection.
 public class User {
     @Id private Long id;
     private String name;
-    
+
     @OneToMany(mappedBy = "author")
     private List<Book> books;
 }
@@ -412,7 +493,7 @@ public class Book {
     @Id private Long id;
     private String title;
     private Integer year;
-    
+
     @ManyToOne
     private User author;
 }
@@ -422,29 +503,28 @@ public class Book {
 
 ```json
 {
-  "projection": [
-    "name",
-    "books[size=5,sort=year:desc].title,year"
-  ]
+  "projection": ["name", "books[size=5,sort=year:desc].title,year"]
 }
 ```
 
 **Breakdown:**
+
 - `books`: Collection name
 - `[size=5,sort=year:desc]`: Collection options
 - `.title,year`: Fields to extract from each element
 
 ### Available Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `size=N` | Maximum number of elements | 10 |
-| `page=P` | Page (0-indexed) | 0 |
-| `sort=field:dir` | Sort (asc/desc) | - |
+| Option           | Description                | Default |
+| ---------------- | -------------------------- | ------- |
+| `size=N`         | Maximum number of elements | 10      |
+| `page=P`         | Page (0-indexed)           | 0       |
+| `sort=field:dir` | Sort (asc/desc)            | -       |
 
 ### Examples
 
 **Last 10 books, sorted by year descending:**
+
 ```json
 {
   "projection": ["name", "books[size=10,sort=year:desc].title,year"]
@@ -452,6 +532,7 @@ public class Book {
 ```
 
 **Multi-column sort:**
+
 ```json
 {
   "projection": ["name", "books[sort=year:desc,title:asc].title,year"]
@@ -459,6 +540,7 @@ public class Book {
 ```
 
 **Page 2 of books (elements 20-29):**
+
 ```json
 {
   "projection": ["name", "books[page=2,size=10].title"]
@@ -497,10 +579,10 @@ public JpaFilterContext<ProductProperty> productContext(EntityManager em) {
         (root, prop) -> switch (prop) {
             // Simple mapping
             case NAME -> root.get("name");
-            
+
             // Relation
             case CATEGORY_NAME -> root.get("category").get("name");
-            
+
             // Calculation (watch performance)
             case TOTAL_STOCK -> root.get("warehouse1Stock")
                                     .add(root.get("warehouse2Stock"));
@@ -517,11 +599,11 @@ For handling custom operators like SOUNDEX, GEO_WITHIN, etc., see [Custom Operat
 
 FilterQL JPA offers several execution strategies:
 
-| Strategy | Description | Usage |
-|----------|-------------|-------|
+| Strategy                  | Description                       | Usage                                 |
+| ------------------------- | --------------------------------- | ------------------------------------- |
 | `MultiQueryFetchStrategy` | Separate query for count and data | **Recommended** - Optimal performance |
-| `FullEntityFetchStrategy` | Loads full entities | When you need the entities |
-| `CountStrategy` | Count only, no data | Statistics |
+| `FullEntityFetchStrategy` | Loads full entities               | When you need the entities            |
+| `CountStrategy`           | Count only, no data               | Statistics                            |
 
 ```java
 // Explicit use of a strategy
@@ -557,13 +639,13 @@ public interface UserDTO {
 
     @ExposedAs(value = "USERNAME", operators = {Op.EQ, Op.MATCHES})
     String getName();
-    
+
     @ExposedAs(exposed = false)  // Not exposed to API (not filterable)
     String getInternalId();
-    
+
     @ExposedAs(value = "EMAIL", operators = {Op.EQ, Op.MATCHES})
     String getEmail();
-    
+
     Integer getAge();  // Without @ExposedAs = not filterable but returned in projection
 }
 ```
@@ -574,14 +656,14 @@ Virtual fields are one of FilterQL's most powerful features. They allow you to d
 
 ### Why Virtual Fields?
 
-| Use Case | Example |
-|----------|---------|
-| **Calculated properties** | Filter by `fullName` (combines firstName + lastName) |
-| **Semantic aliases** | `isActive` instead of complex status checks |
-| **Business logic encapsulation** | `hasAccess` with role/permission verification |
-| **Multi-field searches** | Search across multiple columns simultaneously |
-| **Aggregations** | `orderCount > 10` based on subqueries |
-| **Dynamic filtering** | `withinMyOrg` based on current user's context |
+| Use Case                         | Example                                              |
+| -------------------------------- | ---------------------------------------------------- |
+| **Calculated properties**        | Filter by `fullName` (combines firstName + lastName) |
+| **Semantic aliases**             | `isActive` instead of complex status checks          |
+| **Business logic encapsulation** | `hasAccess` with role/permission verification        |
+| **Multi-field searches**         | Search across multiple columns simultaneously        |
+| **Aggregations**                 | `orderCount > 10` based on subqueries                |
+| **Dynamic filtering**            | `withinMyOrg` based on current user's context        |
 
 ### Basic Syntax
 
@@ -598,6 +680,7 @@ public static PredicateResolver<Entity> methodName(String op, Object[] args) {
 ```
 
 **Method requirements:**
+
 - **Return type:** `PredicateResolver<E>` where `E` is the entity type
 - **Parameters:** `(String op, Object[] args)` — the operator and filter arguments
 - **Visibility:** `public static` (or instance method for Spring beans)
@@ -639,6 +722,7 @@ public interface PersonDTO {
 ```
 
 **Usage:**
+
 ```json
 {
   "filters": {
@@ -680,6 +764,7 @@ public interface PersonDTO { /* ... */ }
 ```
 
 **Usage:**
+
 ```json
 {
   "filters": {
@@ -711,7 +796,7 @@ public class UserTenancyService {
     public PredicateResolver<Person> withinCurrentOrg(String op, Object[] args) {
         // Access current user from security context
         String currentUserOrg = securityContext.getCurrentUser().getOrganization();
-        
+
         return (root, query, cb) -> {
             Boolean withinOrg = args.length > 0 ? (Boolean) args[0] : true;
             if (Boolean.TRUE.equals(withinOrg)) {
@@ -732,6 +817,7 @@ public interface PersonDTO { /* ... */ }
 ```
 
 **Usage:**
+
 ```json
 {
   "filters": {
@@ -756,7 +842,7 @@ public class AccessControlService {
     @ExposedAs(value = "HAS_ACCESS", operators = {Op.EQ})
     public PredicateResolver<Document> hasAccess(String op, Object[] args) {
         List<Long> accessibleIds = permissions.getAccessibleResourceIds();
-        
+
         return (root, query, cb) -> {
             Boolean hasAccess = args.length > 0 ? (Boolean) args[0] : true;
             if (Boolean.TRUE.equals(hasAccess)) {
@@ -786,9 +872,9 @@ public static PredicateResolver<Product> computedScore(String op, Object[] args)
             cb.prod(root.get("rating"), 10),
             root.get("reviewCount")
         );
-        
+
         Integer threshold = (Integer) args[0];
-        
+
         return switch (op) {
             case "EQ" -> cb.equal(score, threshold);
             case "GT" -> cb.gt(score, threshold);
@@ -812,9 +898,9 @@ public static PredicateResolver<Customer> orderCount(String op, Object[] args) {
         var orderRoot = subquery.from(Order.class);
         subquery.select(cb.count(orderRoot))
                .where(cb.equal(orderRoot.get("customer"), root));
-        
+
         Long count = ((Number) args[0]).longValue();
-        
+
         return switch (op) {
             case "GT" -> cb.gt(subquery, count);
             case "LT" -> cb.lt(subquery, count);
@@ -826,6 +912,7 @@ public static PredicateResolver<Customer> orderCount(String op, Object[] args) {
 ```
 
 **Usage:**
+
 ```json
 {
   "filters": {
@@ -921,9 +1008,9 @@ Only expose operators that make sense for the virtual field:
 ```java
 /**
  * Virtual field: Filters products by computed popularity score.
- * 
+ *
  * Score formula: (rating * 10) + (reviewCount * 2) + (salesCount / 100)
- * 
+ *
  * Operators:
  * - GT/GTE: Products with score above threshold
  * - LT/LTE: Products with score below threshold
@@ -943,20 +1030,20 @@ FilterQL supports custom operators beyond the standard set (EQ, MATCHES, GT, etc
 
 ### Why Custom Operators?
 
-| Use Case | Example |
-|----------|---------|
-| **Database functions** | SOUNDEX, LEVENSHTEIN for fuzzy matching |
-| **Geospatial queries** | GEO_WITHIN, GEO_DISTANCE for location filtering |
-| **Full-text search** | FULL_TEXT using database-specific capabilities |
-| **Override behavior** | Custom MATCHES logic for specific properties |
-| **Cross-cutting concerns** | Tenant filtering, soft-delete handling |
+| Use Case                   | Example                                         |
+| -------------------------- | ----------------------------------------------- |
+| **Database functions**     | SOUNDEX, LEVENSHTEIN for fuzzy matching         |
+| **Geospatial queries**     | GEO_WITHIN, GEO_DISTANCE for location filtering |
+| **Full-text search**       | FULL_TEXT using database-specific capabilities  |
+| **Override behavior**      | Custom MATCHES logic for specific properties    |
+| **Cross-cutting concerns** | Tenant filtering, soft-delete handling          |
 
 ### CustomOperatorResolver Interface
 
 ```java
 @FunctionalInterface
 public interface CustomOperatorResolver<P extends Enum<P> & PropertyReference> {
-    
+
     /**
      * @param ref  the property reference being filtered
      * @param op   the operator code (e.g., "SOUNDEX", "EQ")
@@ -993,14 +1080,14 @@ public interface CustomOperatorResolver<P extends Enum<P> & PropertyReference> {
 
 ```java
 JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
-        UserProperty.class, 
+        UserProperty.class,
         mappingBuilder
     ).withCustomOperatorResolver((ref, op, args) -> {
         // Return null to delegate to default handling
         if (!"SOUNDEX".equals(op)) {
             return null;
         }
-        
+
         // Handle SOUNDEX operator
         String fieldPath = switch (ref) {
             case FIRST_NAME -> "firstName";
@@ -1008,7 +1095,7 @@ JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
             default -> throw new IllegalArgumentException(
                 "SOUNDEX not supported for " + ref);
         };
-        
+
         return (root, query, cb) -> cb.equal(
             cb.function("SOUNDEX", String.class, root.get(fieldPath)),
             cb.function("SOUNDEX", String.class, cb.literal((String) args[0]))
@@ -1041,10 +1128,10 @@ private static PredicateResolver<?> handleLevenshtein(UserProperty ref, Object[]
     String field = getFieldPath(ref);
     String searchValue = (String) args[0];
     int maxDistance = args.length > 1 ? (Integer) args[1] : 2;
-    
+
     return (root, query, cb) -> cb.le(
-        cb.function("LEVENSHTEIN", Integer.class, 
-            root.get(field), 
+        cb.function("LEVENSHTEIN", Integer.class,
+            root.get(field),
             cb.literal(searchValue)),
         maxDistance
     );
@@ -1064,7 +1151,7 @@ CustomOperatorResolver<UserProperty> emailOverride = (ref, op, args) -> {
             return cb.like(cb.lower(root.get("email")), pattern);
         };
     }
-    
+
     // Override EQ for STATUS to handle enum aliases
     if (ref == UserProperty.STATUS && "EQ".equals(op)) {
         return (root, query, cb) -> {
@@ -1072,7 +1159,7 @@ CustomOperatorResolver<UserProperty> emailOverride = (ref, op, args) -> {
             return cb.equal(root.get("status"), status);
         };
     }
-    
+
     return null;  // Use default for everything else
 };
 ```
@@ -1114,10 +1201,10 @@ CustomOperatorResolver<UserProperty> resolver = (ref, op, args) -> {
 ```java
 /**
  * Custom operators supported:
- * 
+ *
  * SOUNDEX - Phonetic matching (FIRST_NAME, LAST_NAME only)
  *   Usage: { "ref": "FIRST_NAME", "op": "SOUNDEX", "value": "Jon" }
- * 
+ *
  * GEO_WITHIN - Geographic radius search (LOCATION only)
  *   Usage: { "ref": "LOCATION", "op": "GEO_WITHIN", "value": [lat, lon, radiusKm] }
  */
@@ -1192,9 +1279,9 @@ void allPropertiesShouldHaveTypes() {
 
 For complete implementation details:
 
-| Topic | Documentation |
-|-------|---------------|
-| Core API (interfaces, classes) | [→ Core Reference](./reference/core) |
-| JPA API (context, strategies) | [→ JPA Reference](./reference/jpa-adapter) |
+| Topic                              | Documentation                                    |
+| ---------------------------------- | ------------------------------------------------ |
+| Core API (interfaces, classes)     | [→ Core Reference](./reference/core)             |
+| JPA API (context, strategies)      | [→ JPA Reference](./reference/jpa-adapter)       |
 | Spring API (annotations, services) | [→ Spring Reference](./reference/spring-adapter) |
-| Formal protocol specification | [→ Protocol](./protocol) |
+| Formal protocol specification      | [→ Protocol](./protocol)                         |

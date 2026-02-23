@@ -19,7 +19,7 @@ import java.lang.annotation.Target;
  * <ul>
  *   <li><b>value</b>: name of the exposed REST resource in kebab-case. Defaults to kebab-case of the entity class name.</li>
  *   <li><b>basePath</b>: optional URI path prefix for REST endpoints; kebab-case recommended.</li>
- *   <li><b>strategy</b>: determines the endpoint return type and behavior (PAGINATED, LIST, COUNT, SINGLE, CUSTOM).</li>
+ *   <li><b>strategy</b>: determines the endpoint return type and behavior (PAGINATED, LIST, CUSTOM).</li>
  *   <li><b>pipes</b>: filter transformation pipeline applied before handler execution.</li>
  *   <li><b>handler</b>: custom endpoint implementation with full control over filtering and response.</li>
  *   <li><b>endpointName</b>: custom method name for the generated endpoint.</li>

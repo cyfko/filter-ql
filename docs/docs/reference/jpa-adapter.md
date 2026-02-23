@@ -75,23 +75,23 @@ io.github.cyfko.filterql.jpa
 ```java
 package io.github.cyfko.filterql.jpa;
 
-public class JpaFilterContext<P extends Enum<P> & PropertyReference> 
+public class JpaFilterContext<P extends Enum<P> & PropertyReference>
     implements FilterContext {
-    
+
     /**
      * Constructor with default configuration.
-     * 
+     *
      * @param enumClass PropertyReference enum class
      * @param mappingBuilder property → path/resolver mapping function
      */
     public JpaFilterContext(
-        Class<P> enumClass, 
+        Class<P> enumClass,
         Function<P, Object> mappingBuilder
     );
-    
+
     /**
      * Constructor with custom configuration.
-     * 
+     *
      * @param enumClass PropertyReference enum class
      * @param mappingBuilder mapping function
      * @param filterConfig filtering behavior configuration
@@ -120,7 +120,7 @@ JpaFilterContext<UserPropertyRef> context = new JpaFilterContext<>(
         case EMAIL -> "email";
         case AGE -> "age";
         case CITY -> "address.city.name";  // Nested path
-        
+
         // Custom mapping (PredicateResolverMapping)
         case FULL_NAME -> (PredicateResolverMapping<User>) (op, args) -> (root, query, cb) -> {
             String search = (String) args[0];
@@ -143,7 +143,7 @@ public Class<P> getPropertyRefClass();
 
 /**
  * Replaces the mapping function.
- * 
+ *
  * @param mappingBuilder new mapping function
  * @return previous function
  */
@@ -163,10 +163,10 @@ import io.github.cyfko.filterql.core.spi.PredicateResolver;
 
 @FunctionalInterface
 public interface PredicateResolverMapping<E> extends ReferenceMapping<E> {
-    
+
     /**
      * Resolves a PredicateResolver given the operator code and arguments.
-     * 
+     *
      * @param op the filter operator to apply (e.g., "EQ", "LIKE", "SOUNDEX")
      * @param args the arguments of the filter's operator
      * @return the PredicateResolver for deferred predicate generation
@@ -246,7 +246,7 @@ package io.github.cyfko.filterql.jpa.mappings;
 
 @FunctionalInterface
 public interface CustomOperatorResolver<P extends Enum<P> & PropertyReference> {
-    
+
     /**
      * Resolves a custom operator to a PredicateResolver.
      *
@@ -269,7 +269,7 @@ public interface CustomOperatorResolver<P extends Enum<P> & PropertyReference> {
 
 ```java
 JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
-        UserProperty.class, 
+        UserProperty.class,
         mappingBuilder
     ).withCustomOperatorResolver((ref, op, args) -> {
         return switch (op) {
@@ -281,9 +281,10 @@ JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
 ```
 
 :::tip When to Use
+
 - **CustomOperatorResolver**: For operators that apply to multiple properties (SOUNDEX, FULL_TEXT, GEO_WITHIN)
 - **PredicateResolverMapping**: For property-specific logic where each property has unique behavior
-:::
+  :::
 
 ---
 
@@ -297,22 +298,22 @@ DTO strategy with batch fetching for collections. Avoids N+1 problems.
 package io.github.cyfko.filterql.jpa.strategies;
 
 public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<String, Object>>> {
-    
+
     /**
      * Constructor with projection class.
-     * 
+     *
      * @param projectionClass DTO class annotated with @Projection
      */
     public MultiQueryFetchStrategy(Class<?> projectionClass);
-    
+
     /**
      * Constructor with IoC instance resolver.
-     * 
+     *
      * @param projectionClass DTO class
      * @param instanceResolver resolver for @Computed fields
      */
     public MultiQueryFetchStrategy(
-        Class<?> projectionClass, 
+        Class<?> projectionClass,
         InstanceResolver instanceResolver
     );
 }
@@ -343,7 +344,7 @@ Retrieves complete entities without projection.
 package io.github.cyfko.filterql.jpa.strategies;
 
 public class FullEntityFetchStrategy<E> implements ExecutionStrategy<List<E>> {
-    
+
     /**
      * @param entityClass JPA entity class
      */
@@ -376,7 +377,7 @@ Optimized count query.
 package io.github.cyfko.filterql.jpa.strategies;
 
 public class CountStrategy implements ExecutionStrategy<Long> {
-    
+
     /**
      * @param projectionClass DTO class to derive entity
      */
@@ -396,11 +397,11 @@ Long count = executor.executeWith(em, strategy);
 
 ### Strategy Comparison
 
-| Strategy | Use Case | Return | Projection | Collections |
-|----------|----------|--------|------------|-------------|
-| `MultiQueryFetchStrategy` | DTO with collections | `List<Map<String, Object>>` | ✅ | ✅ Batch |
-| `FullEntityFetchStrategy` | Complete entities | `List<E>` | ❌ | Via lazy loading |
-| `CountStrategy` | Count only | `Long` | ❌ | N/A |
+| Strategy                  | Use Case             | Return                      | Projection | Collections      |
+| ------------------------- | -------------------- | --------------------------- | ---------- | ---------------- |
+| `MultiQueryFetchStrategy` | DTO with collections | `List<Map<String, Object>>` | ✅         | ✅ Batch         |
+| `FullEntityFetchStrategy` | Complete entities    | `List<E>`                   | ❌         | Via lazy loading |
+| `CountStrategy`           | Count only           | `Long`                      | ❌         | N/A              |
 
 ---
 
@@ -417,21 +418,21 @@ public record FilterConfig(
     EnumMatching enumMatching,    // Enum matching strategy
     StringNormalization stringNormalization  // String normalization
 ) {
-    
+
     public static Builder builder();
-    
+
     public enum NullHandling {
         NULLS_FIRST,
         NULLS_LAST,
         NATIVE      // DB default behavior
     }
-    
+
     public enum EnumMatching {
         NAME,       // Match by Enum.name()
         ORDINAL,    // Match by Enum.ordinal()
         STRING      // Match by toString()
     }
-    
+
     public enum StringNormalization {
         NONE,       // No normalization
         TRIM,       // Remove whitespace
@@ -468,10 +469,10 @@ Interface for IoC bean resolution (`@Computed` fields).
 package io.github.cyfko.filterql.jpa.mappings;
 
 public interface InstanceResolver {
-    
+
     /**
      * Resolves a provider instance from the IoC container.
-     * 
+     *
      * @param providerClass provider class
      * @return provider instance
      */
@@ -489,16 +490,16 @@ Utilities for JPA path navigation.
 package io.github.cyfko.filterql.jpa.utils;
 
 public final class PathResolverUtils {
-    
+
     /**
      * Resolves a nested path to a JPA Path.
-     * 
+     *
      * @param root entity root
      * @param path dot-separated path (e.g., "address.city.name")
      * @return resolved JPA Path
      */
     public static <E> Path<?> resolvePath(Root<E> root, String path);
-    
+
     /**
      * Resolves with generic type.
      */
@@ -538,10 +539,10 @@ import io.github.cyfko.projection.Projected;
 
 @Projection(from = User.class)
 public interface UserDTO {
-    
+
     @Projected(from = "firstName")  // Explicit mapping
     String getName();
-    
+
     @Projected(from = "address.city.name")  // Nested path
     String getCityName();
 }
@@ -553,30 +554,39 @@ Defines a dynamically computed field.
 
 ```java
 import io.github.cyfko.projection.Computed;
+import io.github.cyfko.projection.Method;
+import io.github.cyfko.projection.Provider;
 
-@Projection(from = User.class)
+@Projection(from = User.class, providers = @Provider(AgeCalculator.class))
 public interface UserDTO {
-    
-    @Computed(provider = AgeCalculator.class, method = "calculateAge")
+
+    @Computed(
+        dependsOn = "birthDate",
+        computedBy = @Method(type = AgeCalculator.class, value = "calculateAge")
+    )
     Integer getAge();
 }
 ```
 
 ### @Provider
 
-Marks a class as a computed values provider.
+Registers a computation provider class in the `@Projection` annotation.
 
 ```java
 import io.github.cyfko.projection.Provider;
-import org.springframework.stereotype.Component;
+import io.github.cyfko.projection.Projection;
 
-@Provider
-@Component
+@Projection(from = User.class, providers = @Provider(AgeCalculator.class))
+public interface UserDTO {
+    // ...
+}
+
+// The provider class (no annotation needed on the class itself)
 public class AgeCalculator {
-    
-    public Integer calculateAge(User user) {
-        if (user.getBirthDate() == null) return null;
-        return Period.between(user.getBirthDate(), LocalDate.now()).getYears();
+
+    public static Integer toAge(LocalDate birthDate) {
+        if (birthDate == null) return null;
+        return Period.between(birthDate, LocalDate.now()).getYears();
     }
 }
 ```

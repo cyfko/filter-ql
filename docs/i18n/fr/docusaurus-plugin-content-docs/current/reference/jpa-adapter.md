@@ -75,23 +75,23 @@ Implémentation de `FilterContext` pour JPA Criteria API.
 ```java
 package io.github.cyfko.filterql.jpa;
 
-public class JpaFilterContext<P extends Enum<P> & PropertyReference> 
+public class JpaFilterContext<P extends Enum<P> & PropertyReference>
     implements FilterContext {
-    
+
     /**
      * Constructeur avec configuration par défaut.
-     * 
+     *
      * @param enumClass classe de l'enum PropertyReference
      * @param mappingBuilder fonction de mapping propriété → chemin/resolver
      */
     public JpaFilterContext(
-        Class<P> enumClass, 
+        Class<P> enumClass,
         Function<P, Object> mappingBuilder
     );
-    
+
     /**
      * Constructeur avec configuration personnalisée.
-     * 
+     *
      * @param enumClass classe de l'enum PropertyReference
      * @param mappingBuilder fonction de mapping
      * @param filterConfig configuration du comportement de filtrage
@@ -120,7 +120,7 @@ JpaFilterContext<UserPropertyRef> context = new JpaFilterContext<>(
         case EMAIL -> "email";
         case AGE -> "age";
         case CITY -> "address.city.name";  // Chemin imbriqué
-        
+
         // Mapping personnalisé (PredicateResolverMapping)
         case FULL_NAME -> (PredicateResolverMapping<User>) (op, args) -> (root, query, cb) -> {
             String search = (String) args[0];
@@ -143,7 +143,7 @@ public Class<P> getPropertyRefClass();
 
 /**
  * Remplace la fonction de mapping.
- * 
+ *
  * @param mappingBuilder nouvelle fonction de mapping
  * @return fonction précédente
  */
@@ -163,10 +163,10 @@ import io.github.cyfko.filterql.core.spi.PredicateResolver;
 
 @FunctionalInterface
 public interface PredicateResolverMapping<E> extends ReferenceMapping<E> {
-    
+
     /**
      * Résout un PredicateResolver pour le code opérateur et les arguments donnés.
-     * 
+     *
      * @param op le code opérateur du filtre (ex: "EQ", "LIKE", "SOUNDEX")
      * @param args les arguments de l'opérateur du filtre
      * @return le PredicateResolver pour la génération différée du prédicat
@@ -231,7 +231,7 @@ package io.github.cyfko.filterql.jpa.mappings;
 
 @FunctionalInterface
 public interface CustomOperatorResolver<P extends Enum<P> & PropertyReference> {
-    
+
     /**
      * Résout un opérateur personnalisé vers un PredicateResolver.
      *
@@ -254,7 +254,7 @@ public interface CustomOperatorResolver<P extends Enum<P> & PropertyReference> {
 
 ```java
 JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
-        UserProperty.class, 
+        UserProperty.class,
         mappingBuilder
     ).withCustomOperatorResolver((ref, op, args) -> {
         return switch (op) {
@@ -266,9 +266,10 @@ JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
 ```
 
 :::tip Quand Utiliser
+
 - **CustomOperatorResolver** : Pour les opérateurs qui s'appliquent à plusieurs propriétés (SOUNDEX, FULL_TEXT, GEO_WITHIN)
 - **PredicateResolverMapping** : Pour une logique spécifique à une propriété où chaque propriété a un comportement unique
-:::
+  :::
 
 ---
 
@@ -282,22 +283,22 @@ Stratégie DTO avec batch fetching pour les collections. Évite les problèmes N
 package io.github.cyfko.filterql.jpa.strategies;
 
 public class MultiQueryFetchStrategy implements ExecutionStrategy<List<Map<String, Object>>> {
-    
+
     /**
      * Constructeur avec classe de projection.
-     * 
+     *
      * @param projectionClass classe DTO annotée @Projection
      */
     public MultiQueryFetchStrategy(Class<?> projectionClass);
-    
+
     /**
      * Constructeur avec résolveur d'instances IoC.
-     * 
+     *
      * @param projectionClass classe DTO
      * @param instanceResolver résolveur pour champs @Computed
      */
     public MultiQueryFetchStrategy(
-        Class<?> projectionClass, 
+        Class<?> projectionClass,
         InstanceResolver instanceResolver
     );
 }
@@ -328,7 +329,7 @@ Récupère des entités complètes sans projection.
 package io.github.cyfko.filterql.jpa.strategies;
 
 public class FullEntityFetchStrategy<E> implements ExecutionStrategy<List<E>> {
-    
+
     /**
      * @param entityClass classe de l'entité JPA
      */
@@ -361,7 +362,7 @@ Requête de comptage optimisée.
 package io.github.cyfko.filterql.jpa.strategies;
 
 public class CountStrategy implements ExecutionStrategy<Long> {
-    
+
     /**
      * @param projectionClass classe DTO pour dériver l'entité
      */
@@ -381,11 +382,11 @@ Long count = executor.executeWith(em, strategy);
 
 ### Comparaison des Stratégies
 
-| Stratégie | Cas d'Usage | Retour | Projection | Collections |
-|-----------|-------------|--------|------------|-------------|
-| `MultiQueryFetchStrategy` | DTO avec collections | `List<Map<String, Object>>` | ✅ | ✅ Batch |
-| `FullEntityFetchStrategy` | Entités complètes | `List<E>` | ❌ | Via lazy loading |
-| `CountStrategy` | Comptage uniquement | `Long` | ❌ | N/A |
+| Stratégie                 | Cas d'Usage          | Retour                      | Projection | Collections      |
+| ------------------------- | -------------------- | --------------------------- | ---------- | ---------------- |
+| `MultiQueryFetchStrategy` | DTO avec collections | `List<Map<String, Object>>` | ✅         | ✅ Batch         |
+| `FullEntityFetchStrategy` | Entités complètes    | `List<E>`                   | ❌         | Via lazy loading |
+| `CountStrategy`           | Comptage uniquement  | `Long`                      | ❌         | N/A              |
 
 ---
 
@@ -402,21 +403,21 @@ public record FilterConfig(
     EnumMatching enumMatching,    // Stratégie de matching enum
     StringNormalization stringNormalization  // Normalisation des chaînes
 ) {
-    
+
     public static Builder builder();
-    
+
     public enum NullHandling {
         NULLS_FIRST,
         NULLS_LAST,
         NATIVE      // Comportement par défaut de la DB
     }
-    
+
     public enum EnumMatching {
         NAME,       // Matcher par Enum.name()
         ORDINAL,    // Matcher par Enum.ordinal()
         STRING      // Matcher par toString()
     }
-    
+
     public enum StringNormalization {
         NONE,       // Pas de normalisation
         TRIM,       // Supprimer espaces
@@ -453,10 +454,10 @@ Interface pour la résolution de beans IoC (champs `@Computed`).
 package io.github.cyfko.filterql.jpa.mappings;
 
 public interface InstanceResolver {
-    
+
     /**
      * Résout une instance de provider depuis le conteneur IoC.
-     * 
+     *
      * @param providerClass classe du provider
      * @return instance du provider
      */
@@ -474,16 +475,16 @@ Utilitaires pour la navigation de chemin JPA.
 package io.github.cyfko.filterql.jpa.utils;
 
 public final class PathResolverUtils {
-    
+
     /**
      * Résout un chemin imbriqué en Path JPA.
-     * 
+     *
      * @param root racine de l'entité
      * @param path chemin séparé par points (ex: "address.city.name")
      * @return Path JPA résolu
      */
     public static <E> Path<?> resolvePath(Root<E> root, String path);
-    
+
     /**
      * Résout avec type générique.
      */
@@ -507,9 +508,9 @@ Définit une classe DTO avec mapping vers une entité JPA.
 import io.github.cyfko.projection.Projection;
 
 @Projection(from = User.class)
-public class UserDTO {
-    private Long id;
-    private String username;
+public interface UserDTO {
+    Long getId();
+    String getUsername();
     // ...
 }
 ```
@@ -522,13 +523,13 @@ Personnalise le mapping d'un champ DTO.
 import io.github.cyfko.projection.Projected;
 
 @Projection(from = User.class)
-public class UserDTO {
-    
+public interface UserDTO {
+
     @Projected(from = "firstName")  // Mapping explicite
-    private String name;
-    
+    String getName();
+
     @Projected(from = "address.city.name")  // Chemin imbriqué
-    private String cityName;
+    String getCityName();
 }
 ```
 
@@ -538,30 +539,39 @@ Définit un champ calculé dynamiquement.
 
 ```java
 import io.github.cyfko.projection.Computed;
+import io.github.cyfko.projection.Method;
+import io.github.cyfko.projection.Provider;
 
-@Projection(from = User.class)
-public class UserDTO {
-    
-    @Computed(provider = AgeCalculator.class, method = "calculateAge")
-    private Integer age;
+@Projection(from = User.class, providers = @Provider(AgeCalculator.class))
+public interface UserDTO {
+
+    @Computed(
+        dependsOn = "birthDate",
+        computedBy = @Method(type = AgeCalculator.class, value = "calculateAge")
+    )
+    Integer getAge();
 }
 ```
 
 ### @Provider
 
-Marque une classe comme fournisseur de valeurs calculées.
+Enregistre une classe fournisseur de calculs dans l'annotation `@Projection`.
 
 ```java
 import io.github.cyfko.projection.Provider;
-import org.springframework.stereotype.Component;
+import io.github.cyfko.projection.Projection;
 
-@Provider
-@Component
+@Projection(from = User.class, providers = @Provider(AgeCalculator.class))
+public interface UserDTO {
+    // ...
+}
+
+// La classe fournisseur (aucune annotation nécessaire sur la classe elle-même)
 public class AgeCalculator {
-    
-    public Integer calculateAge(User user) {
-        if (user.getBirthDate() == null) return null;
-        return Period.between(user.getBirthDate(), LocalDate.now()).getYears();
+
+    public static Integer toAge(LocalDate birthDate) {
+        if (birthDate == null) return null;
+        return Period.between(birthDate, LocalDate.now()).getYears();
     }
 }
 ```

@@ -33,7 +33,7 @@ Configure annotation processors in the compiler plugin:
                     <path>
                         <groupId>io.github.cyfko</groupId>
                         <artifactId>filterql-spring-processor</artifactId>
-                        <version>1.0.0</version>
+                        <version>4.0.0</version>
                     </path>
                     <path>
                         <groupId>io.github.cyfko</groupId>
@@ -81,34 +81,44 @@ io.github.cyfko.filterql.spring
 
 ### @Exposure
 
-Marks a projection class for REST controller generation.
+Marks a projection interface for REST controller generation.
 
 ```java
 package io.github.cyfko.filterql.spring;
 
+import io.github.cyfko.projection.Method;
+
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.SOURCE)
 public @interface Exposure {
-    
-    /**
-     * REST resource name (kebab-case).
-     * Default: class name in kebab-case.
-     */
+
+    /** REST resource name (kebab-case). Default: class name in kebab-case. */
     String value() default "";
-    
-    /**
-     * Optional URI path prefix.
-     */
+
+    /** Optional URI path prefix. */
     String basePath() default "";
-    
-    /**
-     * Method reference for endpoint annotations.
-     */
-    MethodReference annotationsFrom() default @MethodReference();
+
+    /** Response strategy for the generated endpoint. */
+    Strategy strategy() default Strategy.PAGINATED;
+
+    /** Pipeline of filter transformations applied before the handler. */
+    Method[] pipes() default {};
+
+    /** Custom handler method that processes the filter request. */
+    Method handler() default @Method();
+
+    /** Name of the generated endpoint method. Default: "search" + entity name. */
+    String endpointName() default "";
+
+    enum Strategy {
+        PAGINATED,  // Returns PaginatedData<T>
+        LIST,       // Returns List<T>
+        CUSTOM      // User-defined return type
+    }
 }
 ```
 
-#### Usage
+#### Basic Usage
 
 ```java
 import io.github.cyfko.projection.Projection;
@@ -116,58 +126,97 @@ import io.github.cyfko.filterql.spring.Exposure;
 
 @Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api/v1")
-public class UserDTO {
-    private Long id;
-    private String username;
-    private String email;
+public interface UserDTO {
+    Long getId();
+    String getUsername();
+    String getEmail();
 }
 ```
 
 Generates an endpoint: `POST /api/v1/users/search`
 
-#### Endpoint Annotations
+#### Custom Handler with Annotations
 
-To apply annotations (security, cache, etc.) to generated endpoints:
+Use the `handler` attribute to point to a method that carries security, cache, or other annotations:
 
 ```java
 @Projection(from = User.class)
-@Exposure(value = "users")
-public class UserDTO {
-    
-    // Template method for annotations
+@Exposure(
+    value = "users",
+    handler = @Method("searchUsers")
+)
+public interface UserDTO {
+
     @PreAuthorize("hasRole('ADMIN')")
-    @Cacheable("userCache")
-    private static void exposureEndpoint() {}
+    @Cacheable(value = "userSearch", key = "#filter")
+    @RateLimiter(name = "search-api")
+    static PaginatedData<UserDTO> searchUsers(FilterRequest filter) {
+        // The generated code will call this method;
+        // annotations are transferred to the generated endpoint
+        return null; // Implementation provided by generator
+    }
 }
 ```
 
 Or with a shared template class:
 
 ```java
-// Shared templates
 public class SecurityTemplates {
-    
+
     @PreAuthorize("hasRole('ADMIN')")
     @Cacheable("adminCache")
     @RateLimiter(name = "admin")
-    public static void adminEndpoint() {}
-    
-    @PreAuthorize("hasRole('USER')")
-    @RateLimiter(name = "user")
-    public static void userEndpoint() {}
+    public static PaginatedData<?> adminEndpoint(FilterRequest filter) {
+        return null;
+    }
 }
 
 // Usage
 @Projection(from = User.class)
 @Exposure(
     value = "users",
-    annotationsFrom = @MethodReference(
-        type = SecurityTemplates.class,
-        method = "adminEndpoint"
-    )
+    handler = @Method(type = SecurityTemplates.class, value = "adminEndpoint")
 )
-public class UserDTO { }
+public interface UserDTO { }
 ```
+
+#### Filter Transformation Pipeline
+
+Use `pipes` to apply transformations to the `FilterRequest` before it reaches the handler:
+
+```java
+@Projection(from = User.class)
+@Exposure(
+    value = "users",
+    pipes = {
+        @Method("applyTenantFilter"),
+        @Method(type = FilterPipes.class, value = "sanitize")
+    }
+)
+public interface UserDTO {
+    // ...
+
+    static FilterRequest applyTenantFilter(FilterRequest filter) {
+        User user = SecurityContext.getCurrentUser();
+        return filter.and("tenantId", user.getTenantId());
+    }
+}
+```
+
+**Pipe method requirements:**
+
+- First parameter must be `FilterRequest`
+- Must return `FilterRequest`
+- Method name must be explicitly specified in `@Method`
+- Pipeline executes in declaration order
+
+#### Strategy
+
+| Strategy              | Return Type        | Use Case                        |
+| --------------------- | ------------------ | ------------------------------- |
+| `PAGINATED` (default) | `PaginatedData<T>` | Most common — paginated results |
+| `LIST`                | `List<T>`          | When all results are needed     |
+| `CUSTOM`              | User-defined       | Full control over return type   |
 
 ---
 
@@ -181,17 +230,17 @@ package io.github.cyfko.filterql.spring;
 @Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.SOURCE)
 public @interface ExposedAs {
-    
+
     /**
      * Symbolic name in the generated enum.
      */
     String value();
-    
+
     /**
      * Supported operators.
      */
     Op[] operators() default {};
-    
+
     /**
      * Whether the field is exposed to filtering.
      */
@@ -204,18 +253,18 @@ public @interface ExposedAs {
 ```java
 @Projection(from = User.class)
 @Exposure(value = "users")
-public class UserDTO {
-    
-    private Long id;
-    
+public interface UserDTO {
+
+    Long getId();
+
     @ExposedAs(value = "USERNAME", operators = {Op.EQ, Op.MATCHES, Op.IN})
-    private String username;
-    
+    String getUsername();
+
     @ExposedAs(value = "USER_EMAIL", operators = {Op.EQ, Op.MATCHES})
-    private String email;
-    
+    String getEmail();
+
     @ExposedAs(exposed = false)  // Exclude from filtering
-    private String internalField;
+    String getInternalField();
 }
 ```
 
@@ -249,6 +298,7 @@ public static PredicateResolver<User> fullNameSearch(String op, Object[] args) {
 ```
 
 **Method requirements:**
+
 - Must be `public static` (or instance method if managed by Spring)
 - Return type: `PredicateResolver<E>` where `E` is the entity type
 - Parameters: `(String op, Object[] args)` — the operator and filter arguments
@@ -267,32 +317,32 @@ Main interface for filter execution.
 package io.github.cyfko.filterql.spring.service;
 
 public interface FilterQlService {
-    
+
     /**
      * Search with Map result.
-     * 
+     *
      * @param refClass PropertyReference enum class
      * @param filterRequest filter request
      * @return paginated data
      */
-    <P extends Enum<P> & PropertyReference> 
+    <P extends Enum<P> & PropertyReference>
     PaginatedData<Map<String, Object>> search(
-        Class<P> refClass, 
+        Class<P> refClass,
         FilterRequest<P> filterRequest
     );
-    
+
     /**
      * Search with custom mapping.
-     * 
+     *
      * @param projectionClass target DTO class
      * @param filterRequest filter request
      * @param resultMapper result mapper
      * @return typed paginated data
      */
-    <R, P extends Enum<P> & PropertyReference> 
+    <R, P extends Enum<P> & PropertyReference>
     PaginatedData<R> search(
-        Class<R> projectionClass, 
-        FilterRequest<P> filterRequest, 
+        Class<R> projectionClass,
+        FilterRequest<P> filterRequest,
         ResultMapper<R> resultMapper
     );
 }
@@ -306,13 +356,13 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class UserService {
-    
+
     private final FilterQlService filterQlService;
-    
+
     public UserService(FilterQlService filterQlService) {
         this.filterQlService = filterQlService;
     }
-    
+
     public PaginatedData<Map<String, Object>> searchUsers(
             FilterRequest<UserDTO_> request) {
         return filterQlService.search(UserDTO_.class, request);
@@ -331,13 +381,13 @@ package io.github.cyfko.filterql.spring.service.impl;
 
 @Service
 public class FilterQlServiceImpl implements FilterQlService {
-    
+
     @PersistenceContext
     private EntityManager em;
-    
+
     private final FilterContextRegistry contextRegistry;
     private final InstanceResolver instanceResolver;
-    
+
     // Implementation...
 }
 ```
@@ -357,7 +407,7 @@ public record PaginatedData<T>(
     List<T> data,
     PaginationInfo pagination
 ) {
-    
+
     /**
      * Constructor with defensive copy.
      */
@@ -365,23 +415,23 @@ public record PaginatedData<T>(
         this.data = List.copyOf(data);
         this.pagination = pagination;
     }
-    
+
     /**
      * Constructor from Spring Data Page.
      */
     public PaginatedData(Page<T> page) {
         this(page.getContent(), PaginationInfo.from(page));
     }
-    
+
     /**
      * Transforms data with a mapper.
-     * 
+     *
      * @param mapper transformation function
      * @return new paginated data
      */
     public <R> PaginatedData<R> map(Function<T, R> mapper) {
         return new PaginatedData<>(
-            data.stream().map(mapper).collect(Collectors.toList()), 
+            data.stream().map(mapper).collect(Collectors.toList()),
             pagination
         );
     }
@@ -402,14 +452,14 @@ public record PaginationInfo(
     int pageSize,
     long totalElements
 ) {
-    
+
     /**
      * Calculates the total number of pages.
      */
     public int totalPages() {
         return (int) Math.ceil((double) totalElements / pageSize);
     }
-    
+
     /**
      * Creates from a Spring Data Page.
      */
@@ -434,10 +484,10 @@ package io.github.cyfko.filterql.spring.pagination;
 
 @FunctionalInterface
 public interface ResultMapper<R> {
-    
+
     /**
      * Transforms a Map result to target type.
-     * 
+     *
      * @param row raw data
      * @return transformed object
      */
@@ -455,8 +505,8 @@ ResultMapper<UserDTO> mapper = row -> new UserDTO(
 );
 
 PaginatedData<UserDTO> result = filterQlService.search(
-    UserDTO.class, 
-    request, 
+    UserDTO.class,
+    request,
     mapper
 );
 ```
@@ -474,20 +524,20 @@ package io.github.cyfko.filterql.spring.support;
 
 @Component
 public class FilterContextRegistry {
-    
+
     /**
      * Builds the registry from injected contexts.
      */
     public FilterContextRegistry(List<JpaFilterContext<?>> contexts);
-    
+
     /**
      * Retrieves the context for an enum class.
-     * 
+     *
      * @param enumClass PropertyReference enum class
      * @return corresponding context
      * @throws IllegalArgumentException if not found
      */
-    public <P extends Enum<P> & PropertyReference> 
+    public <P extends Enum<P> & PropertyReference>
     JpaFilterContext<?> getContext(Class<P> enumClass);
 }
 ```
@@ -503,13 +553,13 @@ package io.github.cyfko.filterql.spring.service.impl;
 
 @Component
 public class SpringProviderResolver implements InstanceResolver {
-    
+
     private final ApplicationContext applicationContext;
-    
+
     public SpringProviderResolver(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext;
     }
-    
+
     @Override
     public <T> T resolve(Class<T> providerClass) {
         return applicationContext.getBean(providerClass);
@@ -531,7 +581,7 @@ package io.github.cyfko.filterql.spring.processor;
 @SupportedAnnotationTypes("io.github.cyfko.projection.Projection")
 @SupportedSourceVersion(SourceVersion.RELEASE_17)
 public class ExposureAnnotationProcessor extends AbstractProcessor {
-    
+
     /**
      * Processes @Projection annotated classes.
      * Generates:
@@ -541,7 +591,7 @@ public class ExposureAnnotationProcessor extends AbstractProcessor {
      */
     @Override
     public boolean process(
-        Set<? extends TypeElement> annotations, 
+        Set<? extends TypeElement> annotations,
         RoundEnvironment roundEnv
     );
 }
@@ -559,7 +609,7 @@ public enum UserDTO_ implements PropertyReference {
     USERNAME,
     EMAIL,
     AGE;
-    
+
     @Override
     public Class<?> getType() {
         var pm = ProjectionRegistry.getMetadataFor(UserDTO.class);
@@ -569,7 +619,7 @@ public enum UserDTO_ implements PropertyReference {
             case AGE -> pm.getDirectMapping("age", true).get().dtoFieldType();
         };
     }
-    
+
     @Override
     public Set<Op> getSupportedOperators() {
         return switch(this) {
@@ -578,7 +628,7 @@ public enum UserDTO_ implements PropertyReference {
             case AGE -> Set.of(Op.EQ, Op.GT, Op.LT, Op.GTE, Op.LTE);
         };
     }
-    
+
     @Override
     public Class<?> getEntityType() {
         return User.class;
@@ -592,7 +642,7 @@ public enum UserDTO_ implements PropertyReference {
 // Generated file: FilterQlContextConfig.java
 @Configuration
 public class FilterQlContextConfig {
-    
+
     @Bean
     public JpaFilterContext<?> userDTOContext(InstanceResolver instanceResolver) {
         return new JpaFilterContext<>(UserDTO_.class, (ref) -> switch (ref) {
@@ -610,10 +660,10 @@ public class FilterQlContextConfig {
 // Generated file: FilterQlController.java
 @RestController
 public class FilterQlController {
-    
+
     @Autowired
     private FilterQlService filterQlService;
-    
+
     @PostMapping("/api/v1/users/search")
     public ResponseEntity<PaginatedData<Map<String, Object>>> searchUserDTO(
         @RequestBody @Validated FilterRequest<UserDTO_> request
@@ -638,20 +688,20 @@ package io.github.cyfko.filterql.spring.autoconfigure;
 @ConditionalOnClass(JpaFilterContext.class)
 @EnableConfigurationProperties(FilterQlProperties.class)
 public class FilterQlAutoConfiguration {
-    
+
     @Bean
     @ConditionalOnMissingBean
     public FilterContextRegistry filterContextRegistry(
             List<JpaFilterContext<?>> contexts) {
         return new FilterContextRegistry(contexts);
     }
-    
+
     @Bean
     @ConditionalOnMissingBean
     public InstanceResolver instanceResolver(ApplicationContext ctx) {
         return new SpringProviderResolver(ctx);
     }
-    
+
     @Bean
     @ConditionalOnMissingBean
     public FilterQlService filterQlService(
@@ -673,37 +723,45 @@ public class FilterQlAutoConfiguration {
 import io.github.cyfko.projection.Projection;
 import io.github.cyfko.projection.Projected;
 import io.github.cyfko.projection.Computed;
+import io.github.cyfko.projection.Provider;
+import io.github.cyfko.projection.Method;
 import io.github.cyfko.filterql.spring.Exposure;
 import io.github.cyfko.filterql.spring.ExposedAs;
 import org.springframework.security.access.prepost.PreAuthorize;
 
-@Projection(from = User.class)
-@Exposure(value = "users", basePath = "/api/v1")
-public class UserDTO {
-    
-    private Long id;
-    
+@Projection(from = User.class, providers = @Provider(AgeCalculator.class))
+@Exposure(
+    value = "users",
+    basePath = "/api/v1",
+    handler = @Method("searchUsers")
+)
+public interface UserDTO {
+
+    Long getId();
+
     @ExposedAs(value = "USERNAME", operators = {Op.EQ, Op.MATCHES, Op.IN})
-    private String username;
-    
+    String getUsername();
+
     @Projected(from = "email")
     @ExposedAs(value = "EMAIL", operators = {Op.EQ, Op.MATCHES})
-    private String userEmail;
-    
+    String getUserEmail();
+
     @Projected(from = "address.city.name")
     @ExposedAs(value = "CITY", operators = {Op.EQ, Op.IN})
-    private String cityName;
-    
-    @Computed(provider = AgeCalculator.class, method = "calculateAge")
+    String getCityName();
+
+    @Computed(dependsOn = "birthDate")
     @ExposedAs(exposed = false)  // Not filterable
-    private Integer age;
-    
+    Integer getAge();
+
     @Projected(from = "orders")
-    private List<OrderSummaryDTO> orders;
-    
-    // Annotation template for the generated endpoint
+    List<OrderSummaryDTO> getOrders();
+
+    // Handler method — annotations are transferred to the generated endpoint
     @PreAuthorize("hasRole('USER')")
-    private static void exposureEndpoint() {}
+    static PaginatedData<UserDTO> searchUsers(FilterRequest filter) {
+        return null;
+    }
 }
 ```
 
@@ -735,8 +793,8 @@ curl -X POST http://localhost:8080/api/v1/users/search \
       "userEmail": "john@example.com",
       "cityName": "Paris",
       "orders": [
-        {"id": 101, "total": 150.00},
-        {"id": 98, "total": 75.50}
+        { "id": 101, "total": 150.0 },
+        { "id": 98, "total": 75.5 }
       ]
     }
   ],

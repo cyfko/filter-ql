@@ -21,30 +21,29 @@ Quand le nom du champ DTO diffère du nom de la propriété entité :
 public class Order {
     @Id private Long id;
     private String orderNumber;  // Nom dans l'entité
-    
+
     @OneToMany(mappedBy = "order")
     private List<OrderItem> items;
 }
 
 @Projection(from = Order.class)
 @Exposure(value = "orders", basePath = "/api")
-public class OrderDTO {
+public interface OrderDTO {
 
     @Projected(from = "id")
-    private Long id;
+    Long getId();
 
     @Projected(from = "orderNumber")  // Mappe orderNumber → number
     @ExposedAs(value = "ORDER_NUMBER", operators = {Op.EQ, Op.MATCHES})
-    private String number;
+    String getNumber();
 
     @Projected(from = "items")  // Mappe items → orderItems
-    private List<OrderItemDTO> orderItems;
-
-    // Getters...
+    List<OrderItemDTO> getOrderItems();
 }
 ```
 
 **Cas d'usage :**
+
 - Renommer des propriétés pour l'API (`orderNumber` → `number`)
 - Mapper des collections vers des noms différents
 - Accéder à des propriétés imbriquées (`@Projected(from = "department.name")`)
@@ -56,37 +55,31 @@ Pour des champs qui n'existent pas dans l'entité mais sont calculés à partir 
 ```java
 @Projection(from = User.class, providers = @Provider(UserUtils.class))
 @Exposure(value = "users", basePath = "/api")
-public class UserDTO {
+public interface UserDTO {
 
     @Projected(from = "id")
-    private Long id;
+    Long getId();
 
     @Projected(from = "name")
-    private String name;
+    String getName();
 
     @Projected(from = "orders")
-    private List<OrderDTO> orders;
+    List<OrderDTO> getOrders();
 
     /**
      * Champ calculé à partir de id et name.
      * La méthode de calcul est dans UserUtils.
      */
     @Computed(dependsOn = {"id", "name"})
-    private String keyIdentifier;
+    String getKeyIdentifier();
 
     /**
      * Champ calculé complexe retournant un objet.
      */
     @Computed(dependsOn = {"id"})
-    private UserHistory lastHistory;
+    UserHistory getLastHistory();
 
-    // Getters...
-
-    public static class UserHistory {
-        private String year;
-        private String[] comments;
-        // ...
-    }
+    record UserHistory(String year, String[] comments) {}
 }
 ```
 
@@ -94,19 +87,19 @@ public class UserDTO {
 
 ```java
 public class UserUtils {
-    
+
     /**
      * Appelé automatiquement pour calculer keyIdentifier.
-     * Le nom de méthode suit la convention : get + NomDuChamp
+     * Le nom de méthode suit la convention : to + NomDuChamp
      */
-    public static String getKeyIdentifier(Long id, String name) {
+    public static String toKeyIdentifier(Long id, String name) {
         return id + "-" + name;
     }
 
     /**
      * Appelé automatiquement pour calculer lastHistory.
      */
-    public static UserDTO.UserHistory getLastHistory(Long id) {
+    public static UserDTO.UserHistory toLastHistory(Long id) {
         // Logique pour récupérer l'historique...
         return new UserDTO.UserHistory("2024", new String[]{"Created", "Updated"});
     }
@@ -114,10 +107,90 @@ public class UserUtils {
 ```
 
 **Règles importantes :**
+
 - `@Provider` : Déclare la classe contenant les méthodes de calcul
 - `dependsOn` : Liste les champs de l'entité nécessaires au calcul
-- La méthode doit être `public static` et nommée `get<NomDuChamp>`
+- La méthode doit être `public static` et nommée `to<NomDuChamp>`
 - Les paramètres correspondent aux champs listés dans `dependsOn`
+
+### Référence explicite avec `computedBy`
+
+Au lieu de la résolution conventionnelle, vous pouvez spécifier explicitement la méthode via `computedBy` avec `@Method` :
+
+```java
+@Computed(
+    dependsOn = {"firstName", "lastName"},
+    computedBy = @Method(value = "buildDisplayName")
+)
+String getFullName();
+
+// Ou cibler une classe provider spécifique :
+@Computed(
+    dependsOn = "amount",
+    computedBy = @Method(type = ModernCalculator.class, value = "calculate")
+)
+BigDecimal getTotal();
+```
+
+#### Stratégie de résolution @Method
+
+L'annotation `@Method` supporte une résolution flexible :
+
+| `type`     | `value`    | Résolution                                                               |
+| ---------- | ---------- | ------------------------------------------------------------------------ |
+| Non défini | Non défini | Convention : recherche `to<NomDuChamp>` dans le DTO + tous les providers |
+| Non défini | Spécifié   | Recherche le nom de méthode dans le DTO + tous les providers             |
+| Spécifié   | Non défini | Recherche `to<NomDuChamp>` uniquement dans la classe spécifiée           |
+| Spécifié   | Spécifié   | Correspondance exacte : utilise la méthode dans la classe spécifiée      |
+
+### Calcul en Deux Étapes avec `then` {#then}
+
+L'attribut `then` permet un **pipeline de calcul en deux étapes** : le calcul principal (`computedBy`) alimente son résultat dans une étape de post-traitement (`then`).
+
+```java
+@Projection(from = Product.class, providers = {
+    @Provider(PriceCalculator.class),
+    @Provider(Formatters.class)
+})
+public interface ProductDTO {
+
+    @Computed(
+        dependsOn = {"basePrice", "taxRate"},
+        computedBy = @Method(value = "toCalculateTotal"),
+        then = @Method(value = "toCurrency")  // Post-traitement du résultat
+    )
+    String getFormattedPrice();
+}
+
+public class PriceCalculator {
+    public static BigDecimal toCalculateTotal(BigDecimal base, BigDecimal tax) {
+        return base.multiply(BigDecimal.ONE.add(tax));
+    }
+}
+
+public class Formatters {
+    public static String toCurrency(BigDecimal amount) {
+        return NumberFormat.getCurrencyInstance().format(amount);
+    }
+}
+```
+
+**Flux du pipeline :** `basePrice, taxRate` → `toCalculateTotal()` → `BigDecimal` → `toCurrency()` → `String`
+
+:::tip Quand utiliser `then`
+Utilisez `then` pour les patterns courants de post-traitement :
+
+- **Conversion de type** : `Instant` → `String`
+- **Formatage** : `BigDecimal` → `"€12.34"`
+- **Enveloppement** : `String` → `Optional<String>`
+- **Normalisation** : `String` → `String.trim().toUpperCase()`
+  :::
+
+**Règles pour les méthodes `then` :**
+
+- Doit être `public static` (fonctions pures, pas d'IoC)
+- Prend exactement un paramètre (la sortie de `computedBy`)
+- La méthode `then` est recherchée dans : l'interface DTO → tous les providers enregistrés
 
 ### Agrégations sur Collections avec Reducers {#reducers}
 
@@ -125,14 +198,14 @@ Lorsqu'un champ `@Computed` dépend d'un chemin qui traverse une collection, vou
 
 #### Reducers Disponibles
 
-| Reducer | Constante | Description |
-|---------|-----------|-------------|
-| `SUM` | `Reduce.SUM` | Somme des valeurs numériques |
-| `AVG` | `Reduce.AVG` | Moyenne des valeurs numériques |
-| `COUNT` | `Reduce.COUNT` | Nombre d'éléments |
-| `COUNT_DISTINCT` | `Reduce.COUNT_DISTINCT` | Nombre d'éléments distincts |
-| `MIN` | `Reduce.MIN` | Valeur minimale |
-| `MAX` | `Reduce.MAX` | Valeur maximale |
+| Reducer          | Constante               | Description                    |
+| ---------------- | ----------------------- | ------------------------------ |
+| `SUM`            | `Reduce.SUM`            | Somme des valeurs numériques   |
+| `AVG`            | `Reduce.AVG`            | Moyenne des valeurs numériques |
+| `COUNT`          | `Reduce.COUNT`          | Nombre d'éléments              |
+| `COUNT_DISTINCT` | `Reduce.COUNT_DISTINCT` | Nombre d'éléments distincts    |
+| `MIN`            | `Reduce.MIN`            | Valeur minimale                |
+| `MAX`            | `Reduce.MAX`            | Valeur maximale                |
 
 #### Règle de Correspondance Positionnelle
 
@@ -158,11 +231,11 @@ Lorsqu'un champ `@Computed` dépend d'un chemin qui traverse une collection, vou
 
 Un chemin avec des points n'est **pas** forcément une traversée de collection :
 
-| Chemin | Type | Reducer nécessaire ? |
-|--------|------|---------------------|
-| `address.city` | Scalaire imbriqué (`@Embedded`, `@ManyToOne`) | Non |
-| `orders.total` | Collection (`@OneToMany`) | **Oui** |
-| `departments.teams.employees.salary` | Collections multiples | **Oui** |
+| Chemin                               | Type                                          | Reducer nécessaire ? |
+| ------------------------------------ | --------------------------------------------- | -------------------- |
+| `address.city`                       | Scalaire imbriqué (`@Embedded`, `@ManyToOne`) | Non                  |
+| `orders.total`                       | Collection (`@OneToMany`)                     | **Oui**              |
+| `departments.teams.employees.salary` | Collections multiples                         | **Oui**              |
 
 #### Règle des Chemins de Collection
 
@@ -187,7 +260,7 @@ Considérez une hiérarchie Entreprise → Départements → Employés :
 public class Company {
     @Id private Long id;
     private String name;
-    
+
     @OneToMany(mappedBy = "company")
     private List<Department> departments;
 }
@@ -197,10 +270,10 @@ public class Department {
     @Id private Long id;
     private String name;
     private BigDecimal budget;
-    
+
     @ManyToOne
     private Company company;
-    
+
     @OneToMany(mappedBy = "department")
     private List<Employee> employees;
 }
@@ -210,7 +283,7 @@ public class Employee {
     @Id private Long id;
     private String name;
     private BigDecimal salary;
-    
+
     @ManyToOne
     private Department department;
 }
@@ -221,15 +294,15 @@ public class Employee {
 ```java
 @Projection(from = Company.class, providers = @Provider(CompanyUtils.class))
 @Exposure(value = "companies", basePath = "/api")
-public class CompanyDTO {
-    
+public interface CompanyDTO {
+
     @Projected(from = "id")
     private Long id;
-    
+
     @Projected(from = "name")
     @ExposedAs(value = "NAME", operators = {Op.EQ, Op.MATCHES})
     private String name;
-    
+
     /**
      * Salaire total à travers tous les départements et employés.
      * Le chemin traverse : departments (collection) → employees (collection) → salary
@@ -239,7 +312,7 @@ public class CompanyDTO {
         reducers = {Reduce.SUM}
     )
     private BigDecimal totalSalaries;
-    
+
     /**
      * Budget total à travers tous les départements.
      * Le chemin traverse : departments (collection) → budget
@@ -249,7 +322,7 @@ public class CompanyDTO {
         reducers = {Reduce.SUM}
     )
     private BigDecimal totalBudget;
-    
+
     /**
      * Nombre d'employés à travers tous les départements.
      * Utilise COUNT sur n'importe quel champ (ici : id) de la collection.
@@ -259,7 +332,7 @@ public class CompanyDTO {
         reducers = {Reduce.COUNT}
     )
     private Long employeeCount;
-    
+
     // Getters...
 }
 ```
@@ -268,20 +341,20 @@ public class CompanyDTO {
 
 ```java
 public class CompanyUtils {
-    
+
     /**
      * Reçoit la SUM agrégée de tous les salaires des employés.
      * Le reducer a déjà effectué l'agrégation.
      */
-    public static BigDecimal getTotalSalaries(BigDecimal salarySum) {
+    public static BigDecimal toTotalSalaries(BigDecimal salarySum) {
         return salarySum != null ? salarySum : BigDecimal.ZERO;
     }
-    
-    public static BigDecimal getTotalBudget(BigDecimal budgetSum) {
+
+    public static BigDecimal toTotalBudget(BigDecimal budgetSum) {
         return budgetSum != null ? budgetSum : BigDecimal.ZERO;
     }
-    
-    public static Long getEmployeeCount(Long count) {
+
+    public static Long toEmployeeCount(Long count) {
         return count != null ? count : 0L;
     }
 }
@@ -300,8 +373,8 @@ Vous pouvez mélanger des dépendances scalaires et des dépendances de collecti
 private String summary;
 
 // Le Provider reçoit : (String name, BigDecimal salarySum, BigDecimal budgetAvg)
-public static String getSummary(String name, BigDecimal salarySum, BigDecimal budgetAvg) {
-    return String.format("%s: %.2f€ total salaires, %.2f€ budget moyen", 
+public static String toSummary(String name, BigDecimal salarySum, BigDecimal budgetAvg) {
+    return String.format("%s: %.2f€ total salaires, %.2f€ budget moyen",
         name, salarySum, budgetAvg);
 }
 ```
@@ -329,7 +402,7 @@ FilterQL peut filtrer sur des propriétés de relations (one-to-one, many-to-one
 public class User {
     @Id private Long id;
     private String name;
-    
+
     @ManyToOne
     private Address address;
 }
@@ -411,7 +484,7 @@ Filtrer les éléments d'une collection et paginer le résultat directement dans
 public class User {
     @Id private Long id;
     private String name;
-    
+
     @OneToMany(mappedBy = "author")
     private List<Book> books;
 }
@@ -421,7 +494,7 @@ public class Book {
     @Id private Long id;
     private String title;
     private Integer year;
-    
+
     @ManyToOne
     private User author;
 }
@@ -431,29 +504,28 @@ public class Book {
 
 ```json
 {
-  "projection": [
-    "name",
-    "books[size=5,sort=year:desc].title,year"
-  ]
+  "projection": ["name", "books[size=5,sort=year:desc].title,year"]
 }
 ```
 
 **Décomposition :**
+
 - `books` : Nom de la collection
 - `[size=5,sort=year:desc]` : Options de la collection
 - `.title,year` : Champs à extraire de chaque élément
 
 ### Options Disponibles
 
-| Option | Description | Défaut |
-|--------|-------------|--------|
-| `size=N` | Nombre max d'éléments | 10 |
-| `page=P` | Page (0-indexé) | 0 |
-| `sort=field:dir` | Tri (asc/desc) | - |
+| Option           | Description           | Défaut |
+| ---------------- | --------------------- | ------ |
+| `size=N`         | Nombre max d'éléments | 10     |
+| `page=P`         | Page (0-indexé)       | 0      |
+| `sort=field:dir` | Tri (asc/desc)        | -      |
 
 ### Exemples
 
 **Les 10 derniers livres, triés par année décroissante :**
+
 ```json
 {
   "projection": ["name", "books[size=10,sort=year:desc].title,year"]
@@ -461,6 +533,7 @@ public class Book {
 ```
 
 **Tri multi-colonnes :**
+
 ```json
 {
   "projection": ["name", "books[sort=year:desc,title:asc].title,year"]
@@ -468,6 +541,7 @@ public class Book {
 ```
 
 **Page 2 des livres (éléments 20-29) :**
+
 ```json
 {
   "projection": ["name", "books[page=2,size=10].title"]
@@ -506,10 +580,10 @@ public JpaFilterContext<ProductProperty> productContext(EntityManager em) {
         (root, prop) -> switch (prop) {
             // Mapping simple
             case NAME -> root.get("name");
-            
+
             // Relation
             case CATEGORY_NAME -> root.get("category").get("name");
-            
+
             // Calcul (attention aux performances)
             case TOTAL_STOCK -> root.get("warehouse1Stock")
                                     .add(root.get("warehouse2Stock"));
@@ -526,17 +600,17 @@ Pour gérer des opérateurs personnalisés comme SOUNDEX, GEO_WITHIN, etc., voir
 
 FilterQL JPA propose plusieurs stratégies d'exécution :
 
-| Stratégie | Description | Usage |
-|-----------|-------------|-------|
+| Stratégie                 | Description                                  | Usage                                 |
+| ------------------------- | -------------------------------------------- | ------------------------------------- |
 | `MultiQueryFetchStrategy` | Requête séparée pour le count et les données | **Recommandé** - Performance optimale |
-| `FullEntityFetchStrategy` | Charge les entités complètes | Quand vous avez besoin des entités |
-| `CountStrategy` | Compte uniquement, pas de données | Statistiques |
+| `FullEntityFetchStrategy` | Charge les entités complètes                 | Quand vous avez besoin des entités    |
+| `CountStrategy`           | Compte uniquement, pas de données            | Statistiques                          |
 
 ```java
 // Utilisation explicite d'une stratégie
 FilterQuery<User> query = FilterQueryFactory.of(context);
 PaginatedResult<User> result = query.execute(
-    request, 
+    request,
     new MultiQueryFetchStrategy<>(em, User.class)
 );
 ```
@@ -568,13 +642,13 @@ public class UserDTO {
 
     @ExposedAs(value = "USERNAME", operators = {Op.EQ, Op.MATCHES})
     private String name;
-    
+
     @ExposedAs(exposed = false)  // Non exposé à l'API (pas filtrable)
     private String internalId;
-    
+
     @ExposedAs(value = "EMAIL", operators = {Op.EQ, Op.MATCHES})
     private String email;
-    
+
     private Integer age;  // Sans @ExposedAs = non filtrable mais retourné dans la projection
 }
 ```
@@ -585,14 +659,14 @@ Les champs virtuels sont l'une des fonctionnalités les plus puissantes de Filte
 
 ### Pourquoi les Champs Virtuels ?
 
-| Cas d'utilisation | Exemple |
-|-------------------|---------|
-| **Propriétés calculées** | Filtrer par `fullName` (combine prénom + nom) |
-| **Alias sémantiques** | `isActive` au lieu de vérifications de statut complexes |
-| **Encapsulation métier** | `hasAccess` avec vérification de rôles/permissions |
-| **Recherches multi-champs** | Rechercher dans plusieurs colonnes simultanément |
-| **Agrégations** | `orderCount > 10` basé sur des sous-requêtes |
-| **Filtrage dynamique** | `withinMyOrg` basé sur le contexte de l'utilisateur courant |
+| Cas d'utilisation           | Exemple                                                     |
+| --------------------------- | ----------------------------------------------------------- |
+| **Propriétés calculées**    | Filtrer par `fullName` (combine prénom + nom)               |
+| **Alias sémantiques**       | `isActive` au lieu de vérifications de statut complexes     |
+| **Encapsulation métier**    | `hasAccess` avec vérification de rôles/permissions          |
+| **Recherches multi-champs** | Rechercher dans plusieurs colonnes simultanément            |
+| **Agrégations**             | `orderCount > 10` basé sur des sous-requêtes                |
+| **Filtrage dynamique**      | `withinMyOrg` basé sur le contexte de l'utilisateur courant |
 
 ### Syntaxe de Base
 
@@ -609,6 +683,7 @@ public static PredicateResolver<Entity> nomMethode(String op, Object[] args) {
 ```
 
 **Exigences de la méthode :**
+
 - **Type de retour :** `PredicateResolver<E>` où `E` est le type de l'entité
 - **Paramètres :** `(String op, Object[] args)` — l'opérateur et les arguments du filtre
 - **Visibilité :** `public static` (ou méthode d'instance pour les beans Spring)
@@ -624,7 +699,7 @@ Les méthodes statiques sont idéales pour la **logique de prédicat pure** qui 
 ```java
 @Projection(from = Person.class)
 @Exposure(value = "persons", basePath = "/api")
-public class PersonDTO {
+public interface PersonDTO {
 
     @ExposedAs(value = "FIRST_NAME", operators = {Op.EQ, Op.MATCHES})
     private String firstName;
@@ -650,6 +725,7 @@ public class PersonDTO {
 ```
 
 **Utilisation :**
+
 ```json
 {
   "filters": {
@@ -684,13 +760,14 @@ public class VirtualResolverConfig {
 
 // Enregistrer comme provider dans le DTO
 @Projection(
-    entity = Person.class,
+    from = Person.class,
     providers = @Provider(VirtualResolverConfig.class)
 )
-public class PersonDTO { /* ... */ }
+public interface PersonDTO { /* ... */ }
 ```
 
 **Utilisation :**
+
 ```json
 {
   "filters": {
@@ -722,7 +799,7 @@ public class UserTenancyService {
     public PredicateResolver<Person> withinCurrentOrg(String op, Object[] args) {
         // Accéder à l'utilisateur courant depuis le contexte de sécurité
         String currentUserOrg = securityContext.getCurrentUser().getOrganization();
-        
+
         return (root, query, cb) -> {
             Boolean withinOrg = args.length > 0 ? (Boolean) args[0] : true;
             if (Boolean.TRUE.equals(withinOrg)) {
@@ -736,13 +813,14 @@ public class UserTenancyService {
 
 // Enregistrer comme provider dans le DTO
 @Projection(
-    entity = Person.class,
+    from = Person.class,
     providers = @Provider(UserTenancyService.class)
 )
-public class PersonDTO { /* ... */ }
+public interface PersonDTO { /* ... */ }
 ```
 
 **Utilisation :**
+
 ```json
 {
   "filters": {
@@ -767,7 +845,7 @@ public class AccessControlService {
     @ExposedAs(value = "HAS_ACCESS", operators = {Op.EQ})
     public PredicateResolver<Document> hasAccess(String op, Object[] args) {
         List<Long> accessibleIds = permissions.getAccessibleResourceIds();
-        
+
         return (root, query, cb) -> {
             Boolean hasAccess = args.length > 0 ? (Boolean) args[0] : true;
             if (Boolean.TRUE.equals(hasAccess)) {
@@ -797,9 +875,9 @@ public static PredicateResolver<Product> computedScore(String op, Object[] args)
             cb.prod(root.get("rating"), 10),
             root.get("reviewCount")
         );
-        
+
         Integer threshold = (Integer) args[0];
-        
+
         return switch (op) {
             case "EQ" -> cb.equal(score, threshold);
             case "GT" -> cb.gt(score, threshold);
@@ -823,9 +901,9 @@ public static PredicateResolver<Customer> orderCount(String op, Object[] args) {
         var orderRoot = subquery.from(Order.class);
         subquery.select(cb.count(orderRoot))
                .where(cb.equal(orderRoot.get("customer"), root));
-        
+
         Long count = ((Number) args[0]).longValue();
-        
+
         return switch (op) {
             case "GT" -> cb.gt(subquery, count);
             case "LT" -> cb.lt(subquery, count);
@@ -837,6 +915,7 @@ public static PredicateResolver<Customer> orderCount(String op, Object[] args) {
 ```
 
 **Utilisation :**
+
 ```json
 {
   "filters": {
@@ -875,14 +954,14 @@ Enregistrez-les avec `@Provider` :
 
 ```java
 @Projection(
-    entity = Person.class,
+    from = Person.class,
     providers = {
         @Provider(VirtualResolverConfig.class),  // Méthodes statiques
         @Provider(UserTenancyService.class)      // Bean Spring (méthodes d'instance)
     }
 )
 @Exposure(value = "persons", basePath = "/api")
-public class PersonDTO {
+public interface PersonDTO {
     // ...
 }
 ```
@@ -933,9 +1012,9 @@ N'exposez que les opérateurs qui ont du sens pour le champ virtuel :
 ```java
 /**
  * Champ virtuel : Filtre les produits par score de popularité calculé.
- * 
+ *
  * Formule du score : (rating * 10) + (reviewCount * 2) + (salesCount / 100)
- * 
+ *
  * Opérateurs :
  * - GT/GTE : Produits avec score au-dessus du seuil
  * - LT/LTE : Produits avec score en-dessous du seuil
@@ -955,20 +1034,20 @@ FilterQL supporte des opérateurs personnalisés au-delà de l'ensemble standard
 
 ### Pourquoi des Opérateurs Personnalisés ?
 
-| Cas d'utilisation | Exemple |
-|-------------------|---------|
-| **Fonctions base de données** | SOUNDEX, LEVENSHTEIN pour le matching flou |
-| **Requêtes géospatiales** | GEO_WITHIN, GEO_DISTANCE pour le filtrage par localisation |
-| **Recherche full-text** | FULL_TEXT utilisant les capacités spécifiques à la base |
-| **Surcharge de comportement** | Logique MATCHES personnalisée pour des propriétés spécifiques |
-| **Préoccupations transverses** | Filtrage par tenant, gestion du soft-delete |
+| Cas d'utilisation              | Exemple                                                       |
+| ------------------------------ | ------------------------------------------------------------- |
+| **Fonctions base de données**  | SOUNDEX, LEVENSHTEIN pour le matching flou                    |
+| **Requêtes géospatiales**      | GEO_WITHIN, GEO_DISTANCE pour le filtrage par localisation    |
+| **Recherche full-text**        | FULL_TEXT utilisant les capacités spécifiques à la base       |
+| **Surcharge de comportement**  | Logique MATCHES personnalisée pour des propriétés spécifiques |
+| **Préoccupations transverses** | Filtrage par tenant, gestion du soft-delete                   |
 
 ### Interface CustomOperatorResolver
 
 ```java
 @FunctionalInterface
 public interface CustomOperatorResolver<P extends Enum<P> & PropertyReference> {
-    
+
     /**
      * @param ref  la référence de propriété filtrée
      * @param op   le code de l'opérateur (ex: "SOUNDEX", "EQ")
@@ -1005,14 +1084,14 @@ public interface CustomOperatorResolver<P extends Enum<P> & PropertyReference> {
 
 ```java
 JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
-        UserProperty.class, 
+        UserProperty.class,
         mappingBuilder
     ).withCustomOperatorResolver((ref, op, args) -> {
         // Retourner null pour déléguer au mécanisme par défaut
         if (!"SOUNDEX".equals(op)) {
             return null;
         }
-        
+
         // Gérer l'opérateur SOUNDEX
         String fieldPath = switch (ref) {
             case FIRST_NAME -> "firstName";
@@ -1020,7 +1099,7 @@ JpaFilterContext<UserProperty> context = new JpaFilterContext<>(
             default -> throw new IllegalArgumentException(
                 "SOUNDEX non supporté pour " + ref);
         };
-        
+
         return (root, query, cb) -> cb.equal(
             cb.function("SOUNDEX", String.class, root.get(fieldPath)),
             cb.function("SOUNDEX", String.class, cb.literal((String) args[0]))
@@ -1053,10 +1132,10 @@ private static PredicateResolver<?> handleLevenshtein(UserProperty ref, Object[]
     String field = getFieldPath(ref);
     String searchValue = (String) args[0];
     int maxDistance = args.length > 1 ? (Integer) args[1] : 2;
-    
+
     return (root, query, cb) -> cb.le(
-        cb.function("LEVENSHTEIN", Integer.class, 
-            root.get(field), 
+        cb.function("LEVENSHTEIN", Integer.class,
+            root.get(field),
             cb.literal(searchValue)),
         maxDistance
     );
@@ -1076,7 +1155,7 @@ CustomOperatorResolver<UserProperty> emailOverride = (ref, op, args) -> {
             return cb.like(cb.lower(root.get("email")), pattern);
         };
     }
-    
+
     // Surcharger EQ pour STATUS pour gérer les alias d'enum
     if (ref == UserProperty.STATUS && "EQ".equals(op)) {
         return (root, query, cb) -> {
@@ -1084,7 +1163,7 @@ CustomOperatorResolver<UserProperty> emailOverride = (ref, op, args) -> {
             return cb.equal(root.get("status"), status);
         };
     }
-    
+
     return null;  // Utiliser le défaut pour tout le reste
 };
 ```
@@ -1126,10 +1205,10 @@ CustomOperatorResolver<UserProperty> resolver = (ref, op, args) -> {
 ```java
 /**
  * Opérateurs personnalisés supportés :
- * 
+ *
  * SOUNDEX - Matching phonétique (FIRST_NAME, LAST_NAME uniquement)
  *   Usage : { "ref": "FIRST_NAME", "op": "SOUNDEX", "value": "Jon" }
- * 
+ *
  * GEO_WITHIN - Recherche par rayon géographique (LOCATION uniquement)
  *   Usage : { "ref": "LOCATION", "op": "GEO_WITHIN", "value": [lat, lon, rayonKm] }
  */
@@ -1202,9 +1281,9 @@ void allPropertiesShouldHaveTypes() {
 
 Pour les détails d'implémentation complets :
 
-| Sujet | Documentation |
-|-------|---------------|
-| API Core (interfaces, classes) | [→ Référence Core](./reference/core) |
-| API JPA (contexte, stratégies) | [→ Référence JPA](./reference/jpa-adapter) |
-| API Spring (annotations, services) | [→ Référence Spring](./reference/spring-adapter) |
-| Spécification formelle du protocole | [→ Protocole](./protocol) |
+| Sujet                               | Documentation                                    |
+| ----------------------------------- | ------------------------------------------------ |
+| API Core (interfaces, classes)      | [→ Référence Core](./reference/core)             |
+| API JPA (contexte, stratégies)      | [→ Référence JPA](./reference/jpa-adapter)       |
+| API Spring (annotations, services)  | [→ Référence Spring](./reference/spring-adapter) |
+| Spécification formelle du protocole | [→ Protocole](./protocol)                        |

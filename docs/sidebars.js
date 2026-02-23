@@ -23,6 +23,18 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: '📘 Guides',
+      collapsed: true,
+      items: [
+        'guides/projection',
+        'guides/filter-definition',
+        'guides/dsl-syntax',
+        'guides/property-reference',
+        'guides/custom-operators',
+      ],
+    },
+    {
+      type: 'category',
       label: '📚 API Reference',
       collapsed: true,
       items: [

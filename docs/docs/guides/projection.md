@@ -4,52 +4,52 @@ sidebar_position: 4
 
 # Projection
 
-La projection permet de sélectionner uniquement les champs nécessaires dans les résultats, optimisant ainsi les performances et le transfert de données.
+Projection lets you select only the fields you need, optimizing performance and data transfer.
 
 ---
 
-## Syntaxe de Base
+## Basic Syntax
 
-Les champs de projection sont spécifiés dans le `FilterRequest` :
+Projection fields are specified in the `FilterRequest`:
 
 ```java
 FilterRequest<UserPropertyRef> request = FilterRequest.<UserPropertyRef>builder()
     .filter("activeFilter", UserPropertyRef.STATUS, Op.EQ, UserStatus.ACTIVE)
     .combineWith("activeFilter")
-    .projection("id", "username", "email")  // Champs projetés
+    .projection("id", "username", "email")  // Projected fields
     .build();
 ```
 
 ---
 
-## Grammaire Formelle (EBNF)
+## Formal Grammar (EBNF)
 
 ```ebnf
-(* Spécification de champ de projection *)
+(* Projection field specification *)
 projection-field     = simple-field | nested-field | collection-field ;
 
-(* Champ simple sans hiérarchie *)
+(* Simple field without hierarchy *)
 simple-field         = field-name ;
 
-(* Champ imbriqué avec notation point *)
+(* Nested field with dot notation *)
 nested-field         = field-path , "." , field-list ;
 
-(* Champ de collection avec pagination/tri optionnel *)
+(* Collection field with optional pagination/sorting *)
 collection-field     = field-path-with-options , "." , field-list ;
 
-(* Chemin de champ (peut inclure options de collection) *)
+(* Field path (may include collection options) *)
 field-path           = field-segment , { "." , field-segment } ;
 field-segment-with-options = field-name , [ collection-options ] ;
 
-(* Liste multi-champs (séparée par virgule après le dernier point) *)
+(* Multi-field list (comma-separated after last dot) *)
 field-list           = field-name , { "," , field-name } ;
 
-(* Options de pagination/tri de collection *)
+(* Collection pagination/sorting options *)
 collection-options   = "[" , option-list , "]" ;
 option-list          = option , { "," , option } ;
 option               = size-option | page-option | sort-option ;
 
-(* Options individuelles *)
+(* Individual options *)
 size-option          = "size=" , positive-integer ;
 page-option          = "page=" , non-negative-integer ;
 sort-option          = "sort=" , sort-spec , { "," , sort-spec } ;
@@ -59,88 +59,88 @@ sort-direction       = "asc" | "desc" | "ASC" | "DESC" ;
 
 ---
 
-## Types de Projection
+## Projection Types
 
-### Champs Simples
+### Simple Fields
 
 ```java
 .projection("id", "username", "email", "age")
 ```
 
-### Champs Imbriqués
+### Nested Fields
 
-Pour les relations JPA (`@ManyToOne`, `@OneToOne`), utilisez la notation point :
+For JPA relations (`@ManyToOne`, `@OneToOne`), use dot notation:
 
 ```java
 .projection(
     "id",
     "username",
-    "address.city",        // Accède à user.address.city
-    "address.country",     // Accède à user.address.country
-    "department.name"      // Accède à user.department.name
+    "address.city",        // Accesses user.address.city
+    "address.country",     // Accesses user.address.country
+    "department.name"      // Accesses user.department.name
 )
 ```
 
-### Syntaxe Multi-Champs Compacte
+### Compact Multi-Field Syntax
 
-Pour plusieurs champs partageant le même préfixe :
+For multiple fields sharing the same prefix:
 
 ```java
-// Syntaxe compacte
+// Compact syntax
 .projection("id", "address.city,country,postalCode")
 
-// Équivalent à :
+// Equivalent to:
 .projection("id", "address.city", "address.country", "address.postalCode")
 ```
 
 ---
 
-## Projection de Collections
+## Collection Projection
 
-FilterQL supporte la projection de collections (`@OneToMany`, `@ManyToMany`) avec pagination et tri inline.
+FilterQL supports collection projection (`@OneToMany`, `@ManyToMany`) with inline pagination and sorting.
 
-### Options Disponibles
+### Available Options
 
-| Option | Description | Valeur par Défaut | Plage |
-|--------|-------------|-------------------|-------|
-| `size=N` | Taille de page | 10 | 1 à 10000 |
-| `page=P` | Numéro de page (0-indexé) | 0 | 0+ |
-| `sort=field:dir` | Tri par champ | - | asc/desc |
+| Option           | Description             | Default | Range      |
+| ---------------- | ----------------------- | ------- | ---------- |
+| `size=N`         | Page size               | 10      | 1 to 10000 |
+| `page=P`         | Page number (0-indexed) | 0       | 0+         |
+| `sort=field:dir` | Sort by field           | -       | asc/desc   |
 
-### Exemples
+### Examples
 
-#### Pagination Simple
+#### Simple Pagination
 
 ```java
-// 10 premiers livres par auteur
+// First 10 books per author
 .projection("id", "name", "books[size=10].title,year")
 ```
 
-#### Avec Tri
+#### With Sorting
 
 ```java
-// 20 livres les plus récents
+// 20 most recent books
 .projection("id", "name", "books[size=20,sort=year:desc].title,year")
 ```
 
-#### Pagination et Tri Combinés
+#### Combined Pagination and Sorting
 
 ```java
-// Page 2 (éléments 20-39), triés par année décroissante
+// Page 2 (items 20-39), sorted by year descending
 .projection("id", "name", "books[size=20,page=1,sort=year:desc].title,author,year")
 ```
 
-#### Tri Multi-Colonnes
+#### Multi-Column Sorting
 
 ```java
-// Trier par année desc, puis par titre asc
+// Sort by year desc, then by title asc
 .projection("id", "books[sort=year:desc,title:asc].title,year")
 ```
 
-#### Pagination Hiérarchique
+#### Hierarchical Pagination
 
 ```java
-// 10 auteurs par entité, 5 livres par auteur
+// 10 authors per entity, 5 books per author
 .projection(
     "id",
     "name",
@@ -150,9 +150,9 @@ FilterQL supporte la projection de collections (`@OneToMany`, `@ManyToMany`) ave
 
 ---
 
-## Entités et DTOs
+## Entities and DTOs
 
-### Définition d'Entité
+### Entity Definition
 
 ```java
 @Entity
@@ -160,10 +160,10 @@ public class Author {
     @Id
     private Long id;
     private String name;
-    
+
     @OneToMany(mappedBy = "author")
     private List<Book> books;
-    
+
     @ManyToMany
     @JoinTable(name = "author_awards")
     private Set<Award> awards;
@@ -175,15 +175,15 @@ public class Book {
     private Long id;
     private String title;
     private Integer year;
-    
+
     @ManyToOne
     private Author author;
 }
 ```
 
-### Définition de DTO avec @Projection
+### DTO Definition with @Projection
 
-:::note Dépendance Externe
+:::note External Dependency
 The `@Projection` annotation comes from [projection-spec](https://github.com/cyfko/projection-spec), implemented by [jpa-metamodel-processor](https://github.com/cyfko/jpa-metamodel-processor).
 :::
 
@@ -195,10 +195,10 @@ import io.github.cyfko.projection.Projected;
 public interface AuthorDTO {
     Long getId();
     String getName();
-    
+
     @Projected(from = "books")
     List<BookSummaryDTO> getBooks();
-    
+
     @Projected(from = "awards")
     Set<AwardDTO> getAwards();
 }
@@ -213,9 +213,9 @@ public interface BookSummaryDTO {
 
 ---
 
-## Exécution
+## Execution
 
-### Sans Pagination de Collection
+### Without Collection Pagination
 
 ```java
 FilterRequest<AuthorPropertyRef> request = FilterRequest.<AuthorPropertyRef>builder()
@@ -229,10 +229,10 @@ MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(AuthorDTO.class);
 QueryExecutor<List<Map<String, Object>>> executor = filterQuery.toExecutor(request);
 List<Map<String, Object>> results = executor.executeWith(em, strategy);
 
-// Résultat : Tous les livres et awards pour chaque auteur (sans limite)
+// Result: All books and awards for each author (no limit)
 ```
 
-### Avec Pagination de Collection
+### With Collection Pagination
 
 ```java
 FilterRequest<AuthorPropertyRef> request = FilterRequest.<AuthorPropertyRef>builder()
@@ -241,7 +241,7 @@ FilterRequest<AuthorPropertyRef> request = FilterRequest.<AuthorPropertyRef>buil
     .projection(
         "id",
         "name",
-        "books[size=5,sort=year:desc].title,year"  // 5 derniers livres
+        "books[size=5,sort=year:desc].title,year"  // Last 5 books
     )
     .pagination(new Pagination(0, 20, null))
     .build();
@@ -250,7 +250,7 @@ MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(AuthorDTO.class);
 List<Map<String, Object>> results = executor.executeWith(em, strategy);
 ```
 
-### Résultat JSON
+### JSON Result
 
 ```json
 {
@@ -259,11 +259,11 @@ List<Map<String, Object>> results = executor.executeWith(em, strategy);
       "id": 1,
       "name": "John Smith",
       "books": [
-        {"title": "Latest Book", "year": 2024},
-        {"title": "Previous Work", "year": 2023},
-        {"title": "Classic Novel", "year": 2022},
-        {"title": "Early Writing", "year": 2021},
-        {"title": "First Book", "year": 2020}
+        { "title": "Latest Book", "year": 2024 },
+        { "title": "Previous Work", "year": 2023 },
+        { "title": "Classic Novel", "year": 2022 },
+        { "title": "Early Writing", "year": 2021 },
+        { "title": "First Book", "year": 2020 }
       ]
     }
   ],
@@ -278,56 +278,56 @@ List<Map<String, Object>> results = executor.executeWith(em, strategy);
 
 ---
 
-## Règles de Validation
+## Validation Rules
 
-### Options Cohérentes
+### Consistent Options
 
-Les références multiples à la même collection doivent utiliser des options identiques :
+Multiple references to the same collection must use identical options:
 
 ```java
-// ❌ INVALIDE : options conflictuelles pour 'books'
+// ❌ INVALID: conflicting options for 'books'
 .projection(
     "books[size=10].title",
-    "books[size=20].author"  // ERREUR : size différent
+    "books[size=20].author"  // ERROR: different size
 )
 
-// ✅ VALIDE : options identiques
+// ✅ VALID: identical options
 .projection(
     "books[size=10,sort=year:desc].title",
     "books[size=10,sort=year:desc].author"
 )
 
-// ✅ VALIDE : utiliser la syntaxe multi-champs
+// ✅ VALID: use multi-field syntax
 .projection(
     "books[size=10,sort=year:desc].title,author"
 )
 ```
 
-### Limites de Taille
+### Size Limits
 
 ```java
-// ❌ INVALIDE : size > 10000
-.projection("books[size=50000].title")  // ERREUR
+// ❌ INVALID: size > 10000
+.projection("books[size=50000].title")  // ERROR
 
-// ❌ INVALIDE : size < 1
-.projection("books[size=0].title")  // ERREUR
+// ❌ INVALID: size < 1
+.projection("books[size=0].title")  // ERROR
 ```
 
 ---
 
-## Considérations de Performance
+## Performance Considerations
 
-| Aspect | Recommandation |
-|--------|----------------|
-| **Fetch par défaut** | Sans options, les collections sont récupérées entièrement |
-| **Batch fetching** | `MultiQueryFetchStrategy` utilise le batch fetching pour éviter N+1 |
-| **Mémoire** | La pagination réduit l'empreinte mémoire pour les grandes collections |
-| **Index** | Les champs de tri DOIVENT être indexés pour des performances optimales |
+| Aspect             | Recommendation                                             |
+| ------------------ | ---------------------------------------------------------- |
+| **Default fetch**  | Without options, collections are retrieved entirely        |
+| **Batch fetching** | `MultiQueryFetchStrategy` uses batch fetching to avoid N+1 |
+| **Memory**         | Pagination reduces memory footprint for large collections  |
+| **Indexes**        | Sort fields SHOULD be indexed for optimal performance      |
 
 ---
 
-## Prochaines Étapes
+## Next Steps
 
-- [Agrégations sur Collections](../advanced-guide#reducers) - Calculer des totaux, moyennes, comptages sur des collections imbriquées
-- [Opérateurs Personnalisés](custom-operators) - Créer des opérateurs métier
-- [Référence JPA Adapter](../reference/jpa-adapter) - Stratégies d'exécution détaillées
+- [Collection Aggregations](../advanced-guide#reducers) - Calculate totals, averages, counts on nested collections
+- [Custom Operators](custom-operators) - Create business operators
+- [JPA Adapter Reference](../reference/jpa-adapter) - Detailed execution strategies
