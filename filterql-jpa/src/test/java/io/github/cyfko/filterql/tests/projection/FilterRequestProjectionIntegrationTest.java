@@ -7,12 +7,15 @@ import io.github.cyfko.filterql.core.spi.FilterQuery;
 import io.github.cyfko.filterql.core.api.Op;
 import io.github.cyfko.filterql.core.api.PropertyReference;
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
+import io.github.cyfko.filterql.jpa.spi.InstanceResolver;
 import io.github.cyfko.filterql.tests.entities.projection._2.OrderC;
 import io.github.cyfko.filterql.tests.entities.projection._2.UserC;
 import io.github.cyfko.filterql.core.spi.ExecutionStrategy;
 import io.github.cyfko.filterql.jpa.strategies.FullEntityFetchStrategy;
 import io.github.cyfko.filterql.jpa.strategies.MultiQueryFetchStrategy;
 import io.github.cyfko.filterql.jpa.strategies.helper.RowBuffer;
+import io.github.cyfko.filterql.tests.entities.projection._4.CompanyDto;
+import io.github.cyfko.filterql.tests.entities.projection._4.CompanyProperty;
 import jakarta.persistence.*;
 import org.junit.jupiter.api.*;
 
@@ -242,6 +245,36 @@ class FilterRequestProjectionIntegrationTest {
             UserC bob = results.getFirst();
             assertEquals("Bob Johnson", bob.getName());
             assertEquals("bob@example.com", bob.getEmail());
+        }
+    }
+
+    @Test
+    @Order(5)
+    @DisplayName("FilterRequest: Should handle 1-Level Collections only")
+    void shouldHandleProjectionOfCollectionFieldIsolated() {
+        try (EntityManager em = emf.createEntityManager()) {
+            FilterRequest<UserProperty> request = FilterRequest.<UserProperty>builder()
+                    .projection("orders[size=1]")
+                    .build();
+
+            var strategy = new MultiQueryFetchStrategy(UserC.class);
+            List<RowBuffer> results = filterQuery.execute(request, em, strategy);
+
+            RowBuffer johnBuffer = results.getFirst();
+            Map<String, Object> john = johnBuffer.toMap();
+
+            @SuppressWarnings("unchecked")
+            var orders = (List<Map<String, Object>>) john.get("orders");
+
+            assertNotNull(orders, "Should have orders field");
+            assertEquals(1, orders.size());
+
+            // For Order #1
+            Map<String, Object> ord = orders.getFirst();
+            assertEquals(3, ord.size(), "Order should project only 3 fields");
+            assertEquals(1L, (long) ord.get("id"), "Should have orders's id field with expected value");
+            assertEquals(100.0, (double) ord.get("amount"), "Should have orders's id field with expected value");
+            assertEquals("ORD-001", ord.get("orderNumber"), "Should have orders's name field with expected value");
         }
     }
 }

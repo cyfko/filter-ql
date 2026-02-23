@@ -176,6 +176,38 @@ class UltimateNestedBenchmarkTest {
         runComparisonNoComputed(projection, "2-Level Collections");
     }
 
+    @Test
+    @Order(5)
+    @DisplayName("Projection: projection holds only collection field")
+    void shouldHandleProjectionOfUniqueCollectionField() {
+        try (EntityManager em = emf.createEntityManager()) {
+
+            FilterRequest<CompanyProperty> request = FilterRequest.<CompanyProperty>builder()
+                    .projection("departments")
+                    .pagination(0,1)
+                    .build();
+
+            InstanceResolver resolver = InstanceResolver.noBean();
+            MultiQueryFetchStrategy strategy = new MultiQueryFetchStrategy(CompanyDto.class, resolver);
+
+            List<RowBuffer> result = FilterQueryFactory.of(filterContext).execute(request, em, strategy);
+            var first = result.getFirst().toMap();
+
+            @SuppressWarnings("unchecked")
+            var departments = (List<Map<String, Object>>) first.get("departments");
+
+            assertEquals(3, departments.size(), "Should have 3 departments");
+
+            for (int i = 0; i < departments.size(); i++) {
+                Map<String, Object> department = departments.get(i);
+                assertFalse(department.containsKey("teams"), "Should not have department's teams because not implicitly projected");
+                assertEquals((long) i+1, (long) department.get("id"), "Should have department's id field with expected value");
+                assertEquals("Dept-0-" + i, department.get("name"), "Should have department's name field with expected value");
+                assertEquals((long) 100_000 + i* 10_000L, (long) department.get("budget"), "Should have department's budget field with expected value");
+            }
+        }
+    }
+
     private void runComparison(Set<String> projection, String testName) {
         try (EntityManager em = emf.createEntityManager()) {
 
