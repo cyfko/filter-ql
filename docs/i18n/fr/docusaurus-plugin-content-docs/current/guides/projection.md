@@ -101,11 +101,11 @@ FilterQL supporte la projection de collections (`@OneToMany`, `@ManyToMany`) ave
 
 ### Options Disponibles
 
-| Option | Description | Valeur par Défaut | Plage |
-|--------|-------------|-------------------|-------|
-| `size=N` | Taille de page | 10 | 1 à 10000 |
-| `page=P` | Numéro de page (0-indexé) | 0 | 0+ |
-| `sort=field:dir` | Tri par champ | - | asc/desc |
+| Option           | Description               | Valeur par Défaut | Plage     |
+| ---------------- | ------------------------- | ----------------- | --------- |
+| `size=N`         | Taille de page            | 10                | 1 à 10000 |
+| `page=P`         | Numéro de page (0-indexé) | 0                 | 0+        |
+| `sort=field:dir` | Tri par champ             | -                 | asc/desc  |
 
 ### Exemples
 
@@ -160,10 +160,10 @@ public class Author {
     @Id
     private Long id;
     private String name;
-    
+
     @OneToMany(mappedBy = "author")
     private List<Book> books;
-    
+
     @ManyToMany
     @JoinTable(name = "author_awards")
     private Set<Award> awards;
@@ -175,7 +175,7 @@ public class Book {
     private Long id;
     private String title;
     private Integer year;
-    
+
     @ManyToOne
     private Author author;
 }
@@ -192,22 +192,22 @@ import io.github.cyfko.projection.Projection;
 import io.github.cyfko.projection.Projected;
 
 @Projection(from = Author.class)
-public class AuthorDTO {
-    private Long id;
-    private String name;
-    
+public interface AuthorDTO {
+    Long getId();
+    String getName();
+
     @Projected(from = "books")
-    private List<BookSummaryDTO> books;
-    
+    List<BookSummaryDTO> getBooks();
+
     @Projected(from = "awards")
-    private Set<AwardDTO> awards;
+    Set<AwardDTO> getAwards();
 }
 
 @Projection(from = Book.class)
-public class BookSummaryDTO {
-    private Long id;
-    private String title;
-    private Integer year;
+public interface BookSummaryDTO {
+    Long getId();
+    String getTitle();
+    Integer getYear();
 }
 ```
 
@@ -259,11 +259,11 @@ List<Map<String, Object>> results = executor.executeWith(em, strategy);
       "id": 1,
       "name": "John Smith",
       "books": [
-        {"title": "Latest Book", "year": 2024},
-        {"title": "Previous Work", "year": 2023},
-        {"title": "Classic Novel", "year": 2022},
-        {"title": "Early Writing", "year": 2021},
-        {"title": "First Book", "year": 2020}
+        { "title": "Latest Book", "year": 2024 },
+        { "title": "Previous Work", "year": 2023 },
+        { "title": "Classic Novel", "year": 2022 },
+        { "title": "Early Writing", "year": 2021 },
+        { "title": "First Book", "year": 2020 }
       ]
     }
   ],
@@ -317,12 +317,12 @@ Les références multiples à la même collection doivent utiliser des options i
 
 ## Considérations de Performance
 
-| Aspect | Recommandation |
-|--------|----------------|
-| **Fetch par défaut** | Sans options, les collections sont récupérées entièrement |
-| **Batch fetching** | `MultiQueryFetchStrategy` utilise le batch fetching pour éviter N+1 |
-| **Mémoire** | La pagination réduit l'empreinte mémoire pour les grandes collections |
-| **Index** | Les champs de tri DOIVENT être indexés pour des performances optimales |
+| Aspect               | Recommandation                                                         |
+| -------------------- | ---------------------------------------------------------------------- |
+| **Fetch par défaut** | Sans options, les collections sont récupérées entièrement              |
+| **Batch fetching**   | `MultiQueryFetchStrategy` utilise le batch fetching pour éviter N+1    |
+| **Mémoire**          | La pagination réduit l'empreinte mémoire pour les grandes collections  |
+| **Index**            | Les champs de tri DOIVENT être indexés pour des performances optimales |
 
 ---
 

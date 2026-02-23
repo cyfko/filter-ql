@@ -297,11 +297,11 @@ public class Employee {
 public interface CompanyDTO {
 
     @Projected(from = "id")
-    private Long id;
+    Long getId();
 
     @Projected(from = "name")
     @ExposedAs(value = "NAME", operators = {Op.EQ, Op.MATCHES})
-    private String name;
+    String getName();
 
     /**
      * Salaire total à travers tous les départements et employés.
@@ -311,7 +311,7 @@ public interface CompanyDTO {
         dependsOn = {"departments.employees.salary"},
         reducers = {Reduce.SUM}
     )
-    private BigDecimal totalSalaries;
+    BigDecimal getTotalSalaries();
 
     /**
      * Budget total à travers tous les départements.
@@ -321,7 +321,7 @@ public interface CompanyDTO {
         dependsOn = {"departments.budget"},
         reducers = {Reduce.SUM}
     )
-    private BigDecimal totalBudget;
+    BigDecimal getTotalBudget();
 
     /**
      * Nombre d'employés à travers tous les départements.
@@ -331,9 +331,7 @@ public interface CompanyDTO {
         dependsOn = {"departments.employees.id"},
         reducers = {Reduce.COUNT}
     )
-    private Long employeeCount;
-
-    // Getters...
+    Long getEmployeeCount();
 }
 ```
 
@@ -420,22 +418,22 @@ public class Address {
 ```java
 @Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api")
-public class UserDTO {
+public interface UserDTO {
 
     @ExposedAs(value = "NAME", operators = {Op.EQ, Op.MATCHES})
-    private String name;
+    String getName();
 
-    private AddressDTO address;  // DTO imbriqué
+    AddressDTO getAddress();  // DTO imbriqué
 }
 
 @Projection(from = Address.class)
-public class AddressDTO {
+public interface AddressDTO {
 
     @ExposedAs(value = "CITY", operators = {Op.EQ, Op.MATCHES, Op.IN})
-    private String city;
+    String getCity();
 
     @ExposedAs(value = "COUNTRY", operators = {Op.EQ, Op.IN})
-    private String country;
+    String getCountry();
 }
 ```
 
@@ -630,7 +628,7 @@ PaginatedResult<User> result = query.execute(
 ```java
 @Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api/v2")
-public class UserDTO {
+public interface UserDTO {
     // ...
 }
 ```
@@ -644,18 +642,18 @@ Pour personnaliser l'exposition d'une propriété :
 ```java
 @Projection(from = User.class)
 @Exposure(value = "users", basePath = "/api")
-public class UserDTO {
+public interface UserDTO {
 
     @ExposedAs(value = "USERNAME", operators = {Op.EQ, Op.MATCHES})
-    private String name;
+    String getName();
 
-    @ExposedAs(exposed = false)  // Non exposé à l'API (pas filtrable)
-    private String internalId;
+    @ExposedAs(exposed = false)  // Non exposé à l'API (non filtrable)
+    String getInternalId();
 
     @ExposedAs(value = "EMAIL", operators = {Op.EQ, Op.MATCHES})
-    private String email;
+    String getEmail();
 
-    private Integer age;  // Sans @ExposedAs = non filtrable mais retourné dans la projection
+    Integer getAge();  // Sans @ExposedAs = non filtrable mais retourné dans la projection
 }
 ```
 
@@ -708,10 +706,10 @@ Les méthodes statiques sont idéales pour la **logique de prédicat pure** qui 
 public interface PersonDTO {
 
     @ExposedAs(value = "FIRST_NAME", operators = {Op.EQ, Op.MATCHES})
-    private String firstName;
+    String getFirstName();
 
     @ExposedAs(value = "LAST_NAME", operators = {Op.EQ, Op.MATCHES})
-    private String lastName;
+    String getLastName();
 
     /**
      * Champ virtuel : recherche dans firstName OU lastName.
