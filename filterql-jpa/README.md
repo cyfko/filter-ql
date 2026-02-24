@@ -2,9 +2,7 @@
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.cyfko/filterql-adapter-jpa)](https://search.maven.org/artifact/io.github.cyfko/filterql-adapter-jpa)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Build](https://github.com/cyfko/filterql-adapter-jpa/actions/workflows/ci.yml/badge.svg)](https://github.com/cyfko/filterql-adapter-jpa/actions)
 [![Java Version](https://img.shields.io/badge/Java-21%2B-blue)](https://adoptium.net/)
-[![codecov](https://codecov.io/gh/cyfko/filterql-adapter-jpa/badge.svg)](https://codecov.io/gh/cyfko/filterql-adapter-jpa)
 [![Javadoc](https://javadoc.io/badge2/io.github.cyfko/filterql-adapter-jpa/javadoc.svg)](https://javadoc.io/doc/io.github.cyfko/filterql-adapter-jpa)
 ---
 
@@ -58,6 +56,47 @@ The JPA Adapter translates FilterQL's framework-agnostic filter model into execu
 ---
 
 ## Quick Start
+
+### 0. Installation
+
+**Maven**:
+
+```xml
+<dependency>
+    <groupId>io.github.cyfko</groupId>
+    <artifactId>filterql-adapter-jpa</artifactId>
+    <version>2.0.0</version>
+</dependency>
+```
+
+Configure the annotation processor in the compiler plugin:
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+                <annotationProcessorPaths>
+                    <path>
+                        <groupId>io.github.cyfko</groupId>
+                        <artifactId>jpa-metamodel-processor</artifactId>
+                        <version>1.0.4</version>
+                    </path>
+                </annotationProcessorPaths>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+```
+
+**Gradle**:
+
+```kotlin
+implementation("io.github.cyfko:filterql-adapter-jpa:2.0.0")
+annotationProcessor("io.github.cyfko:jpa-metamodel-processor:1.0.4")
+```
 
 ### 1. Define PropertyReference
 
@@ -523,18 +562,6 @@ public enum AuthorPropertyRef implements PropertyReference {
     
     // Implementation maps BOOKS_YEAR -> "books.year"
 }
-```
-
----
-
-## Maven Dependency
-
-```xml
-<dependency>
-    <groupId>io.github.cyfko</groupId>
-    <artifactId>filterql-adapter-jpa</artifactId>
-    <version>2.0.0</version>
-</dependency>
 ```
 
 ---

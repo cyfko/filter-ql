@@ -37,7 +37,8 @@
     <scm>
         <connection>scm:git:git://github.com/cyfko/filter-ql</connection>
         <developerConnection>scm:git:git@github.com:cyfko/filter-ql.git</developerConnection>
-        <url>https://github.com/cyfko/filter-ql/tree/main/adapters/java/jpa</url>
+        <url>https://github.com/cyfko/filter-ql/tree/main/filterql-jpa</url>
+        <tag>HEAD</tag>
     </scm>
 
     <properties>
