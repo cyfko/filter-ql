@@ -10,7 +10,6 @@
     <name>FilterQL Spring Boot Starter</name>
     <description>
         ✨ Spring Boot Starter for FilterQL - Annotation-driven dynamic filtering REST APIs.
-        Auto-generates REST endpoints with search, count, and schema introspection.
         Supports custom result mappers, virtual fields, and endpoint customization.
     </description>
     <url>https://github.com/cyfko/filter-ql</url>
@@ -35,6 +34,7 @@
         <connection>scm:git:git://github.com/cyfko/filter-ql</connection>
         <developerConnection>scm:git:ssh://github.com:cyfko/filter-ql.git</developerConnection>
         <url>https://github.com/cyfko/filter-ql/tree/main/filterql-spring</url>
+        <tag>HEAD</tag>
     </scm>
 
     <parent>
