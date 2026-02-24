@@ -1,6 +1,4 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.cyfko</groupId>
     <artifactId>filterql-spring</artifactId>
@@ -41,7 +39,7 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>4.0.0</version>
-        <relativePath/>
+        <relativePath />
     </parent>
 
     <properties>
@@ -71,14 +69,14 @@
         <dependency>
             <groupId>io.github.cyfko</groupId>
             <artifactId>filterql-core</artifactId>
-            <version>${filterql-core.version}</version>
+            <version>4.0.2</version>
         </dependency>
 
         <!-- FilterQL JPA -->
         <dependency>
             <groupId>io.github.cyfko</groupId>
             <artifactId>filterql-adapter-jpa</artifactId>
-            <version>${filterql-jpa.version}</version>
+            <version>2.0.0</version>
         </dependency>
 
         <!-- ⚙️ Contexte Spring (ApplicationContext, @Configuration, etc.) -->
