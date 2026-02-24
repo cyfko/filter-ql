@@ -1,8 +1,9 @@
 # FilterQL Core Module
 
-**Version**: 4.0.1  
-**License**: MIT  
-**Java**: 21+
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.cyfko/filterql-core)](https://search.maven.org/artifact/io.github.cyfko/filterql-core)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Java Version](https://img.shields.io/badge/Java-21%2B-blue)](https://adoptium.net/)
+[![Javadoc](https://javadoc.io/badge2/io.github.cyfko/filterql-core/javadoc.svg)](https://javadoc.io/doc/io.github.cyfko/filterql-core)
 ---
 
 ## Overview
@@ -1149,7 +1150,7 @@ FilterQuery<MyExecutionContext> query = FilterQueryFactory.of(context, parser);
 <dependency>
     <groupId>io.github.cyfko</groupId>
     <artifactId>filterql-core</artifactId>
-    <version>4.0.1</version>
+    <version>4.0.2</version>
 </dependency>
 ```
 

@@ -1,10 +1,11 @@
 # FilterQL JPA Adapter
 
-**Version**: 2.0.0  
-**License**: MIT  
-**Java**: 21+  
-**Dependencies**: FilterQL Core 4.0.0, Jakarta Persistence API 3.1.0
-
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.cyfko/filterql-adapter-jpa)](https://search.maven.org/artifact/io.github.cyfko/filterql-adapter-jpa)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Build](https://github.com/cyfko/filterql-adapter-jpa/actions/workflows/ci.yml/badge.svg)](https://github.com/cyfko/filterql-adapter-jpa/actions)
+[![Java Version](https://img.shields.io/badge/Java-21%2B-blue)](https://adoptium.net/)
+[![codecov](https://codecov.io/gh/cyfko/filterql-adapter-jpa/badge.svg)](https://codecov.io/gh/cyfko/filterql-adapter-jpa)
+[![Javadoc](https://javadoc.io/badge2/io.github.cyfko/filterql-adapter-jpa/javadoc.svg)](https://javadoc.io/doc/io.github.cyfko/filterql-adapter-jpa)
 ---
 
 ## Overview

@@ -57,10 +57,10 @@
         <central-publishing-plugin.version>0.7.0</central-publishing-plugin.version>
 
         <!-- Dependencies Versions -->
-        <filterql-core.version>4.0.2-SNAPSHOT</filterql-core.version>
-        <projection-spec.version>2.0.0-SNAPSHOT</projection-spec.version>
-        <jpa-metamodel.version>2.0.0-SNAPSHOT</jpa-metamodel.version>
-        <jpa-processor.version>1.0.4-SNAPSHOT</jpa-processor.version>
+        <filterql-core.version>4.0.2</filterql-core.version>
+        <projection-spec.version>2.0.0</projection-spec.version>
+        <jpa-metamodel.version>2.0.1</jpa-metamodel.version>
+        <jpa-processor.version>1.0.4</jpa-processor.version>
         <jakarta-persistence.version>3.1.0</jakarta-persistence.version>
         <hibernate.version>6.6.8.Final</hibernate.version>
         <h2database.version>2.3.232</h2database.version>
