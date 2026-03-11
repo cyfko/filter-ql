@@ -2,7 +2,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.cyfko</groupId>
     <artifactId>filterql-spring</artifactId>
-    <version>4.0.1-SNAPSHOT</version>
+    <version>4.0.1</version>
     <packaging>jar</packaging>
 
     <name>FilterQL Spring Boot Starter</name>
@@ -32,7 +32,7 @@
         <connection>scm:git:git://github.com/cyfko/filter-ql</connection>
         <developerConnection>scm:git:git@github.com:cyfko/filter-ql.git</developerConnection>
         <url>https://github.com/cyfko/filter-ql/tree/main/filterql-spring</url>
-        <tag>filterql-spring-v4.0.0</tag>
+        <tag>filterql-spring-v4.0.1</tag>
     </scm>
 
     <parent>
@@ -43,7 +43,7 @@
     </parent>
 
     <properties>
-        <java.version>17</java.version>
+        <java.version>21</java.version>
         <spring.boot.version>3.3.5</spring.boot.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
