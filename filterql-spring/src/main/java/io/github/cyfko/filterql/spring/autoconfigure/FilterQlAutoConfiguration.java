@@ -1,11 +1,9 @@
 package io.github.cyfko.filterql.spring.autoconfigure;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.cyfko.filterql.jpa.JpaFilterContext;
 import io.github.cyfko.filterql.spring.projection.ProjectionJacksonModule;
 import io.github.cyfko.filterql.spring.support.FilterContextRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -76,16 +74,8 @@ public class FilterQlAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(ProjectionJacksonModule.class)
-    public com.fasterxml.jackson.databind.Module filterQlProjectionJacksonModule(ObjectMapper objectMapper) {
-        ProjectionJacksonModule projectionJacksonModule = new ProjectionJacksonModule();
-        objectMapper.registerModule(projectionJacksonModule);
-        return projectionJacksonModule;
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(ObjectMapper.class)
-    public ObjectMapper defaultObjectMapper() {
-        return new ObjectMapper();
+    public com.fasterxml.jackson.databind.Module filterQlProjectionJacksonModule() {
+        return new ProjectionJacksonModule();
     }
 
 }
